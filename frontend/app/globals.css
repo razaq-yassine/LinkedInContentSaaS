@@ -1,0 +1,210 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  /* LinkedIn Color System */
+  --linkedin-primary: #0A66C2;
+  --linkedin-primary-hover: #004182;
+  --linkedin-primary-light: #378FE9;
+  --linkedin-background: #F3F2F0;
+  --linkedin-surface: #FFFFFF;
+  --linkedin-surface-hover: #F9F9F9;
+  --linkedin-text: #000000;
+  --linkedin-text-secondary: #666666;
+  --linkedin-border: #E0DFDC;
+  --linkedin-success: #057642;
+  --linkedin-error: #CC1016;
+  
+  /* Base theme using LinkedIn colors */
+  --radius: 0.5rem;
+  --background: 243 242 240;  /* LinkedIn background #F3F2F0 */
+  --foreground: 0 0 0;  /* Black text */
+  --card: 255 255 255;  /* White cards */
+  --card-foreground: 0 0 0;
+  --popover: 255 255 255;
+  --popover-foreground: 0 0 0;
+  --primary: 10 102 194;  /* LinkedIn blue #0A66C2 */
+  --primary-foreground: 255 255 255;
+  --secondary: 240 240 240;
+  --secondary-foreground: 0 0 0;
+  --muted: 243 242 240;
+  --muted-foreground: 102 102 102;
+  --accent: 243 242 240;
+  --accent-foreground: 0 0 0;
+  --destructive: 204 16 22;  /* LinkedIn error red */
+  --border: 224 223 220;  /* LinkedIn border #E0DFDC */
+  --input: 224 223 220;
+  --ring: 10 102 194;  /* LinkedIn blue for focus rings */
+  --chart-1: 10 102 194;
+  --chart-2: 5 118 66;
+  --chart-3: 245 199 93;
+  --chart-4: 204 16 22;
+  --chart-5: 94 94 94;
+  --sidebar: 255 255 255;
+  --sidebar-foreground: 0 0 0;
+  --sidebar-primary: 10 102 194;
+  --sidebar-primary-foreground: 255 255 255;
+  --sidebar-accent: 243 242 240;
+  --sidebar-accent-foreground: 0 0 0;
+  --sidebar-border: 224 223 220;
+  --sidebar-ring: 10 102 194;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Fira Sans', Ubuntu, Oxygen, 'Oxygen Sans', Cantarell, 'Droid Sans', Arial, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+  
+  /* LinkedIn-style transitions */
+  button, a {
+    transition: all 200ms ease;
+  }
+  
+  /* LinkedIn-style shadows */
+  .shadow-linkedin-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  
+  .shadow-linkedin-md {
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  .shadow-linkedin-lg {
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
+  }
+  
+  /* LinkedIn button styles */
+  .btn-linkedin-primary {
+    background-color: var(--linkedin-primary);
+    color: white;
+    border-radius: 24px;
+    padding: 8px 16px;
+    font-weight: 600;
+    transition: background-color 200ms ease;
+  }
+  
+  .btn-linkedin-primary:hover {
+    background-color: var(--linkedin-primary-hover);
+  }
+}
+
+/* Image generation loading animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Progress bar animation (left to right) */
+@keyframes progress-bar {
+  0% {
+    width: 0%;
+    transform: translateX(0);
+  }
+  50% {
+    width: 70%;
+    transform: translateX(0);
+  }
+  100% {
+    width: 100%;
+    transform: translateX(0);
+  }
+}
+
+.animate-progress-bar {
+  animation: progress-bar 2s ease-in-out infinite;
+}
