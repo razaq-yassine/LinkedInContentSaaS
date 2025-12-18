@@ -31,6 +31,53 @@ class OnboardingPreviewResponse(BaseModel):
 class UpdatePreferencesRequest(BaseModel):
     preferences: Dict[str, Any]
 
+class OnboardingStateResponse(BaseModel):
+    user_id: str
+    current_step: int
+    onboarding_completed: bool
+    has_cv: bool
+    has_processed_profile: bool
+    profile_data: Optional[Dict[str, Any]] = None
+
+@router.get("/state", response_model=OnboardingStateResponse)
+async def get_onboarding_state(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current onboarding state and resume data
+    """
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    
+    if not profile:
+        profile = UserProfile(user_id=user_id, onboarding_step=1)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    
+    # Check if AI has already processed the CV
+    has_processed_profile = bool(profile.profile_md)
+    has_cv = bool(profile.cv_text)
+    
+    # Prepare profile data if it exists
+    profile_data = None
+    if has_processed_profile:
+        profile_data = {
+            "profile_md": profile.profile_md,
+            "writing_style_md": profile.writing_style_md,
+            "context_json": profile.context_json,
+            "preferences": profile.preferences
+        }
+    
+    return OnboardingStateResponse(
+        user_id=user_id,
+        current_step=profile.onboarding_step,
+        onboarding_completed=profile.onboarding_completed,
+        has_cv=has_cv,
+        has_processed_profile=has_processed_profile,
+        profile_data=profile_data
+    )
+
 @router.post("/start", response_model=OnboardingStartResponse)
 async def start_onboarding(
     user_id: str = Depends(get_current_user_id),

@@ -9,16 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255),
     linkedin_id VARCHAR(255) UNIQUE,
     account_type ENUM('person', 'business') DEFAULT 'person',
-    linkedin_access_token TEXT,
-    linkedin_refresh_token TEXT,
-    linkedin_token_expires_at TIMESTAMP,
-    linkedin_profile_data JSON,
-    linkedin_connected BOOLEAN DEFAULT FALSE,
-    linkedin_last_sync TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_email (email),
-    INDEX idx_linkedin (linkedin_id),
-    INDEX idx_linkedin_connected (linkedin_connected)
+    INDEX idx_linkedin (linkedin_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- User profiles table
@@ -51,20 +44,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     INDEX idx_user_created (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Conversation messages table (stores both user and AI messages)
-CREATE TABLE IF NOT EXISTS conversation_messages (
-    id VARCHAR(36) PRIMARY KEY,
-    conversation_id VARCHAR(36) NOT NULL,
-    role ENUM('user', 'assistant') NOT NULL,
-    content TEXT NOT NULL,
-    post_id VARCHAR(36),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
-    FOREIGN KEY (post_id) REFERENCES generated_posts(id) ON DELETE SET NULL,
-    INDEX idx_conversation_created (conversation_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Generated posts table
+-- Generated posts table (moved before conversation_messages)
 CREATE TABLE IF NOT EXISTS generated_posts (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -85,16 +65,29 @@ CREATE TABLE IF NOT EXISTS generated_posts (
     FULLTEXT INDEX ft_content (content)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Conversation messages table (stores both user and AI messages)
+CREATE TABLE IF NOT EXISTS conversation_messages (
+    id VARCHAR(36) PRIMARY KEY,
+    conversation_id VARCHAR(36) NOT NULL,
+    role ENUM('user', 'assistant') NOT NULL,
+    content TEXT NOT NULL,
+    post_id VARCHAR(36),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES generated_posts(id) ON DELETE SET NULL,
+    INDEX idx_conversation_created (conversation_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Generated images table (stores AI-generated images for posts)
 CREATE TABLE IF NOT EXISTS generated_images (
     id VARCHAR(36) PRIMARY KEY,
     post_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
-    image_data TEXT NOT NULL,  -- Base64 encoded image
+    image_data TEXT NOT NULL,
     prompt TEXT NOT NULL,
     model VARCHAR(255),
-    image_metadata JSON,  -- Renamed from metadata to avoid SQLAlchemy conflict
-    is_current BOOLEAN DEFAULT FALSE,  -- Mark current image for post
+    image_metadata JSON,
+    is_current BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES generated_posts(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -108,13 +101,13 @@ CREATE TABLE IF NOT EXISTS generated_pdfs (
     id VARCHAR(36) PRIMARY KEY,
     post_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
-    pdf_data TEXT NOT NULL,  -- Base64 encoded PDF
-    slide_images JSON,  -- Array of base64 slide images for preview
+    pdf_data TEXT NOT NULL,
+    slide_images JSON,
     slide_count INT NOT NULL,
-    prompts JSON NOT NULL,  -- Array of prompts used for each slide
+    prompts JSON NOT NULL,
     model VARCHAR(255),
     pdf_metadata JSON,
-    is_current BOOLEAN DEFAULT FALSE,  -- Mark current PDF for post
+    is_current BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES generated_posts(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -258,5 +251,3 @@ Mix these formats regularly for algorithm optimization:
 }', 'Default user preferences for content generation'),
 
 (UUID(), 'trending_topics', '["AI and automation in business", "Remote work best practices", "Career growth strategies", "Leadership lessons", "Industry-specific technical updates", "Productivity tips", "Workplace culture", "Professional development", "Tech trends", "Data-driven insights"]', 'Sample trending topics for suggestions');
-
-

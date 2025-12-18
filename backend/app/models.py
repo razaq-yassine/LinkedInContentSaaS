@@ -32,9 +32,18 @@ class User(Base):
     
     id = Column(String(36), primary_key=True, default=generate_uuid)
     email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=True)  # Null for OAuth-only users
     name = Column(String(255))
+    email_verified = Column(Boolean, default=False)
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
     linkedin_id = Column(String(255), unique=True, index=True)
     account_type = Column(SQLEnum(AccountType), default=AccountType.PERSON)
+    linkedin_access_token = Column(Text)
+    linkedin_refresh_token = Column(Text)
+    linkedin_token_expires_at = Column(DateTime)
+    linkedin_profile_data = Column(JSON)
+    linkedin_connected = Column(Boolean, default=False, index=True)
+    linkedin_last_sync = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -228,4 +237,25 @@ class AdminSetting(Base):
     value = Column(Text)
     description = Column(Text)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TokenType(str, enum.Enum):
+    EMAIL_VERIFICATION = "email_verification"
+    PASSWORD_RESET = "password_reset"
+
+
+class UserToken(Base):
+    """Stores tokens for email verification and password reset"""
+    __tablename__ = "user_tokens"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    token_type = Column(SQLEnum(TokenType), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
 

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LinkedInPostPreview } from "@/components/LinkedInPostPreview";
 import {
   Send,
@@ -526,7 +526,7 @@ export default function GeneratePage() {
                         userProfile={{
                           name: user?.name || "Your Name",
                           headline: "Professional | Content Creator",
-                          avatar: undefined,
+                          avatar: user?.linkedin_profile_picture,
                         }}
                         onCopyText={() => copyToClipboard(msg.post_content || msg.content)}
                         onCopyImagePrompt={() => {

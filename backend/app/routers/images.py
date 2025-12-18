@@ -124,19 +124,19 @@ async def generate_image_endpoint(
             detail=f"Image generation failed: {str(e)}"
         )
 
-@router.post("/generate-from-post", response_model=ImageGenerationResponse)
-async def generate_image_from_post_endpoint(
-    request: ImageFromPostRequest,
+@router.post("/generate/{post_id}", response_model=ImageGenerationResponse)
+async def generate_image_for_post(
+    post_id: str,
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
-    Generate an image for a specific LinkedIn post
+    Generate an image for a specific LinkedIn post by ID
     Automatically saves to database and marks as current
     """
     # Get the post
     post = db.query(GeneratedPost).filter(
-        GeneratedPost.id == request.post_id,
+        GeneratedPost.id == post_id,
         GeneratedPost.user_id == user_id
     ).first()
     
@@ -147,33 +147,31 @@ async def generate_image_from_post_endpoint(
         )
     
     try:
-        # Get image prompt from post options or use custom
-        image_prompt = request.custom_prompt
-        if not image_prompt and post.generation_options:
+        # Get image prompt from post options
+        image_prompt = None
+        if post.generation_options:
             image_prompt = post.generation_options.get("image_prompt")
         
         if not image_prompt:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No image prompt available for this post"
-            )
+            # Generate a default prompt based on post content
+            image_prompt = f"Professional LinkedIn post illustration: {post.content[:200]}"
         
         result = await generate_image_from_post(
             post_content=post.content,
             image_prompt=image_prompt,
-            post_format=post.format.value
+            post_format=post.format.value if post.format else "text"
         )
         
         # Mark all other images for this post as not current
         db.query(GeneratedImage).filter(
-            GeneratedImage.post_id == request.post_id
+            GeneratedImage.post_id == post_id
         ).update({"is_current": False})
         
         # Save new image
         image_id = str(uuid.uuid4())
         generated_image = GeneratedImage(
             id=image_id,
-            post_id=request.post_id,
+            post_id=post_id,
             user_id=user_id,
             image_data=result["image"],
             prompt=result["metadata"]["prompt"],
@@ -191,7 +189,7 @@ async def generate_image_from_post_endpoint(
             prompt=result["metadata"]["prompt"],
             model=result["metadata"]["model"],
             metadata=result["metadata"],
-            post_id=request.post_id,
+            post_id=post_id,
             is_current=True
         )
     

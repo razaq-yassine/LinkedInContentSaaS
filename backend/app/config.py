@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 class Settings(BaseSettings):
+    # Development mode - skips email verification
+    dev_mode: bool = True
+    
     # Database (SQLite for development)
     database_url: str = "sqlite:///./linkedin_content_saas.db"
     
@@ -33,9 +36,33 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
     
+    # LinkedIn OAuth
+    linkedin_client_id: str = ""
+    linkedin_client_secret: str = ""
+    linkedin_redirect_uri: str = "http://localhost:8000/api/auth/linkedin/callback"
+    
+    # Google OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+    
+    # SMTP Email Configuration
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""  # For Gmail, use App Password
+    smtp_from_email: str = ""
+    smtp_from_name: str = "ContentAI"
+    smtp_use_tls: bool = True
+    
+    # Token expiration
+    email_verification_expire_hours: int = 24
+    password_reset_expire_hours: int = 1
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "allow"
 
 @lru_cache()
 def get_settings():

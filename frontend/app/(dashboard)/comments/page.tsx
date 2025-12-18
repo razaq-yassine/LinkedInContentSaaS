@@ -25,7 +25,7 @@ export default function CommentsPage() {
     setLoading(true);
     try {
       // For MVP, we're using text instead of actual screenshot
-      const response = await api.generate.evaluateComment(postText);
+      const response = await api.comments.evaluate(postText);
       setEvaluation(response.data);
       setStep("evaluation");
     } catch (error: any) {
@@ -38,7 +38,7 @@ export default function CommentsPage() {
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const response = await api.generate.comment(postText, {});
+      const response = await api.comments.generate(postText);
       setComment(response.data.content);
       setStep("comment");
     } catch (error: any) {

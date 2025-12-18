@@ -183,7 +183,7 @@ export default function HistoryPage() {
                         userProfile={{
                           name: user?.name || "Your Name",
                           headline: "Professional | Content Creator",
-                          avatar: undefined,
+                          avatar: user?.linkedin_profile_picture,
                         }}
                         onCopyText={() => copyToClipboard(post.content)}
                         onCopyImagePrompt={() => {
@@ -202,14 +202,13 @@ export default function HistoryPage() {
                             copyToClipboard(formattedPrompts);
                           }
                         }}
-                        onGenerateImage={() => {
+                        onRegenerateImage={() => {
                           alert("Image generation coming soon! The prompt will be sent to an AI image generator.");
                         }}
                         onDownloadImage={() => alert("Image download coming soon!")}
                         onRegenerate={() => alert("Regenerate from history coming soon!")}
                         onSchedule={() => alert("Schedule feature coming soon!")}
                         onPost={() => alert("LinkedIn posting coming soon!")}
-                        hasGeneratedImage={false}
                         className="max-w-full"
                       />
                   </div>

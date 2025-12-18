@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ConversationList } from "@/components/ConversationList";
 import { 
   PenSquare, 
@@ -187,6 +187,9 @@ export default function DashboardLayout({
           <div className="border-t border-[#E0DFDC] p-4">
             <div className="flex items-center gap-3">
               <Avatar className="w-10 h-10">
+                {user.linkedin_profile_picture && (
+                  <AvatarImage src={user.linkedin_profile_picture} alt={user.name || "User"} />
+                )}
                 <AvatarFallback className="bg-[#0A66C2] text-white font-semibold">
                   {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
                 </AvatarFallback>

@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
+import { LinkedInConnect } from "@/components/LinkedInConnect";
+import { GoogleConnect } from "@/components/GoogleConnect";
 
 export default function SettingsPage() {
   const [preferences, setPreferences] = useState<any>(null);
@@ -96,13 +98,14 @@ export default function SettingsPage() {
               </p>
               
               <div className="space-y-8">
-                {Object.entries(preferences?.post_type_distribution || {}).map(([key, value]) => {
+                {Object.entries(preferences?.post_type_distribution || {}).map(([key, value]: [string, any]) => {
                   const labels: Record<string, string> = {
                     text_only: "Text Only",
                     text_with_image: "Text + Image",
                     carousel: "Carousel",
                     video: "Video",
                   };
+                  const numValue = Number(value);
                   return (
                     <div key={key}>
                       <div className="flex justify-between mb-3">
@@ -110,18 +113,18 @@ export default function SettingsPage() {
                           {labels[key] || key}
                         </Label>
                         <span className="text-sm font-bold text-[#0A66C2]">
-                          {value}%
+                          {numValue}%
                         </span>
                       </div>
                       {/* Visual bar */}
                       <div className="h-2 bg-[#E0DFDC] rounded-full mb-2 overflow-hidden">
                         <div
                           className="h-full bg-[#0A66C2] transition-all duration-300"
-                          style={{ width: `${value}%` }}
+                          style={{ width: `${numValue}%` }}
                         />
                       </div>
                       <Slider
-                        value={[value as number]}
+                        value={[numValue]}
                         onValueChange={(v) => updateDistribution(key, v[0])}
                         max={100}
                         step={5}
@@ -195,28 +198,42 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="account" className="mt-6">
-            <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
-              <h2 className="text-2xl font-bold text-black mb-4">Account Settings</h2>
-              <p className="text-[#666666] mb-6">
-                Manage your account preferences and subscription
-              </p>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-semibold text-black mb-2">Current Plan</h3>
-                  <div className="bg-[#F3F2F0] p-4 rounded-lg">
-                    <p className="text-lg font-bold text-[#0A66C2]">Free Plan</p>
-                    <p className="text-sm text-[#666666] mt-1">5 posts per month</p>
-                  </div>
+            <div className="space-y-6">
+              {/* Connected Accounts Section */}
+              <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
+                <h2 className="text-2xl font-bold text-black mb-6">Connected Accounts</h2>
+                <p className="text-[#666666] mb-6">
+                  Manage your linked social accounts
+                </p>
+                <div className="space-y-4">
+                  <LinkedInConnect />
+                  <GoogleConnect />
                 </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full border-[#E0DFDC] hover:border-[#0A66C2]" 
-                  disabled
-                >
-                  Upgrade Plan
-                </Button>
-              </div>
-            </Card>
+              </Card>
+              
+              <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
+                <h2 className="text-2xl font-bold text-black mb-4">Subscription</h2>
+                <p className="text-[#666666] mb-6">
+                  Manage your subscription plan
+                </p>
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-semibold text-black mb-2">Current Plan</h3>
+                    <div className="bg-[#F3F2F0] p-4 rounded-lg">
+                      <p className="text-lg font-bold text-[#0A66C2]">Free Plan</p>
+                      <p className="text-sm text-[#666666] mt-1">5 posts per month</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-[#E0DFDC] hover:border-[#0A66C2]" 
+                    disabled
+                  >
+                    Upgrade Plan
+                  </Button>
+                </div>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 

@@ -25,6 +25,8 @@ export default function Step4UploadCV({ onNext, onBack }: Step4Props) {
     }
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -34,11 +36,17 @@ export default function Step4UploadCV({ onNext, onBack }: Step4Props) {
       const droppedFile = e.dataTransfer.files[0];
       const validTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"];
       
-      if (validTypes.includes(droppedFile.type)) {
-        setFile(droppedFile);
-      } else {
+      if (!validTypes.includes(droppedFile.type)) {
         alert("Please upload a PDF or image file (JPG, PNG, WebP)");
+        return;
       }
+      
+      if (droppedFile.size > MAX_FILE_SIZE) {
+        alert("File size exceeds 10MB limit. Please upload a smaller file.");
+        return;
+      }
+      
+      setFile(droppedFile);
     }
   };
 
@@ -47,11 +55,17 @@ export default function Step4UploadCV({ onNext, onBack }: Step4Props) {
       const selectedFile = e.target.files[0];
       const validTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"];
       
-      if (validTypes.includes(selectedFile.type)) {
-        setFile(selectedFile);
-      } else {
+      if (!validTypes.includes(selectedFile.type)) {
         alert("Please upload a PDF or image file (JPG, PNG, WebP)");
+        return;
       }
+      
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        alert("File size exceeds 10MB limit. Please upload a smaller file.");
+        return;
+      }
+      
+      setFile(selectedFile);
     }
   };
 

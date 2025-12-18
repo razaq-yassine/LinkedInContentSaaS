@@ -21,13 +21,12 @@ export default function AdminPage() {
 
   const loadAdminData = async () => {
     try {
-      const [usersRes, statsRes, rulesRes] = await Promise.all([
+      const [usersRes, rulesRes] = await Promise.all([
         api.admin.getUsers(),
-        api.admin.getStats?.() || Promise.resolve({ data: {} }),
         api.admin.getRules(),
       ]);
       setUsers(usersRes.data);
-      setStats(statsRes.data);
+      setStats({});
       setRules(rulesRes.data);
     } catch (error) {
       console.error("Failed to load admin data:", error);
