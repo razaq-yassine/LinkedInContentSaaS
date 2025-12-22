@@ -1,5 +1,6 @@
 from openai import OpenAI
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from typing import Dict, List, Optional
 from ..config import get_settings
 
@@ -8,29 +9,34 @@ settings = get_settings()
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
-# Initialize Gemini client
-if settings.gemini_api_key:
-    genai.configure(api_key=settings.gemini_api_key)
-    # Use model from settings (default: gemini-2.5-flash)
-    gemini_model = genai.GenerativeModel(settings.gemini_model)
-else:
-    gemini_model = None
+# Initialize Gemini client (new SDK)
+gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
 
 async def generate_completion(
     system_prompt: str,
     user_message: str,
     model: Optional[str] = None,
-    temperature: float = 0.7
+    temperature: float = 0.7,
+    use_search: bool = False
 ) -> str:
     """
     Generate a completion using either OpenAI or Gemini based on AI_PROVIDER setting
-    Model parameter is optional - uses settings.openai_model or settings.gemini_model by default
+    
+    Args:
+        system_prompt: System instructions
+        user_message: User query
+        model: Optional model override (uses settings default if not provided)
+        temperature: Generation temperature
+        use_search: Enable web search (only supported by Gemini)
     """
     provider = settings.ai_provider.lower()
     
     if provider == "gemini":
-        return await _generate_with_gemini(system_prompt, user_message, temperature)
+        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search)
     elif provider == "openai":
+        if use_search:
+            # OpenAI doesn't have built-in search, fall back to standard completion
+            print("Warning: Web search not supported by OpenAI, using standard completion")
         # Use model from settings if not explicitly provided
         openai_model = model or settings.openai_model
         return await _generate_with_openai(system_prompt, user_message, openai_model, temperature)
@@ -66,27 +72,41 @@ async def _generate_with_openai(
 async def _generate_with_gemini(
     system_prompt: str,
     user_message: str,
-    temperature: float = 0.7
+    temperature: float = 0.7,
+    use_search: bool = False
 ) -> str:
     """
-    Generate a completion using Google Gemini API
+    Generate a completion using Google Gemini API (new google-genai SDK)
+    
+    Args:
+        system_prompt: System instructions
+        user_message: User query
+        temperature: Generation temperature
+        use_search: Enable Google Search grounding for web searches
     """
-    if not gemini_model:
+    if not gemini_client:
         raise Exception("Gemini API key not configured")
     
     try:
-        # Gemini doesn't have separate system/user roles in the same way
         # Combine system prompt with user message
         combined_prompt = f"{system_prompt}\n\n{user_message}"
         
-        # Configure generation
-        generation_config = genai.types.GenerationConfig(
-            temperature=temperature,
-        )
+        # Prepare configuration
+        config_params = {
+            "temperature": temperature,
+        }
         
-        response = gemini_model.generate_content(
-            combined_prompt,
-            generation_config=generation_config
+        # Add Google Search tool if requested
+        if use_search:
+            config_params["tools"] = [types.Tool(google_search=types.GoogleSearch())]
+        
+        config = types.GenerateContentConfig(**config_params)
+        
+        # Generate content using new SDK
+        response = gemini_client.models.generate_content(
+            model=settings.gemini_model,
+            contents=combined_prompt,
+            config=config,
         )
         
         return response.text
@@ -322,3 +342,119 @@ Output ONLY the title, nothing else."""
         words = first_message.split()[:4]
         return " ".join(words).title()
 
+async def find_trending_topics(expertise_areas: List[str], industry: str) -> List[Dict[str, str]]:
+    """
+    Find trending topics related to user's expertise and industry using web search
+    
+    Args:
+        expertise_areas: List of expertise areas from CV
+        industry: User's industry/sector
+    
+    Returns:
+        List of trending topics with title and description
+    """
+    system_prompt = """You are a trend analyst. Using current web search results, identify 5-7 trending topics 
+that are relevant to the user's expertise and industry.
+
+For each topic, provide:
+1. A concise title (3-5 words)
+2. A brief description (1-2 sentences) explaining why it's trending and relevant
+3. How it relates to their expertise
+
+Format your response as a JSON array:
+[
+  {
+    "title": "Topic Title",
+    "description": "Why this topic is trending and relevant...",
+    "relevance": "How it connects to their expertise..."
+  }
+]
+
+Focus on:
+- Current trends (last 3 months)
+- Topics with high engagement potential
+- Practical, actionable topics
+- Mix of technical and strategic topics"""
+
+    user_message = f"""Find trending topics for someone with this background:
+
+Expertise Areas: {', '.join(expertise_areas)}
+Industry: {industry}
+
+Search for current trends, hot topics, and emerging discussions in their field that would make great LinkedIn content."""
+
+    try:
+        result = await generate_completion(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=0.7,
+            use_search=True  # Enable web search
+        )
+        
+        # Parse JSON
+        import json
+        result = result.strip()
+        if result.startswith("```"):
+            result = result.split("```")[1]
+            if result.startswith("json"):
+                result = result[4:]
+        
+        topics = json.loads(result.strip())
+        return topics
+    except Exception as e:
+        print(f"Error finding trending topics: {str(e)}")
+        # Return default topics if search fails
+        return [
+            {
+                "title": "Industry Best Practices",
+                "description": "Current best practices and methodologies in your field",
+                "relevance": "Directly related to your expertise"
+            },
+            {
+                "title": "Emerging Technologies",
+                "description": "New technologies impacting your industry",
+                "relevance": "Helps position you as forward-thinking"
+            },
+            {
+                "title": "Professional Development",
+                "description": "Career growth and skill development topics",
+                "relevance": "Appeals to your target audience"
+            }
+        ]
+
+async def research_topic_with_search(topic: str, context: str = "") -> str:
+    """
+    Research a specific topic using web search for current information
+    
+    Args:
+        topic: The topic to research
+        context: Optional context about the user's perspective or expertise
+    
+    Returns:
+        Research summary with current insights
+    """
+    system_prompt = """You are a research assistant. Using current web search results, provide a comprehensive 
+but concise summary of the given topic.
+
+Include:
+- Current state and recent developments
+- Key statistics or data points
+- Different perspectives or approaches
+- Practical implications
+
+Keep it focused and actionable for LinkedIn content creation."""
+
+    user_message = f"Research this topic: {topic}"
+    if context:
+        user_message += f"\n\nContext: {context}"
+
+    try:
+        result = await generate_completion(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=0.7,
+            use_search=True
+        )
+        return result
+    except Exception as e:
+        raise Exception(f"Failed to research topic: {str(e)}")

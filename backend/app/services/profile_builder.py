@@ -4,9 +4,11 @@ from .ai_service import (
     generate_profile_from_cv,
     analyze_writing_style,
     generate_context_json,
-    generate_default_preferences
+    generate_default_preferences,
+    find_trending_topics
 )
 from ..models import UserProfile
+import json
 
 async def build_user_profile(
     user_id: str,
@@ -60,6 +62,32 @@ Hook → Context → Insight → Takeaway
     # Generate context JSON
     print(f"Generating context metadata...")
     context_json = await generate_context_json(cv_text, profile_md)
+    
+    # Find trending topics using web search
+    print(f"🔍 Finding trending topics using web search...")
+    print(f"   Expertise areas: {context_json.get('expertise_tags', [])}")
+    print(f"   Industry: {context_json.get('industry', 'General')}")
+    trending_topics = []
+    try:
+        # Extract expertise areas and industry from context
+        expertise_areas = context_json.get("expertise_tags", [])
+        industry = context_json.get("industry", "General")
+        
+        if expertise_areas:
+            print(f"   Searching web for trending topics...")
+            trending_topics = await find_trending_topics(expertise_areas, industry)
+            print(f"✅ Found {len(trending_topics)} trending topics:")
+            for i, topic in enumerate(trending_topics[:3], 1):
+                print(f"   {i}. {topic.get('title', 'N/A')}")
+        else:
+            print("⚠️  No expertise areas found, skipping trending topics search")
+    except Exception as e:
+        print(f"❌ Error finding trending topics: {str(e)}")
+        print(f"   Falling back to default topics")
+        trending_topics = []
+    
+    # Add trending topics to context
+    context_json["trending_topics"] = trending_topics
     
     # Generate preferences based on style choice
     print(f"Setting up preferences for style: {style_choice}...")

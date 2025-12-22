@@ -97,6 +97,15 @@ def build_post_generation_prompt(
     Build complete prompt for post generation including user context
     """
     
+    # Include trending topics if available
+    trending_topics_section = ""
+    trending_topics = context_json.get('trending_topics', [])
+    if trending_topics:
+        trending_topics_section = "\n## Trending Topics (Current)\n"
+        for topic in trending_topics[:5]:  # Show top 5
+            trending_topics_section += f"- **{topic.get('title', '')}**: {topic.get('description', '')}\n"
+        trending_topics_section += "\nConsider these trending topics if relevant to the user's request.\n"
+    
     system_prompt = f"""{CONTENT_GENERATION_SYSTEM_PROMPT}
 
 ## User Profile Context
@@ -104,7 +113,7 @@ def build_post_generation_prompt(
 
 ## Writing Style to Match
 {writing_style_md}
-
+{trending_topics_section}
 ## User Preferences
 - Tone: {context_json.get('tone', 'professional')}
 - Hashtag count: {options.get('hashtag_count', 4)}

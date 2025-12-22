@@ -14,7 +14,7 @@ from ..schemas.generation import (
     GenerationHistoryResponse,
     UpdateGenerationRequest
 )
-from ..services.ai_service import generate_completion, generate_conversation_title
+from ..services.ai_service import generate_completion, generate_conversation_title, research_topic_with_search
 from ..prompts.system_prompts import build_post_generation_prompt
 from ..prompts.templates import get_format_specific_instructions
 from ..prompts.format_instructions import (
@@ -94,12 +94,30 @@ async def generate_post(
         # Add JSON response instruction
         system_prompt += f"\n\n{RESPONSE_FORMAT_REQUIREMENTS}\n{json_format}"
         
+        # Determine if web search should be used
+        # Use web search for trending topics, current events, statistics, or research-heavy requests
+        use_web_search = False
+        search_keywords = ['trending', 'current', 'latest', 'recent', 'statistics', 'data', 'research', 'news', 'update']
+        message_lower = request.message.lower()
+        
+        # Check if message contains search-worthy keywords
+        if any(keyword in message_lower for keyword in search_keywords):
+            use_web_search = True
+            print(f"Enabling web search for request: {request.message[:50]}...")
+        
+        # Also check if user explicitly requested trending topics
+        topic_mode = request.options.get('topic_mode', 'auto')
+        if topic_mode == 'trending':
+            use_web_search = True
+            print("Enabling web search for trending topic request")
+        
         # Generate post
         try:
             raw_response = await generate_completion(
                 system_prompt=system_prompt,
                 user_message=request.message,
-                temperature=0.8
+                temperature=0.8,
+                use_search=use_web_search
             )
         except Exception as e:
             error_trace = traceback.format_exc()

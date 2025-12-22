@@ -46,9 +46,10 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
       </div>
 
       <Tabs defaultValue="profile" className="mb-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="style">Writing Style</TabsTrigger>
+          <TabsTrigger value="trending">Trending Topics</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
         </TabsList>
 
@@ -59,6 +60,25 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
                 {profileData.profile_md || "Generating profile..."}
               </pre>
             </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="trending">
+          <Card className="p-6">
+            <h3 className="font-bold text-lg mb-4">Trending Topics in Your Field</h3>
+            {profileData.context_json?.trending_topics?.length > 0 ? (
+              <div className="space-y-4">
+                {profileData.context_json.trending_topics.map((topic: any, index: number) => (
+                  <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
+                    <h4 className="font-semibold text-base mb-1">{topic.title}</h4>
+                    <p className="text-sm text-slate-600 mb-2">{topic.description}</p>
+                    <p className="text-xs text-slate-500 italic">{topic.relevance}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500">Finding trending topics in your field...</p>
+            )}
           </Card>
         </TabsContent>
 

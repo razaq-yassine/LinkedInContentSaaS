@@ -1,0 +1,47 @@
+# Cursor AI Rules for LinkedIn Content SaaS
+
+## Documentation Policy
+
+**DO NOT** create documentation files (*.md, README.md, GUIDE.md, etc.) unless explicitly requested by the user.
+
+### Rules:
+1. Focus on code implementation only
+2. Add inline code comments when necessary
+3. Update existing README.md if absolutely needed, but do not create new docs
+4. Do not create:
+   - Implementation guides
+   - Quick start guides
+   - Changelog files
+   - Summary documents
+   - Tutorial files
+   - Feature documentation
+   - Flow diagrams
+   - Any other markdown documentation files
+
+### Exceptions:
+- Only create documentation if user explicitly asks: "create documentation", "write a guide", "document this"
+- Code comments and docstrings are allowed and encouraged
+
+## Code Style
+
+### Python
+- Use type hints
+- Add docstrings to functions (brief, not extensive)
+- Keep code DRY (Don't Repeat Yourself)
+
+### TypeScript/React
+- Use TypeScript for type safety
+- Keep components focused and small
+- Use functional components with hooks
+
+## Testing
+- Create test files when implementing features
+- Use descriptive test names
+- Keep tests simple and focused
+
+## General
+- Prioritize working code over documentation
+- Ask clarifying questions if requirements are unclear
+- Implement fully before showing results
+- Clean up temporary files when done
+
