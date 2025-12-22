@@ -114,3 +114,4 @@ def get_json_format(post_type: str) -> str:
         return IMAGE_JSON_FORMAT
     return TEXT_JSON_FORMAT
 
+

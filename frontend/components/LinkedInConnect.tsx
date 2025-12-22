@@ -66,7 +66,7 @@ export function LinkedInConnect() {
   const handleSyncPosts = async () => {
     setSyncing(true);
     try {
-      const response = await api.auth.syncLinkedInPosts();
+      const response = await api.auth.linkedInSyncPosts();
       alert(`Successfully synced ${response.data.posts_count} posts!`);
       setLastSync(new Date().toISOString());
     } catch (error: any) {

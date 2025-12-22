@@ -111,3 +111,7 @@ out/
 *.backup
 *.old
 
+
+*.plan.md
+*.db
+*.db.backup*

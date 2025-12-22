@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircle, Mail } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import axios from "axios";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { api } from "@/lib/api-client";
 
 export function GoogleConnect() {
   const [connected, setConnected] = useState(false);
@@ -20,10 +18,7 @@ export function GoogleConnect() {
 
   const checkConnectionStatus = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_URL}/auth/google/status`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.auth.googleStatus();
       setConnected(response.data.connected);
       setProfileData(response.data.profile_data);
     } catch (error) {
@@ -34,7 +29,7 @@ export function GoogleConnect() {
   const handleConnect = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/auth/google/login`);
+      const response = await api.auth.googleLogin();
       const authUrl = response.data.authorization_url;
       window.location.href = authUrl;
     } catch (error: any) {
