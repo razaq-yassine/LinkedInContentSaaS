@@ -188,7 +188,7 @@ async def process_onboarding(
     db: Session = Depends(get_db)
 ):
     """
-    Process CV and writing samples to generate profile
+    Process CV and writing samples to generate profile with TOON context
     Step 4 - Main processing
     """
     profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
@@ -196,7 +196,7 @@ async def process_onboarding(
         raise HTTPException(status_code=400, detail="CV not found. Please upload CV first.")
     
     try:
-        # Build user profile using AI
+        # Build user profile using AI with TOON context
         profile_data = await build_user_profile(
             user_id=user_id,
             cv_text=profile.cv_text,
@@ -220,17 +220,42 @@ async def process_onboarding(
         updated_profile.onboarding_step = 5
         db.commit()
         
+        # Return structured profile context (parsed from TOON)
+        context_json = profile_data.get("context_json", {})
+        
         return {
             "success": True,
             "message": "Profile generated successfully",
             "profile": {
                 "profile_md": profile_data["profile_md"],
                 "writing_style_md": profile_data["writing_style_md"],
-                "context_json": profile_data["context_json"],
+                "profile_context": {
+                    "personal_info": {
+                        "name": context_json.get("name", ""),
+                        "current_role": context_json.get("current_role", ""),
+                        "company": context_json.get("company", ""),
+                        "industry": context_json.get("industry", ""),
+                        "years_experience": context_json.get("years_experience", 0)
+                    },
+                    "expertise": context_json.get("expertise", []),
+                    "target_audience": context_json.get("target_audience", []),
+                    "content_strategy": {
+                        "content_goals": context_json.get("content_goals", []),
+                        "posting_frequency": context_json.get("posting_frequency", "2-3x per week"),
+                        "tone": context_json.get("tone", "professional")
+                    },
+                    "content_mix": context_json.get("content_mix", []),
+                    "content_ideas_evergreen": context_json.get("content_ideas_evergreen", []),
+                    "content_ideas_trending": context_json.get("content_ideas_trending", []),
+                    "ai_generated_fields": profile_data.get("ai_generated_fields", [])
+                },
+                "context_json": context_json,  # Legacy field
                 "preferences": profile_data["preferences"]
             }
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Profile generation failed: {str(e)}")
 
 @router.get("/preview", response_model=OnboardingPreviewResponse)
@@ -273,6 +298,86 @@ async def update_preferences(
         "success": True,
         "message": "Preferences updated successfully"
     }
+
+@router.patch("/update-field")
+async def update_profile_field(
+    section: str,
+    field: str,
+    value: Any,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a specific field in the profile context
+    Used for inline editing during onboarding review
+    """
+    from ..utils.toon_parser import parse_toon_to_dict, dict_to_toon
+    
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    try:
+        # Get current context
+        context_json = profile.context_json or {}
+        
+        # Update the specific field
+        if section == "personal_info":
+            if field in ["name", "current_role", "company", "industry", "years_experience"]:
+                context_json[field] = value
+        elif section == "expertise":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="Expertise must be an array")
+            context_json["expertise"] = value
+        elif section == "target_audience":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="Target audience must be an array")
+            context_json["target_audience"] = value
+        elif section == "content_strategy":
+            if field in ["posting_frequency", "tone"]:
+                context_json[field] = value
+            elif field == "content_goals":
+                context_json["content_goals"] = value
+        elif section == "content_mix":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="Content mix must be an array")
+            context_json["content_mix"] = value
+        elif section == "content_ideas_evergreen":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="Content ideas must be an array")
+            context_json["content_ideas_evergreen"] = value
+        elif section == "content_ideas_trending":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="Content ideas must be an array")
+            context_json["content_ideas_trending"] = value
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown section: {section}")
+        
+        # Update database
+        profile.context_json = context_json
+        
+        # Regenerate TOON format
+        try:
+            toon_context = dict_to_toon(context_json)
+            if profile.custom_instructions:
+                profile.custom_instructions = f"TOON_CONTEXT:\n{toon_context}"
+        except Exception as e:
+            print(f"Warning: Could not regenerate TOON: {str(e)}")
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Field updated successfully",
+            "updated_context": context_json
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to update field: {str(e)}")
 
 @router.post("/complete")
 async def complete_onboarding(

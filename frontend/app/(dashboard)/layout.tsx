@@ -14,7 +14,8 @@ import {
   Settings, 
   Menu, 
   X,
-  LogOut
+  LogOut,
+  Sparkles
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 
@@ -112,6 +113,7 @@ export default function DashboardLayout({
     { href: "/generate", label: "Copilot", icon: MessageSquare },
     { href: "/history", label: "Posts Planning", icon: Calendar },
     { href: "/comments", label: "Comments", icon: MessageSquare },
+    { href: "/context", label: "Profile Context", icon: Sparkles },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

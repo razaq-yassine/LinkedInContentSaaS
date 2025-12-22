@@ -25,6 +25,18 @@ function OnboardingContent() {
   const [profileData, setProfileData] = useState<any>(null);
 
   useEffect(() => {
+    // Restore profile data from localStorage if on step 5
+    const savedProfileData = localStorage.getItem("onboarding_profile_data");
+    if (savedProfileData && step === 5) {
+      try {
+        setProfileData(JSON.parse(savedProfileData));
+      } catch (error) {
+        console.error("Failed to restore profile data:", error);
+      }
+    }
+  }, [step]);
+
+  useEffect(() => {
     // Check onboarding state on mount
     const checkOnboardingState = async () => {
       try {
@@ -124,7 +136,10 @@ function OnboardingContent() {
       try {
         const processResponse = await api.onboarding.process(styleChoice);
         console.log("Process response:", processResponse);
-        setProfileData(processResponse.data.profile);
+        const profileDataFromResponse = processResponse.data.profile;
+        setProfileData(profileDataFromResponse);
+        // Save to localStorage for persistence
+        localStorage.setItem("onboarding_profile_data", JSON.stringify(profileDataFromResponse));
         setStep(5);
       } catch (processError: any) {
         console.warn("Profile processing failed, skipping to generate:", processError);
@@ -155,6 +170,9 @@ function OnboardingContent() {
     try {
       // Update preferences
       await api.user.updatePreferences(preferences);
+
+      // Clear saved profile data
+      localStorage.removeItem("onboarding_profile_data");
 
       // Complete onboarding
       await api.onboarding.complete();

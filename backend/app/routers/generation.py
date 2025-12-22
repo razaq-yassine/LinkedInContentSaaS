@@ -54,14 +54,39 @@ async def generate_post(
                 detail="Please complete onboarding first"
             )
         
+        # Extract TOON context if available (stored in custom_instructions)
+        toon_context = None
+        if profile.custom_instructions and profile.custom_instructions.startswith("TOON_CONTEXT:"):
+            toon_context = profile.custom_instructions.replace("TOON_CONTEXT:\n", "")
+        
         # Build system prompt with user context
-        system_prompt = build_post_generation_prompt(
-            profile_md=profile.profile_md or "",
-            writing_style_md=profile.writing_style_md or "",
-            context_json=profile.context_json or {},
-            user_message=request.message,
-            options=request.options
-        )
+        # If TOON context is available, use it for token efficiency
+        if toon_context:
+            system_prompt = f"""You are a LinkedIn content expert. Generate high-quality LinkedIn posts based on the user's profile context.
+
+USER PROFILE CONTEXT (TOON format - token-efficient):
+{toon_context}
+
+WRITING STYLE:
+{profile.writing_style_md or "Professional, engaging, value-driven"}
+
+Generate content that:
+1. Matches the user's tone and expertise level
+2. Resonates with their target audience
+3. Follows their content strategy and goals
+4. Uses appropriate format (text/carousel/image/video)
+
+User request: {request.message}
+"""
+        else:
+            # Fallback to legacy JSON-based prompt
+            system_prompt = build_post_generation_prompt(
+                profile_md=profile.profile_md or "",
+                writing_style_md=profile.writing_style_md or "",
+                context_json=profile.context_json or {},
+                user_message=request.message,
+                options=request.options
+            )
         
         # Add format-specific instructions
         post_type = request.options.get('post_type', 'text')

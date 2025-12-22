@@ -1,7 +1,7 @@
 from openai import OpenAI
 from google import genai
 from google.genai import types
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from ..config import get_settings
 
 settings = get_settings()
@@ -259,6 +259,213 @@ Return a JSON object with this structure:
             }
         }
 
+async def generate_profile_context_toon(
+    cv_text: str, 
+    industry_hint: str = None
+) -> tuple[str, Dict[str, Any]]:
+    """
+    Generate comprehensive profile context in TOON format with intelligent defaults.
+    Returns (toon_string, metadata_dict) where metadata includes which fields were AI-generated.
+    
+    Args:
+        cv_text: Extracted CV text
+        industry_hint: Optional industry hint from user
+        
+    Returns:
+        Tuple of (TOON formatted string, metadata dict with ai_generated_fields)
+    """
+    system_prompt = """Extract comprehensive profile context from CV and generate intelligent defaults for missing fields.
+
+Output TOON format with these sections:
+
+1. PERSONAL INFO (extract from CV):
+name: [Full Name]
+current_role: [Job Title]
+company: [Company or "Independent Professional"]
+industry: [Specific industry]
+years_experience: [Number]
+
+2. EXPERTISE (extract skills/technologies with realistic assessment):
+expertise[N]{skill,level,years,ai_generated}:
+  [Skill],Expert|Advanced|Intermediate|Beginner,[Years],false|true
+  
+Levels: Expert (5+ years), Advanced (3-5), Intermediate (1-3), Beginner (<1)
+
+3. TARGET AUDIENCE (infer from role and industry):
+target_audience[N]{persona,description}:
+  [Audience Type],[1-2 sentence description]
+
+Examples:
+- Software engineers → "Software Developers,Early to mid-career developers learning best practices"
+- Marketing managers → "Marketing Professionals,Digital marketers looking to improve campaign performance"
+- Executives → "Business Leaders,C-level executives and senior managers seeking strategic insights"
+
+4. CONTENT STRATEGY (generate based on industry best practices):
+content_goals[N]: [Goal1],[Goal2],[Goal3],[Goal4]
+posting_frequency: [Recommended frequency based on industry]
+tone: [Appropriate tone for industry and role]
+
+Industry-specific tones:
+- Tech/Engineering: technical yet accessible, educator mindset
+- Marketing/Creative: engaging, storytelling-focused, visual
+- Healthcare: professional, empathetic, evidence-based
+- Finance/Legal: authoritative, data-driven, professional
+- Leadership/Executive: strategic, visionary, thought-leader
+
+5. CONTENT MIX (industry-appropriate percentages):
+content_mix[5]{category,percentage}:
+  [Category],[%]
+
+Tech default: Best Practices,30 | Tutorials,25 | Career Advice,20 | Trends,15 | Personal,10
+Marketing default: Case Studies,30 | Tips & Tricks,25 | Industry News,20 | Creative Ideas,15 | Personal,10
+Healthcare default: Research Insights,30 | Best Practices,25 | Patient Stories,20 | Industry News,15 | Personal,10
+
+6. AI-GENERATED TRACKING:
+ai_generated_fields[N]: [field1],[field2],...
+
+CRITICAL RULES:
+1. NEVER leave any field empty
+2. Mark fields as ai_generated:true if inferred (not directly in CV)
+3. Be specific and realistic - no generic placeholders
+4. Adjust all recommendations to industry context
+5. Posting frequency defaults: Tech/Creative (2-3x/week), Healthcare/Finance (1-2x/week), Executive (1x/week)
+
+Output only TOON format, no explanations."""
+
+    result = await generate_completion(
+        system_prompt=system_prompt,
+        user_message=f"CV Content:\n\n{cv_text}\n\n{f'Industry Hint: {industry_hint}' if industry_hint else ''}",
+        temperature=0.5
+    )
+    
+    # Parse metadata from the TOON result
+    try:
+        from ..utils.toon_parser import parse_toon_to_dict
+        parsed = parse_toon_to_dict(result)
+        
+        # Extract AI-generated fields list
+        ai_generated_fields = parsed.get('ai_generated_fields', [])
+        
+        metadata = {
+            'ai_generated_fields': ai_generated_fields,
+            'toon_format': result,
+            'parsed_data': parsed
+        }
+        
+        return result, metadata
+    except Exception as e:
+        print(f"Error parsing TOON result: {str(e)}")
+        # Return result anyway, let caller handle parsing
+        return result, {'ai_generated_fields': [], 'toon_format': result}
+
+
+async def generate_evergreen_content_ideas(
+    cv_text: str,
+    expertise_areas: List[str],
+    industry: str,
+    achievements: List[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Generate 10-15 evergreen content ideas based on CV achievements and expertise.
+    
+    Args:
+        cv_text: Full CV text
+        expertise_areas: List of expertise areas extracted from CV
+        industry: User's industry
+        achievements: Optional list of key achievements
+        
+    Returns:
+        List of content idea dicts with title, format, hook, why_relevant, ai_generated
+    """
+    system_prompt = """Generate 10-15 evergreen content ideas based on the person's experience and achievements.
+
+Each idea should be:
+- Specific to their actual experience (use real numbers, projects, technologies from CV)
+- Actionable and valuable for their target audience
+- Varied in format (mix of carousel, text, text_with_image, video)
+- Timeless (not trend-dependent)
+
+For each idea, output JSON array with:
+{
+  "title": "Compelling title based on real experience",
+  "format": "carousel|text|text_with_image|video",
+  "hook": "Opening line that grabs attention (use specific numbers/details from CV)",
+  "why_relevant": "Why this topic matters based on their unique experience",
+  "ai_generated": false
+}
+
+Format distribution aim:
+- Carousel: 40% (best for multi-point lessons, frameworks, before/after)
+- Text: 30% (best for stories, opinions, quick insights)
+- Text with image: 20% (best for single powerful concept with visual)
+- Video: 10% (best for tutorials, demos, personal messages)
+
+Examples of good hooks:
+- "5 years ago, I made a mistake that cost $50K..." (use real timeframe/numbers)
+- "After leading 15 teams, here's what nobody tells you about..."
+- "The framework I used to go from X to Y in [timeframe]..."
+
+Focus on their achievements, lessons learned, mistakes made, frameworks developed, and unique insights."""
+
+    achievements_text = ""
+    if achievements:
+        achievements_text = f"\n\nKey Achievements:\n" + "\n".join(f"- {a}" for a in achievements)
+    
+    user_message = f"""Generate evergreen content ideas for this professional:
+
+CV Excerpt:
+{cv_text[:2000]}
+
+Expertise Areas: {', '.join(expertise_areas)}
+Industry: {industry}{achievements_text}
+
+Create 10-15 unique, specific ideas based on their actual experience."""
+
+    try:
+        result = await generate_completion(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=0.7
+        )
+        
+        # Parse JSON array
+        import json
+        result = result.strip()
+        if result.startswith("```"):
+            result = result.split("```")[1]
+            if result.startswith("json"):
+                result = result[4:]
+        
+        ideas = json.loads(result.strip())
+        
+        # Ensure all ideas have required fields
+        for idea in ideas:
+            if 'ai_generated' not in idea:
+                idea['ai_generated'] = False
+                
+        return ideas[:15]  # Max 15 ideas
+        
+    except Exception as e:
+        print(f"Error generating evergreen ideas: {str(e)}")
+        # Return minimal default ideas
+        return [
+            {
+                "title": f"Lessons from {len(expertise_areas)} Years in {industry}",
+                "format": "carousel",
+                "hook": f"After working in {industry}, here's what I've learned...",
+                "why_relevant": "Based on your professional experience",
+                "ai_generated": True
+            },
+            {
+                "title": f"Key Skills Every {industry} Professional Needs",
+                "format": "text",
+                "hook": "The skills that matter most in today's market...",
+                "why_relevant": "Aligned with your expertise areas",
+                "ai_generated": True
+            }
+        ]
+
+
 async def generate_default_preferences(style_choice: str) -> Dict:
     """
     Generate default preferences based on style choice
@@ -344,34 +551,45 @@ Output ONLY the title, nothing else."""
 
 async def find_trending_topics(expertise_areas: List[str], industry: str) -> List[Dict[str, str]]:
     """
-    Find trending topics related to user's expertise and industry using web search
+    Find trending topics related to user's expertise and industry using web search.
+    Returns content ideas in format compatible with TOON structure.
     
     Args:
         expertise_areas: List of expertise areas from CV
         industry: User's industry/sector
     
     Returns:
-        List of trending topics with title and description
+        List of trending content ideas with title, format, hook, why_relevant, source
     """
-    system_prompt = """You are a trend analyst. Using current web search results, identify 5-7 trending topics 
+    system_prompt = """You are a trend analyst. Using current web search results, identify 5-10 trending topics 
 that are relevant to the user's expertise and industry.
 
 For each topic, provide:
-1. A concise title (3-5 words)
-2. A brief description (1-2 sentences) explaining why it's trending and relevant
-3. How it relates to their expertise
+1. A compelling title (5-8 words) that would work as a LinkedIn post
+2. Suggested format (carousel, text, text_with_image, or video)
+3. A hook - the opening line for the post
+4. Why it's relevant to this specific professional
+5. Mark source as "web_search"
 
 Format your response as a JSON array:
 [
   {
-    "title": "Topic Title",
-    "description": "Why this topic is trending and relevant...",
-    "relevance": "How it connects to their expertise..."
+    "title": "Compelling Post Title About Trending Topic",
+    "format": "carousel|text|text_with_image|video",
+    "hook": "Opening line that references current trend...",
+    "why_relevant": "Why this matters for their expertise/industry",
+    "source": "web_search"
   }
 ]
 
+Format selection guidelines:
+- Carousel: Multi-point trends, comparisons, predictions
+- Text: Opinion pieces, hot takes, analysis
+- Text with image: Single powerful stat or insight
+- Video: Demos, explanations, reactions
+
 Focus on:
-- Current trends (last 3 months)
+- Current trends (last 1-3 months)
 - Topics with high engagement potential
 - Practical, actionable topics
 - Mix of technical and strategic topics"""
@@ -400,25 +618,33 @@ Search for current trends, hot topics, and emerging discussions in their field t
                 result = result[4:]
         
         topics = json.loads(result.strip())
-        return topics
+        
+        # Ensure all topics have required fields
+        for topic in topics:
+            if 'source' not in topic:
+                topic['source'] = 'web_search'
+            if 'format' not in topic:
+                topic['format'] = 'text'
+                
+        return topics[:10]  # Max 10 trending topics
+        
     except Exception as e:
         print(f"Error finding trending topics: {str(e)}")
         # Return default topics if search fails
         return [
             {
-                "title": "Industry Best Practices",
-                "description": "Current best practices and methodologies in your field",
-                "relevance": "Directly related to your expertise"
+                "title": "Current Best Practices in Your Industry",
+                "format": "text",
+                "hook": "The industry is evolving fast. Here's what's working now...",
+                "why_relevant": "Directly related to your expertise",
+                "source": "web_search"
             },
             {
-                "title": "Emerging Technologies",
-                "description": "New technologies impacting your industry",
-                "relevance": "Helps position you as forward-thinking"
-            },
-            {
-                "title": "Professional Development",
-                "description": "Career growth and skill development topics",
-                "relevance": "Appeals to your target audience"
+                "title": "Emerging Technologies to Watch",
+                "format": "carousel",
+                "hook": "5 technologies that will change how we work...",
+                "why_relevant": "Helps position you as forward-thinking",
+                "source": "web_search"
             }
         ]
 

@@ -1,37 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { User, Briefcase, Users, Target, Lightbulb } from "lucide-react";
+import { User, Briefcase, Users, Target, Lightbulb, RefreshCw, Sparkles } from "lucide-react";
 import CollapsibleSection, { Field } from "@/components/onboarding/CollapsibleSection";
 import FieldEditor from "@/components/onboarding/FieldEditor";
 import { api } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 
-interface Step5Props {
-  profileData: any;
-  onComplete: (preferences: any) => void;
-  onBack: () => void;
-}
+export default function ContextPage() {
+  const [context, setContext] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshingTrending, setRefreshingTrending] = useState(false);
+  const [generatingIdeas, setGeneratingIdeas] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
-export default function Step5Preview({ profileData, onComplete, onBack }: Step5Props) {
-  const [context, setContext] = useState(profileData.profile_context || {});
-  const [preferences, setPreferences] = useState(
-    profileData.preferences || {
-      post_type_distribution: {
-        text_only: 40,
-        text_with_image: 30,
-        carousel: 25,
-        video: 5,
-      },
-      hashtag_count: 4,
+  useEffect(() => {
+    loadProfileContext();
+  }, []);
+
+  const loadProfileContext = async () => {
+    try {
+      setLoading(true);
+      const response = await api.user.getProfile();
+      const profile = response.data;
+      
+      // Build context structure from profile data
+      const profileContext = {
+        personal_info: {
+          name: profile.context_json?.name || "",
+          current_role: profile.context_json?.current_role || "",
+          company: profile.context_json?.company || "",
+          industry: profile.context_json?.industry || "",
+          years_experience: profile.context_json?.years_experience || 0,
+        },
+        expertise: profile.context_json?.expertise || [],
+        target_audience: profile.context_json?.target_audience || [],
+        content_strategy: {
+          content_goals: profile.context_json?.content_goals || [],
+          posting_frequency: profile.context_json?.posting_frequency || "2-3x per week",
+          tone: profile.context_json?.tone || "professional",
+        },
+        content_mix: profile.context_json?.content_mix || [],
+        content_ideas_evergreen: profile.context_json?.content_ideas_evergreen || [],
+        content_ideas_trending: profile.context_json?.content_ideas_trending || [],
+        ai_generated_fields: profile.context_json?.ai_generated_fields || [],
+      };
+
+      setContext(profileContext);
+    } catch (error) {
+      console.error("Failed to load profile context:", error);
+      alert("Failed to load profile. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  );
-
-  const aiGeneratedFields = context.ai_generated_fields || [];
+  };
 
   const handleFieldUpdate = async (section: string, fieldKey: string, value: any) => {
     try {
+      setSaveStatus("saving");
+      
       // Update local state
       const updatedContext = { ...context };
       if (section === "personal_info") {
@@ -45,10 +73,85 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
 
       // Save to backend
       await api.onboarding.updateField(section, fieldKey, value);
+      
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
       console.error("Failed to update field:", error);
+      setSaveStatus("idle");
+      alert("Failed to save changes. Please try again.");
     }
   };
+
+  const handleRefreshTrending = async () => {
+    try {
+      setRefreshingTrending(true);
+      
+      // Call backend to refresh trending topics
+      const response = await api.user.refreshTrendingTopics();
+      
+      // Update context with new trending topics
+      setContext({
+        ...context,
+        content_ideas_trending: response.data.trending_topics || [],
+      });
+      
+      alert("Trending topics refreshed successfully!");
+    } catch (error) {
+      console.error("Failed to refresh trending topics:", error);
+      alert("Failed to refresh trending topics. Please try again.");
+    } finally {
+      setRefreshingTrending(false);
+    }
+  };
+
+  const handleGenerateMoreIdeas = async () => {
+    try {
+      setGeneratingIdeas(true);
+      
+      // Call backend to generate more content ideas
+      const response = await api.user.generateContentIdeas();
+      
+      // Add new ideas to existing ones
+      setContext({
+        ...context,
+        content_ideas_evergreen: [
+          ...context.content_ideas_evergreen,
+          ...(response.data.content_ideas || []),
+        ],
+      });
+      
+      alert(`Generated ${response.data.content_ideas?.length || 0} new content ideas!`);
+    } catch (error) {
+      console.error("Failed to generate content ideas:", error);
+      alert("Failed to generate content ideas. Please try again.");
+    } finally {
+      setGeneratingIdeas(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A66C2] mx-auto"></div>
+          <p className="mt-4 text-[#666666]">Loading your profile context...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!context) {
+    return (
+      <div className="max-w-4xl mx-auto py-12">
+        <div className="text-center">
+          <p className="text-[#666666]">No profile context found. Please complete onboarding first.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const aiGeneratedFields = context.ai_generated_fields || [];
 
   // Personal Information Fields
   const personalInfoFields: Field[] = [
@@ -94,31 +197,6 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
     },
   ];
 
-  // Expertise Fields
-  const expertiseFields: Field[] = [
-    {
-      key: "expertise",
-      label: "Skills & Expertise",
-      value: context.expertise || [],
-      type: "array",
-      aiGenerated: aiGeneratedFields.includes("expertise"),
-      editable: true,
-    },
-  ];
-
-  // Target Audience Fields
-  const targetAudienceFields: Field[] = [
-    {
-      key: "target_audience",
-      label: "Target Audience",
-      value: context.target_audience || [],
-      type: "array",
-      aiGenerated: aiGeneratedFields.includes("target_audience"),
-      aiReasoning: "Inferred from your role and industry",
-      editable: true,
-    },
-  ];
-
   // Content Strategy Fields
   const contentStrategyFields: Field[] = [
     {
@@ -160,44 +238,26 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
     },
   ];
 
-  // Content Mix Fields
-  const contentMixFields: Field[] = [
-    {
-      key: "content_mix",
-      label: "Content Mix",
-      value: context.content_mix || [],
-      type: "array",
-      aiGenerated: aiGeneratedFields.includes("content_mix"),
-      aiReasoning: "Industry-specific content distribution",
-      editable: true,
-    },
-  ];
-
-  // Combined Content Ideas (Evergreen + Trending)
   const evergreenIdeas = context.content_ideas_evergreen || [];
   const trendingIdeas = context.content_ideas_trending || [];
-  const contentIdeasFields: Field[] = [
-    {
-      key: "content_ideas",
-      label: "Content Ideas",
-      value: [...evergreenIdeas, ...trendingIdeas],
-      type: "array",
-      aiGenerated: false,
-      editable: false,
-    },
-  ];
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold mb-2">Review Your Profile Context</h2>
-        <p className="text-slate-600">
-          Review and edit the AI-generated profile. Fields marked with{" "}
-          <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
-            ✨ AI Suggested
-          </span>{" "}
-          were intelligently generated based on your CV.
-        </p>
+    <div className="max-w-4xl mx-auto py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Profile Context</h1>
+            <p className="text-slate-600">
+              Manage your profile context used for generating LinkedIn posts
+            </p>
+          </div>
+          {saveStatus !== "idle" && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              {saveStatus === "saving" ? "Saving..." : "✓ Saved"}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4 mb-8">
@@ -207,7 +267,7 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
           description="Your basic professional details"
           fields={personalInfoFields}
           onFieldUpdate={(key, value) => handleFieldUpdate("personal_info", key, value)}
-          defaultExpanded={true}
+          defaultExpanded={false}
           icon={<User className="h-5 w-5" />}
         >
           {personalInfoFields.map((field) => (
@@ -230,7 +290,7 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
         <CollapsibleSection
           title="Expertise & Skills"
           description="Your professional skills and experience levels"
-          fields={expertiseFields}
+          fields={[{ key: "expertise", label: "Skills", value: context.expertise, type: "array" }]}
           onFieldUpdate={(key, value) => handleFieldUpdate("expertise", key, value)}
           icon={<Briefcase className="h-5 w-5" />}
         >
@@ -267,7 +327,7 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
         <CollapsibleSection
           title="Target Audience"
           description="Who you're creating content for"
-          fields={targetAudienceFields}
+          fields={[{ key: "target_audience", label: "Audience", value: context.target_audience, type: "array" }]}
           onFieldUpdate={(key, value) => handleFieldUpdate("target_audience", key, value)}
           icon={<Users className="h-5 w-5" />}
         >
@@ -309,7 +369,7 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
         <CollapsibleSection
           title="Content Mix"
           description="Distribution of content types"
-          fields={contentMixFields}
+          fields={[{ key: "content_mix", label: "Mix", value: context.content_mix, type: "array" }]}
           onFieldUpdate={(key, value) => handleFieldUpdate("content_mix", key, value)}
           icon={<Target className="h-5 w-5" />}
         >
@@ -327,11 +387,53 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
         <CollapsibleSection
           title="Content Ideas"
           description={`${evergreenIdeas.length + trendingIdeas.length} topic ideas for your LinkedIn posts`}
-          fields={contentIdeasFields}
+          fields={[{ key: "content_ideas", label: "Ideas", value: [], type: "array" }]}
           onFieldUpdate={() => {}}
           icon={<Lightbulb className="h-5 w-5" />}
         >
           <div className="space-y-6">
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button
+                onClick={handleGenerateMoreIdeas}
+                disabled={generatingIdeas}
+                variant="outline"
+                size="sm"
+                className="border-[#0A66C2] text-[#0A66C2] hover:bg-[#EEF3F8]"
+              >
+                {generatingIdeas ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#0A66C2] mr-2"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate More Ideas
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleRefreshTrending}
+                disabled={refreshingTrending}
+                variant="outline"
+                size="sm"
+                className="border-purple-600 text-purple-700 hover:bg-purple-50"
+              >
+                {refreshingTrending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600 mr-2"></div>
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Trending Topics
+                  </>
+                )}
+              </Button>
+            </div>
+
             {/* Topic Ideas Section */}
             {evergreenIdeas.length > 0 && (
               <div>
@@ -396,15 +498,7 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
           </div>
         </CollapsibleSection>
       </div>
-
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
-          ← Back
-        </Button>
-        <Button onClick={() => onComplete(preferences)} size="lg">
-          Complete Setup →
-        </Button>
-      </div>
     </div>
   );
 }
+
