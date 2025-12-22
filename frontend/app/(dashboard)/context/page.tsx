@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, Briefcase, Users, Target, Lightbulb, RefreshCw, Sparkles } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import CollapsibleSection, { Field } from "@/components/onboarding/CollapsibleSection";
 import FieldEditor from "@/components/onboarding/FieldEditor";
 import { api } from "@/lib/api-client";
@@ -501,13 +502,16 @@ export default function ContextPage() {
         </CollapsibleSection>
 
         {/* Additional Context and Rules */}
-        <CollapsibleSection
-          title="Additional Context and Rules"
-          description="Specify tone, style, format preferences, content guidelines, brand voice, topics to avoid, or any specific rules for content generation"
-          fields={[{ key: "additional_context", label: "Additional Context", value: context.additional_context || "", type: "text" }]}
-          onFieldUpdate={(key, value) => handleFieldUpdate("additional_context", key, value)}
-          icon={<Sparkles className="h-5 w-5" />}
-        >
+        <div className="bg-white rounded-xl shadow-linkedin-md border border-[#E0DFDC] p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-black">Additional Context and Rules</h3>
+              <p className="text-sm text-[#666666]">Specify tone, style, format preferences, content guidelines, brand voice, topics to avoid, or any specific rules for content generation</p>
+            </div>
+          </div>
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium text-black mb-2 block">
@@ -525,7 +529,7 @@ export default function ContextPage() {
               </p>
             </div>
           </div>
-        </CollapsibleSection>
+        </div>
       </div>
     </div>
   );
