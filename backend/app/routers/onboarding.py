@@ -350,19 +350,22 @@ async def update_profile_field(
             if not isinstance(value, list):
                 raise HTTPException(status_code=400, detail="Content ideas must be an array")
             context_json["content_ideas_trending"] = value
+        elif section == "additional_context":
+            # Store additional_context in context_json
+            context_json["additional_context"] = value
         else:
             raise HTTPException(status_code=400, detail=f"Unknown section: {section}")
         
         # Update database
         profile.context_json = context_json
         
-        # Regenerate TOON format
+        # Always regenerate TOON format from updated context_json
         try:
             toon_context = dict_to_toon(context_json)
-            if profile.custom_instructions:
-                profile.custom_instructions = f"TOON_CONTEXT:\n{toon_context}"
+            profile.custom_instructions = f"TOON_CONTEXT:\n{toon_context}"
         except Exception as e:
             print(f"Warning: Could not regenerate TOON: {str(e)}")
+            # If TOON generation fails, still update context_json but keep existing custom_instructions
         
         db.commit()
         

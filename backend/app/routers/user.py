@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List
 
@@ -64,36 +64,74 @@ async def get_user_profile(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     
+    # Extract additional_context from context_json for backward compatibility
+    context_json = profile.context_json or {}
+    additional_context = context_json.get("additional_context", "")
+    
+    # If additional_context is not in context_json, try to extract from custom_instructions
+    if not additional_context and profile.custom_instructions:
+        if profile.custom_instructions.startswith("TOON_CONTEXT:"):
+            # Extract from TOON if it exists there
+            toon_content = profile.custom_instructions.replace("TOON_CONTEXT:\n", "")
+            try:
+                from ..utils.toon_parser import parse_toon_to_dict
+                parsed = parse_toon_to_dict(toon_content)
+                additional_context = parsed.get("additional_context", "")
+            except:
+                pass
+        else:
+            # Legacy: use custom_instructions as additional_context
+            additional_context = profile.custom_instructions
+    
     return UserProfileResponse(
         user_id=profile.user_id,
         profile_md=profile.profile_md,
         writing_style_md=profile.writing_style_md,
         context_json=profile.context_json,
         preferences=profile.preferences,
+        custom_instructions=additional_context,  # Return additional_context as custom_instructions for backward compatibility
         onboarding_step=profile.onboarding_step,
         onboarding_completed=profile.onboarding_completed
     )
 
 @router.put("/profile/custom-instructions")
 async def update_custom_instructions(
-    instructions: str,
+    request: Dict[str, str],
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """
-    Update custom instructions
+    Update additional context (stored in context_json, not custom_instructions)
     """
+    from ..utils.toon_parser import dict_to_toon
+    
     profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
     
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     
-    profile.custom_instructions = instructions
+    additional_context = request.get("instructions", "")
+    
+    # Update context_json with additional_context
+    context_json = profile.context_json or {}
+    context_json["additional_context"] = additional_context
+    
+    # Update the profile
+    profile.context_json = context_json
+    
+    # Always regenerate TOON from context_json and store it
+    try:
+        toon_context = dict_to_toon(context_json)
+        profile.custom_instructions = f"TOON_CONTEXT:\n{toon_context}"
+    except Exception as e:
+        print(f"Warning: Could not regenerate TOON: {str(e)}")
+        # If TOON generation fails, still update context_json but keep existing custom_instructions
+    
     db.commit()
     
     return {
         "success": True,
-        "message": "Custom instructions updated"
+        "message": "Additional context updated"
     }
 
 @router.post("/refresh-trending-topics")

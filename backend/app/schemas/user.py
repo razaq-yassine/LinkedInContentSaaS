@@ -16,6 +16,7 @@ class UserProfileResponse(BaseModel):
     writing_style_md: Optional[str]
     context_json: Optional[Dict[str, Any]]
     preferences: Optional[Dict[str, Any]]
+    custom_instructions: Optional[str]
     onboarding_step: int
     onboarding_completed: bool
     

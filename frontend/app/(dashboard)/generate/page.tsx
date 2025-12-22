@@ -11,7 +11,10 @@ import {
   Settings2,
   X,
   Users,
-  Sparkles
+  Sparkles,
+  CheckCircle2,
+  TrendingUp,
+  FileText
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -21,8 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { ContextConfigModal } from "@/components/ContextConfigModal";
+import { GenerationOptionsMenu } from "@/components/GenerationOptionsMenu";
+import { PostTypeMenu } from "@/components/PostTypeMenu";
 
 interface Message {
   id: string;
@@ -50,7 +62,13 @@ export default function GeneratePage() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [showContextModal, setShowContextModal] = useState(false);
+  const [hasContext, setHasContext] = useState(false);
+  const [useTrendingTopic, setUseTrendingTopic] = useState(false);
+  const [showPostTypeMenu, setShowPostTypeMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
+  const postTypeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Track generated images by message ID (post ID)
   const [currentImages, setCurrentImages] = useState<Record<string, string>>({}); // post_id -> base64 image
@@ -68,16 +86,86 @@ export default function GeneratePage() {
   const [showPdfHistory, setShowPdfHistory] = useState<Record<string, boolean>>({}); // post_id -> boolean
 
   // Generation options
-  const [postType, setPostType] = useState("auto");
-  const [tone, setTone] = useState("professional");
-  const [length, setLength] = useState("medium");
-  const [hashtagCount, setHashtagCount] = useState(4);
+  // Default values
+  const DEFAULT_POST_TYPE = "auto";
+  const DEFAULT_TONE = "professional";
+  const DEFAULT_LENGTH = "medium";
+  const DEFAULT_HASHTAG_COUNT = 4;
+
+  // Load saved options from localStorage
+  const loadSavedOptions = () => {
+    if (typeof window === "undefined") {
+      return {
+        postType: DEFAULT_POST_TYPE,
+        tone: DEFAULT_TONE,
+        length: DEFAULT_LENGTH,
+        hashtagCount: DEFAULT_HASHTAG_COUNT,
+      };
+    }
+
+    const saved = localStorage.getItem("generationOptions");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          postType: parsed.postType || DEFAULT_POST_TYPE,
+          tone: parsed.tone || DEFAULT_TONE,
+          length: parsed.length || DEFAULT_LENGTH,
+          hashtagCount: parsed.hashtagCount ?? DEFAULT_HASHTAG_COUNT,
+        };
+      } catch {
+        return {
+          postType: DEFAULT_POST_TYPE,
+          tone: DEFAULT_TONE,
+          length: DEFAULT_LENGTH,
+          hashtagCount: DEFAULT_HASHTAG_COUNT,
+        };
+      }
+    }
+    return {
+      postType: DEFAULT_POST_TYPE,
+      tone: DEFAULT_TONE,
+      length: DEFAULT_LENGTH,
+      hashtagCount: DEFAULT_HASHTAG_COUNT,
+    };
+  };
+
+  const savedOptions = loadSavedOptions();
+  const [postType, setPostType] = useState(savedOptions.postType);
+  const [tone, setTone] = useState(savedOptions.tone);
+  const [length, setLength] = useState(savedOptions.length);
+  const [hashtagCount, setHashtagCount] = useState(savedOptions.hashtagCount);
+  const [contextTone, setContextTone] = useState<string | null>(null);
+
+  // Save options to localStorage whenever they change
+  useEffect(() => {
+    const options = {
+      postType,
+      tone,
+      length,
+      hashtagCount,
+    };
+    localStorage.setItem("generationOptions", JSON.stringify(options));
+  }, [postType, tone, length, hashtagCount]);
+
+  // Get the effective default tone (from context if available, otherwise fallback)
+  const effectiveDefaultTone = contextTone || DEFAULT_TONE;
+  
+  // Check if options are changed from defaults
+  const areOptionsChanged =
+    postType !== DEFAULT_POST_TYPE ||
+    tone !== effectiveDefaultTone ||
+    length !== DEFAULT_LENGTH ||
+    hashtagCount !== DEFAULT_HASHTAG_COUNT;
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
       setUser(JSON.parse(userData));
     }
+
+    // Check if user has context
+    checkContext();
 
     // Load conversation if ID is provided, otherwise clear messages
     if (conversationId) {
@@ -86,6 +174,68 @@ export default function GeneratePage() {
       setMessages([]);
     }
   }, [conversationId]);
+
+  const checkContext = async () => {
+    try {
+      const response = await api.user.getProfile();
+      const contextJson = response.data?.context_json;
+      setHasContext(!!contextJson && Object.keys(contextJson).length > 0);
+      
+      // Extract tone from TOON context
+      if (contextJson?.tone) {
+        let toneFromContext = contextJson.tone.toLowerCase().trim();
+        
+        // Normalize tone values to match select options
+        const toneMap: Record<string, string> = {
+          'professional': 'professional',
+          'casual': 'casual',
+          'thought-leader': 'thought-leader',
+          'thought leader': 'thought-leader',
+          'educator': 'educator',
+          'technical yet accessible': 'professional',
+          'engaging': 'casual',
+          'storytelling-focused': 'casual',
+          'authoritative': 'professional',
+          'strategic': 'thought-leader',
+          'visionary': 'thought-leader',
+        };
+        
+        // Map to known tone or use as-is if it matches
+        const normalizedTone = toneMap[toneFromContext] || toneFromContext;
+        
+        // Only use if it's one of our valid options
+        const validTones = ['professional', 'casual', 'thought-leader', 'educator'];
+        if (validTones.includes(normalizedTone)) {
+          setContextTone(normalizedTone);
+          
+          // If user hasn't saved a custom tone preference, use context tone
+          const saved = localStorage.getItem("generationOptions");
+          if (!saved) {
+            setTone(normalizedTone);
+          } else {
+            try {
+              const parsed = JSON.parse(saved);
+              // Only update if no tone was saved or if it's still the default
+              if (!parsed.tone || parsed.tone === DEFAULT_TONE) {
+                setTone(normalizedTone);
+              }
+            } catch {
+              setTone(normalizedTone);
+            }
+          }
+        } else {
+          setContextTone(DEFAULT_TONE);
+        }
+      }
+    } catch (error: any) {
+      // Silently fail - network errors shouldn't break the UI
+      // Only log if it's not a network error (which is expected if backend is down)
+      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
+        console.error("Failed to check context:", error);
+      }
+      setHasContext(false);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -800,15 +950,62 @@ export default function GeneratePage() {
               className="border-0 resize-none focus-visible:ring-0 text-base px-5 py-4"
             />
             <div className="px-4 py-3 bg-[#F9F9F9] border-t border-[#E0DFDC] flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowOptions(!showOptions)}
-                className="text-[#666666]"
-              >
-                <Settings2 className="w-4 h-4 mr-2" />
-                Options
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowContextModal(true)}
+                  className={`text-[#666666] ${hasContext ? 'hover:bg-green-50' : ''}`}
+                >
+                  Context
+                  {hasContext ? (
+                    <CheckCircle2 className="w-4 h-4 ml-2 text-green-600" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 ml-2 text-gray-400" />
+                  )}
+                </Button>
+                <div ref={postTypeButtonRef} className="inline-block">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPostTypeMenu(!showPostTypeMenu)}
+                    className={`text-[#666666] hover:bg-[#F3F2F0] ${
+                      showPostTypeMenu ? "bg-[#F3F2F0]" : ""
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    {postType === "auto" ? "Auto-detect" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType}
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setUseTrendingTopic(!useTrendingTopic)}
+                  className={`${
+                    useTrendingTopic
+                      ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
+                      : "text-[#666666] hover:bg-orange-50 hover:text-orange-600"
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Trending
+                </Button>
+                <div ref={optionsButtonRef} className="inline-block">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowOptions(!showOptions)}
+                    className={`${
+                      areOptionsChanged
+                        ? "text-purple-600 bg-purple-50 hover:bg-purple-100"
+                        : "text-[#666666] hover:bg-purple-50 hover:text-purple-600"
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Options
+                  </Button>
+                </div>
+              </div>
               <Button
                 onClick={handleSend}
                 disabled={loading || !input.trim()}
@@ -820,80 +1017,40 @@ export default function GeneratePage() {
             </div>
           </div>
 
-          {/* Options Panel */}
-          {showOptions && (
-            <div className="mt-3 bg-white rounded-xl shadow-linkedin-md border border-[#E0DFDC] p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm text-black">Generation Options</h3>
-                <button
-                  onClick={() => setShowOptions(false)}
-                  className="p-1 hover:bg-[#F3F2F0] rounded transition-colors"
-                >
-                  <X className="w-4 h-4 text-[#666666]" />
-                </button>
-              </div>
+          {/* Post Type Menu */}
+          <PostTypeMenu
+            open={showPostTypeMenu}
+            onOpenChange={setShowPostTypeMenu}
+            postType={postType}
+            setPostType={setPostType}
+            triggerRef={postTypeButtonRef}
+          />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-[#666666]">Post Type</Label>
-                  <Select value={postType} onValueChange={setPostType}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto-detect</SelectItem>
-                      <SelectItem value="text">Text Only</SelectItem>
-                      <SelectItem value="carousel">Carousel</SelectItem>
-                      <SelectItem value="image">Text + Image</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-xs text-[#666666]">Tone</Label>
-                  <Select value={tone} onValueChange={setTone}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="casual">Casual</SelectItem>
-                      <SelectItem value="thought-leader">Thought Leader</SelectItem>
-                      <SelectItem value="educator">Educator</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-xs text-[#666666]">Length</Label>
-                  <Select value={length} onValueChange={setLength}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="short">Short</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="long">Long</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-xs text-[#666666]">
-                    Hashtags: {hashtagCount}
-                  </Label>
-                  <Slider
-                    value={[hashtagCount]}
-                    onValueChange={(v) => setHashtagCount(v[0])}
-                    max={10}
-                    step={1}
-                    className="mt-2"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Generation Options Menu */}
+          <GenerationOptionsMenu
+            open={showOptions}
+            onOpenChange={setShowOptions}
+            tone={tone}
+            setTone={setTone}
+            length={length}
+            setLength={setLength}
+            hashtagCount={hashtagCount}
+            setHashtagCount={setHashtagCount}
+            triggerRef={optionsButtonRef}
+          />
         </div>
+
+        {/* Context Configuration Modal */}
+        <ContextConfigModal
+          open={showContextModal}
+          onOpenChange={(open) => {
+            setShowContextModal(open);
+            if (!open) {
+              // Refresh context status when modal is closed
+              checkContext();
+            }
+          }}
+        />
       </div>
     </div>
   );

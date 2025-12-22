@@ -54,18 +54,50 @@ async def generate_post(
                 detail="Please complete onboarding first"
             )
         
-        # Extract TOON context if available (stored in custom_instructions)
+        # Extract TOON context - prioritize regenerating from context_json
         toon_context = None
-        if profile.custom_instructions and profile.custom_instructions.startswith("TOON_CONTEXT:"):
+        additional_context = ""
+        
+        # First, try to get TOON from context_json (most up-to-date)
+        if profile.context_json:
+            from ..utils.toon_parser import dict_to_toon
+            try:
+                toon_context = dict_to_toon(profile.context_json)
+                # Extract additional_context for prioritization
+                additional_context = profile.context_json.get("additional_context", "")
+            except Exception as e:
+                print(f"Warning: Could not generate TOON from context_json: {str(e)}")
+        
+        # Fallback: try to extract from custom_instructions if TOON not generated
+        if not toon_context and profile.custom_instructions and profile.custom_instructions.startswith("TOON_CONTEXT:"):
             toon_context = profile.custom_instructions.replace("TOON_CONTEXT:\n", "")
+            # Try to parse TOON to extract additional_context
+            if toon_context:
+                try:
+                    from ..utils.toon_parser import parse_toon_to_dict
+                    parsed = parse_toon_to_dict(toon_context)
+                    additional_context = parsed.get("additional_context", "")
+                except:
+                    pass
         
         # Build system prompt with user context
         # If TOON context is available, use it for token efficiency
         if toon_context:
+            # Prioritize additional_context if it exists
+            additional_context_section = ""
+            if additional_context and additional_context.strip():
+                additional_context_section = f"""
+
+## ADDITIONAL CONTEXT AND RULES (HIGHEST PRIORITY - MUST FOLLOW):
+{additional_context}
+
+IMPORTANT: The above additional context and rules take precedence over all other context. Follow these instructions strictly when generating content.
+"""
+            
             system_prompt = f"""You are a LinkedIn content expert. Generate high-quality LinkedIn posts based on the user's profile context.
 
 USER PROFILE CONTEXT (TOON format - token-efficient):
-{toon_context}
+{toon_context}{additional_context_section}
 
 WRITING STYLE:
 {profile.writing_style_md or "Professional, engaging, value-driven"}
@@ -75,6 +107,7 @@ Generate content that:
 2. Resonates with their target audience
 3. Follows their content strategy and goals
 4. Uses appropriate format (text/carousel/image/video)
+5. STRICTLY adheres to any additional context and rules provided above
 
 User request: {request.message}
 """

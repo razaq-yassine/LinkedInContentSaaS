@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, Briefcase, Users, Target, Lightbulb, RefreshCw, Sparkles } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import CollapsibleSection, { Field } from "@/components/onboarding/CollapsibleSection";
 import FieldEditor from "@/components/onboarding/FieldEditor";
 import { api } from "@/lib/api-client";
@@ -45,6 +46,7 @@ export default function ContextPage() {
         content_ideas_evergreen: profile.context_json?.content_ideas_evergreen || [],
         content_ideas_trending: profile.context_json?.content_ideas_trending || [],
         ai_generated_fields: profile.context_json?.ai_generated_fields || [],
+        additional_context: profile.context_json?.additional_context || profile.custom_instructions || "",
       };
 
       setContext(profileContext);
@@ -495,6 +497,33 @@ export default function ContextPage() {
                 </div>
               </div>
             )}
+          </div>
+        </CollapsibleSection>
+
+        {/* Additional Context and Rules */}
+        <CollapsibleSection
+          title="Additional Context and Rules"
+          description="Specify tone, style, format preferences, content guidelines, brand voice, topics to avoid, or any specific rules for content generation"
+          fields={[{ key: "additional_context", label: "Additional Context", value: context.additional_context || "", type: "text" }]}
+          onFieldUpdate={(key, value) => handleFieldUpdate("additional_context", key, value)}
+          icon={<Sparkles className="h-5 w-5" />}
+        >
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-black mb-2 block">
+                Additional Context and Rules (Optional)
+              </Label>
+              <Textarea
+                placeholder="Specify tone, style, format preferences, content guidelines, brand voice, topics to avoid, or any specific rules for content generation..."
+                value={context.additional_context || ""}
+                onChange={(e) => handleFieldUpdate("additional_context", "additional_context", e.target.value)}
+                rows={6}
+                className="resize-none"
+              />
+              <p className="text-xs text-[#666666] mt-2">
+                {(context.additional_context || "").length}/500 characters
+              </p>
+            </div>
           </div>
         </CollapsibleSection>
       </div>

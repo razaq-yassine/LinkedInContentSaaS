@@ -82,6 +82,9 @@ async def build_user_profile(
     parsed_context['content_ideas_evergreen'] = evergreen_ideas
     parsed_context['content_ideas_trending'] = trending_ideas
     
+    # Step 6.5: Initialize additional_context as empty (user-editable, not AI-generated)
+    parsed_context['additional_context'] = ""
+    
     # Step 7: Regenerate complete TOON with content ideas
     try:
         complete_toon = dict_to_toon(parsed_context)
