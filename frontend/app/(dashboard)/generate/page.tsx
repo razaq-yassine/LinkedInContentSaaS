@@ -14,7 +14,11 @@ import {
   Sparkles,
   CheckCircle2,
   TrendingUp,
-  FileText
+  FileText,
+  Zap,
+  Image,
+  Layers,
+  Check
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -438,6 +442,101 @@ export default function GeneratePage() {
     }
   };
 
+  const handleInspiration = async () => {
+    if (loading) return;
+
+    // User-friendly message to show in UI
+    const displayMessage = "I need inspiration";
+    // Backend message that triggers random topic generation
+    const backendMessage = "Generate me a random post";
+
+    const userMessageObj: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: displayMessage,
+    };
+
+    setMessages((prev) => [...prev, userMessageObj]);
+    setLoading(true);
+
+    try {
+      const options = {
+        post_type: postType,
+        tone,
+        length,
+        hashtag_count: hashtagCount,
+      };
+
+      const response = await api.generate.post(
+        backendMessage, // Send random trigger to backend
+        options,
+        undefined,
+        conversationId || undefined
+      );
+      const data = response.data;
+
+      const assistantMessage: Message = {
+        id: data.id,
+        role: "assistant",
+        content: data.post_content || data.content,
+        post_content: data.post_content,
+        format_type: data.format_type || data.format,
+        image_prompt: data.image_prompt,
+        image_prompts: data.image_prompts,
+        post_id: data.id,
+        metadata: data.metadata,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      // Store post ID mapping
+      setPostIdMap(prev => ({ ...prev, [assistantMessage.id]: data.id }));
+
+      // Auto-generate image/PDF based on format
+      if (assistantMessage.format_type === 'image' && assistantMessage.image_prompt) {
+        const postId = data.id;
+        autoGenerateImage(postId, assistantMessage.image_prompt);
+      } else if (assistantMessage.format_type === 'carousel') {
+        const postId = data.id;
+        if (assistantMessage.image_prompts && assistantMessage.image_prompts.length > 0) {
+          autoGenerateCarouselPDF(postId, assistantMessage.image_prompts);
+        } else if (assistantMessage.image_prompt) {
+          autoGenerateCarouselPDF(postId, [assistantMessage.image_prompt]);
+        }
+      }
+
+      // If this is a new conversation, update URL
+      if (!conversationId && data.conversation_id) {
+        router.push(`/generate?conversation=${data.conversation_id}`);
+        window.dispatchEvent(new CustomEvent("conversationCreated"));
+      }
+    } catch (error: any) {
+      console.error("Inspiration generation failed:", error);
+
+      let errorText = "Sorry, I encountered an error generating your post. Please try again.";
+      if (error.response?.data?.detail) {
+        errorText = error.response.data.detail;
+        if (errorText.includes("onboarding")) {
+          errorText = "Please complete onboarding first. Redirecting...";
+          setTimeout(() => {
+            router.push("/onboarding");
+          }, 2000);
+        }
+      } else if (error.message) {
+        errorText = error.message;
+      }
+
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: errorText,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
@@ -623,32 +722,99 @@ export default function GeneratePage() {
         <div className="space-y-6 mb-6">
           {messages.length === 0 && (
             <div className="text-center py-20">
-              <div className="w-16 h-16 bg-[#E7F3FF] rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-[#0A66C2]" />
-              </div>
-              <h2 className="text-2xl font-bold text-black mb-2">
-                What would you like to create today?
-              </h2>
-              <p className="text-[#666666] mb-8">
-                Tell me about your topic, and I'll create an engaging LinkedIn post
-              </p>
-              <div className="max-w-md mx-auto text-left space-y-2">
-                <p className="text-sm font-semibold text-[#666666]">Example prompts:</p>
-                <div className="space-y-2">
-                  {[
-                    "Write a post about AI in sales automation",
-                    "Create a carousel on leadership best practices",
-                    "Share insights on remote team management",
-                  ].map((example, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setInput(example)}
-                      className="block w-full text-left px-4 py-3 bg-white border border-[#E0DFDC] rounded-lg hover:border-[#0A66C2] hover:shadow-linkedin-sm transition-all text-sm text-black"
-                    >
-                      {example}
-                    </button>
-                  ))}
+              <div className="max-w-2xl mx-auto">
+                {/* Icon */}
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <Sparkles className="w-10 h-10 text-purple-600" />
                 </div>
+                
+                {/* Heading */}
+                <h2 className="text-3xl font-bold text-black mb-3">
+                  Need inspiration?
+                </h2>
+                
+                {/* Description */}
+                <p className="text-lg text-[#666666] mb-8 max-w-lg mx-auto leading-relaxed">
+                  Let AI generate a unique LinkedIn post tailored to your expertise and style. 
+                  Click below to get started instantly.
+                </p>
+                
+                {/* Inspiration Button */}
+                <div className="mb-8">
+                  <Button
+                    onClick={handleInspiration}
+                    disabled={loading}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full px-10 py-7 text-lg font-semibold shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    size="lg"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 mr-2" />
+                        Generate random post for me
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Post Type Selection Cards */}
+                <div className="mb-8">
+                  <p className="text-sm text-[#666666] mb-4 text-center">Select post type:</p>
+                  <div className="flex items-center justify-center gap-3 flex-wrap">
+                    {[
+                      { value: "auto", label: "Choose for me", icon: Zap },
+                      { value: "image", label: "Text + Image", icon: Image },
+                      { value: "text", label: "Text Only", icon: FileText },
+                      { value: "carousel", label: "Carousel", icon: Layers },
+                    ].map((type) => {
+                      const IconComponent = type.icon;
+                      const isSelected = postType === type.value;
+                      return (
+                        <button
+                          key={type.value}
+                          onClick={() => setPostType(type.value)}
+                          className={`
+                            relative w-24 h-24 rounded-xl border-2 transition-all duration-200
+                            flex flex-col items-center justify-center gap-2
+                            ${isSelected
+                              ? "bg-gradient-to-br from-purple-50 to-blue-50 border-purple-500 shadow-lg scale-105"
+                              : "bg-white border-[#E0DFDC] hover:border-purple-300 hover:shadow-md"
+                            }
+                          `}
+                        >
+                          <IconComponent
+                            className={`w-6 h-6 ${
+                              isSelected ? "text-purple-600" : "text-[#666666]"
+                            }`}
+                          />
+                          <span
+                            className={`text-xs font-medium text-center px-1 ${
+                              isSelected ? "text-purple-600" : "text-[#666666]"
+                            }`}
+                          >
+                            {type.label}
+                          </span>
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5">
+                              <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Helper text */}
+                <p className="text-sm text-[#999999]">
+                  Or type your own topic in the input below
+                </p>
               </div>
             </div>
           )}
@@ -934,7 +1100,7 @@ export default function GeneratePage() {
         </div>
 
         {/* Input Area */}
-        <div className="sticky bottom-0 pb-6">
+        <div className="sticky bottom-0 pb-6 z-10">
           <div className="bg-white rounded-2xl shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden">
             <Textarea
               placeholder="Describe what you want to post about..."
@@ -974,7 +1140,7 @@ export default function GeneratePage() {
                     }`}
                   >
                     <FileText className="w-4 h-4 mr-2" />
-                    {postType === "auto" ? "Auto-detect" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType}
+                    {postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType}
                   </Button>
                 </div>
                 <Button
