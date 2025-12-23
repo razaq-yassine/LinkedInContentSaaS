@@ -18,6 +18,7 @@ const postTypes = [
   { value: "image", label: "Text + Image" },
   { value: "text", label: "Text Only" },
   { value: "carousel", label: "Carousel" },
+  { value: "video_script", label: "Video script" },
 ];
 
 export function PostTypeMenu({

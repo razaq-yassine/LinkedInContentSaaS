@@ -93,7 +93,49 @@ def get_format_specific_instructions(format_type: str) -> str:
         "text": "Plain text post with single-line formatting, no images.",
         "carousel": f"{CAROUSEL_TEMPLATE}",
         "image": f"{TEXT_IMAGE_TEMPLATE}",
-        "video": "Create a video script with: Hook (first 3 seconds), Main content (structure in 3 parts), CTA ending."
+        "video_script": """Generate a comprehensive LinkedIn video script as a SINGLE FORMATTED TEXT STRING.
+
+CRITICAL: Output the script as readable text, NOT as a dictionary or structured object.
+
+STRUCTURE (format as readable text with section markers):
+[Hook - 3-5 seconds]
+Your attention-grabbing opening line here. Make it conversational and engaging.
+
+[Introduction - 10-15 seconds]
+Set up the topic and why it matters. Brief background or personal connection. Establish credibility.
+
+[Main Content - 40-60 seconds]
+Break down into 2-3 key points:
+
+Point 1: [Brief point title]
+[Visual cue: what to show/do]
+Your script text here with natural pauses and conversational flow. Include pacing notes like [pause] or [emphasize].
+
+Point 2: [Brief point title]
+[Visual cue: what to show/do]
+Your script text here.
+
+Point 3: [Brief point title]
+[Visual cue: what to show/do]
+Your script text here.
+
+[Summary - 10-15 seconds]
+Reinforce the key takeaway. One clear message viewers should remember. Tie back to the hook if possible.
+
+[CTA - 5-10 seconds]
+Clear call-to-action. Ask a question, request comments, or suggest follow-up action. Keep it natural.
+
+TOTAL DURATION: 60-90 seconds
+
+WRITING STYLE:
+- Write as a SINGLE CONTINUOUS TEXT STRING
+- Conversational and natural (as if speaking, not reading)
+- Include visual cues in brackets: [show screen], [gesture], [pause]
+- Use short sentences and natural pauses
+- Format sections clearly with [Section Name] markers
+- Make it engaging and valuable
+
+OUTPUT FORMAT: Return ONLY the formatted script text as a string in the "post_content" field. Do NOT return a dictionary or structured object."""
     }
     
     return instructions.get(format_type, instructions["text"])

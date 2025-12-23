@@ -17,7 +17,8 @@ async def generate_completion(
     user_message: str,
     model: Optional[str] = None,
     temperature: float = 0.7,
-    use_search: bool = False
+    use_search: bool = False,
+    conversation_history: Optional[List[Dict[str, str]]] = None
 ) -> str:
     """
     Generate a completion using either OpenAI or Gemini based on AI_PROVIDER setting
@@ -28,18 +29,19 @@ async def generate_completion(
         model: Optional model override (uses settings default if not provided)
         temperature: Generation temperature
         use_search: Enable web search (only supported by Gemini)
+        conversation_history: Optional list of previous messages in format [{"role": "user|assistant", "content": "..."}]
     """
     provider = settings.ai_provider.lower()
     
     if provider == "gemini":
-        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search)
+        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search, conversation_history)
     elif provider == "openai":
         if use_search:
             # OpenAI doesn't have built-in search, fall back to standard completion
             print("Warning: Web search not supported by OpenAI, using standard completion")
         # Use model from settings if not explicitly provided
         openai_model = model or settings.openai_model
-        return await _generate_with_openai(system_prompt, user_message, openai_model, temperature)
+        return await _generate_with_openai(system_prompt, user_message, openai_model, temperature, conversation_history)
     else:
         raise Exception(f"Unknown AI provider: {provider}")
 
@@ -47,21 +49,44 @@ async def _generate_with_openai(
     system_prompt: str,
     user_message: str,
     model: str = "gpt-4o",
-    temperature: float = 0.7
+    temperature: float = 0.7,
+    conversation_history: Optional[List[Dict[str, str]]] = None
 ) -> str:
     """
     Generate a completion using OpenAI API
+    
+    Args:
+        system_prompt: System instructions
+        user_message: Current user query
+        model: Model name
+        temperature: Generation temperature
+        conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
     """
     if not openai_client:
         raise Exception("OpenAI API key not configured")
     
     try:
+        # Build messages array with system prompt, conversation history, and current user message
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history if provided
+        if conversation_history:
+            for msg in conversation_history:
+                # Ensure role is valid (user or assistant)
+                role = msg.get("role", "user")
+                if role not in ["user", "assistant"]:
+                    role = "user"
+                messages.append({
+                    "role": role,
+                    "content": msg.get("content", "")
+                })
+        
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
+        
         response = openai_client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
+            messages=messages,
             temperature=temperature
         )
         
@@ -73,23 +98,39 @@ async def _generate_with_gemini(
     system_prompt: str,
     user_message: str,
     temperature: float = 0.7,
-    use_search: bool = False
+    use_search: bool = False,
+    conversation_history: Optional[List[Dict[str, str]]] = None
 ) -> str:
     """
     Generate a completion using Google Gemini API (new google-genai SDK)
     
     Args:
         system_prompt: System instructions
-        user_message: User query
+        user_message: Current user query
         temperature: Generation temperature
         use_search: Enable Google Search grounding for web searches
+        conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
     """
     if not gemini_client:
         raise Exception("Gemini API key not configured")
     
     try:
-        # Combine system prompt with user message
-        combined_prompt = f"{system_prompt}\n\n{user_message}"
+        # Build conversation history string if provided
+        history_text = ""
+        if conversation_history:
+            history_parts = []
+            for msg in conversation_history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role == "user":
+                    history_parts.append(f"User: {content}")
+                elif role == "assistant":
+                    history_parts.append(f"Assistant: {content}")
+            if history_parts:
+                history_text = "\n\n".join(history_parts) + "\n\n"
+        
+        # Combine system prompt, conversation history, and current user message
+        combined_prompt = f"{system_prompt}\n\n{history_text}User: {user_message}"
         
         # Prepare configuration
         config_params = {

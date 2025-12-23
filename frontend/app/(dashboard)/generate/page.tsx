@@ -18,7 +18,8 @@ import {
   Zap,
   Image,
   Layers,
-  Check
+  Check,
+  Video
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -93,7 +94,7 @@ export default function GeneratePage() {
   // Default values
   const DEFAULT_POST_TYPE = "auto";
   const DEFAULT_TONE = "professional";
-  const DEFAULT_LENGTH = "medium";
+  const DEFAULT_LENGTH = "short";
   const DEFAULT_HASHTAG_COUNT = 4;
 
   // Load saved options from localStorage
@@ -155,9 +156,8 @@ export default function GeneratePage() {
   // Get the effective default tone (from context if available, otherwise fallback)
   const effectiveDefaultTone = contextTone || DEFAULT_TONE;
   
-  // Check if options are changed from defaults
+  // Check if options are changed from defaults (excluding postType which is managed separately)
   const areOptionsChanged =
-    postType !== DEFAULT_POST_TYPE ||
     tone !== effectiveDefaultTone ||
     length !== DEFAULT_LENGTH ||
     hashtagCount !== DEFAULT_HASHTAG_COUNT;
@@ -537,6 +537,71 @@ export default function GeneratePage() {
     }
   };
 
+  // Parse user prompt for length and hashtag preferences
+  const parsePromptPreferences = (userMessage: string) => {
+    const messageLower = userMessage.toLowerCase();
+    
+    // Parse length preferences
+    let parsedLength = length; // Default to current setting
+    if (messageLower.includes('long') || messageLower.includes('lengthy') || messageLower.includes('extended')) {
+      parsedLength = 'long';
+    } else if (messageLower.includes('short') || messageLower.includes('brief') || messageLower.includes('concise')) {
+      parsedLength = 'short';
+    } else if (messageLower.includes('medium') || messageLower.includes('moderate')) {
+      parsedLength = 'medium';
+    }
+    
+    // Parse hashtag count preferences
+    let parsedHashtagCount = hashtagCount; // Default to current setting
+    
+    // Look for explicit hashtag count requests
+    const hashtagPatterns = [
+      /(\d+)\s*hashtags?/i,
+      /hashtags?.*?(\d+)/i,
+      /(\d+)\s*tags?/i,
+      /tags?.*?(\d+)/i,
+      /more\s+hashtags?/i,
+      /add\s+more\s+hashtags?/i,
+      /include\s+more\s+hashtags?/i,
+      /extra\s+hashtags?/i,
+      /fewer\s+hashtags?/i,
+      /less\s+hashtags?/i,
+      /no\s+hashtags?/i,
+      /without\s+hashtags?/i,
+    ];
+    
+    for (const pattern of hashtagPatterns) {
+      const match = userMessage.match(pattern);
+      if (match) {
+        if (match[1]) {
+          // Found explicit number
+          const count = parseInt(match[1], 10);
+          if (!isNaN(count) && count >= 0 && count <= 10) {
+            parsedHashtagCount = count;
+            break;
+          }
+        } else if (pattern.source.includes('more') || pattern.source.includes('add') || pattern.source.includes('include') || pattern.source.includes('extra')) {
+          // User wants more hashtags - increase by 2-3
+          parsedHashtagCount = Math.min(10, hashtagCount + 3);
+          break;
+        } else if (pattern.source.includes('fewer') || pattern.source.includes('less')) {
+          // User wants fewer hashtags - decrease by 1-2
+          parsedHashtagCount = Math.max(0, hashtagCount - 2);
+          break;
+        } else if (pattern.source.includes('no') || pattern.source.includes('without')) {
+          // User wants no hashtags
+          parsedHashtagCount = 0;
+          break;
+        }
+      }
+    }
+    
+    return {
+      length: parsedLength,
+      hashtag_count: parsedHashtagCount,
+    };
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
@@ -552,11 +617,14 @@ export default function GeneratePage() {
     setLoading(true);
 
     try {
+      // Parse user prompt for preferences (overrides current settings)
+      const promptPreferences = parsePromptPreferences(userMessage);
+      
       const options = {
         post_type: postType,
         tone,
-        length,
-        hashtag_count: hashtagCount,
+        length: promptPreferences.length, // Use parsed length (prompt has priority)
+        hashtag_count: promptPreferences.hashtag_count, // Use parsed hashtag count (prompt has priority)
       };
 
       const response = await api.generate.post(
@@ -567,11 +635,26 @@ export default function GeneratePage() {
       );
       const data = response.data;
 
+      // Safeguard: Extract actual post_content if it's a JSON string
+      let postContent = data.post_content || data.content;
+      if (typeof postContent === 'string' && postContent.trim().startsWith('{') && postContent.includes('"post_content"')) {
+        try {
+          const parsed = JSON.parse(postContent);
+          if (parsed && typeof parsed === 'object' && parsed.post_content) {
+            postContent = parsed.post_content;
+            console.log("Extracted post_content from JSON string in frontend");
+          }
+        } catch (e) {
+          // If parsing fails, keep original postContent
+          console.warn("Failed to parse post_content JSON string:", e);
+        }
+      }
+
       const assistantMessage: Message = {
         id: data.id,
         role: "assistant",
-        content: data.post_content || data.content,
-        post_content: data.post_content,
+        content: postContent,
+        post_content: postContent,
         format_type: data.format_type || data.format,
         image_prompt: data.image_prompt,
         image_prompts: data.image_prompts, // For carousel posts
@@ -770,6 +853,7 @@ export default function GeneratePage() {
                       { value: "image", label: "Text + Image", icon: Image },
                       { value: "text", label: "Text Only", icon: FileText },
                       { value: "carousel", label: "Carousel", icon: Layers },
+                      { value: "video_script", label: "Video script", icon: Video },
                     ].map((type) => {
                       const IconComponent = type.icon;
                       const isSelected = postType === type.value;
@@ -1139,8 +1223,18 @@ export default function GeneratePage() {
                       showPostTypeMenu ? "bg-[#F3F2F0]" : ""
                     }`}
                   >
-                    <FileText className="w-4 h-4 mr-2" />
-                    {postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType}
+                    {(() => {
+                      const iconMap: Record<string, typeof FileText> = {
+                        auto: Zap,
+                        image: Image,
+                        text: FileText,
+                        carousel: Layers,
+                        video_script: Video,
+                      };
+                      const IconComponent = iconMap[postType] || FileText;
+                      return <IconComponent className="w-4 h-4 mr-2" />;
+                    })()}
+                    {postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType === "video_script" ? "Video script" : postType}
                   </Button>
                 </div>
                 <Button

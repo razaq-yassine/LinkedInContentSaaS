@@ -16,8 +16,6 @@ import { Sparkles, Globe } from "lucide-react";
 interface GenerationOptionsMenuProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  postType: string;
-  setPostType: (value: string) => void;
   tone: string;
   setTone: (value: string) => void;
   length: string;

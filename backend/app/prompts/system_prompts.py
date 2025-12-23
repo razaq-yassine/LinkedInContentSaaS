@@ -106,13 +106,19 @@ def build_post_generation_prompt(
 {trending_topics_section}
 ## User Preferences
 - Tone: {context_json.get('tone', 'professional')}
-- Hashtag count: {options.get('hashtag_count', 4)}
+- Hashtag count: {options.get('hashtag_count', 4)} (ALWAYS include this many hashtags unless user explicitly requests zero)
 - Post format: {options.get('format', 'text')}
 
 ## Generation Options
 - Post type: {options.get('post_type', 'auto')}
 - Length: {options.get('length', 'medium')}
 - Hook style: {options.get('hook_style', 'data_driven')}
+
+## CRITICAL: Hashtags
+- ALWAYS include exactly {options.get('hashtag_count', 4)} relevant hashtags at the end of the post
+- Hashtags should be relevant to the content and industry
+- Only skip hashtags if user explicitly requests "no hashtags" or "zero hashtags"
+- Include hashtags in the metadata field as an array
 
 Generate a post that sounds EXACTLY like this person wrote it, following their style perfectly."""
 
