@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 
 from ..database import get_db
-from ..models import UserProfile, GeneratedPost, Conversation, ConversationMessage, MessageRole
+from ..models import UserProfile, GeneratedPost, Conversation, ConversationMessage, MessageRole, PostFormat
 from ..routers.auth import get_current_user_id
 from ..schemas.generation import (
     PostGenerationRequest,
@@ -80,6 +80,121 @@ async def generate_post(
                 except:
                     pass
         
+        # Parse user message for length and hashtag preferences (prompt has priority)
+        def parse_prompt_preferences(user_message: str, current_options: dict) -> dict:
+            """
+            Parse user prompt for length and hashtag preferences.
+            User prompt takes priority over UI settings.
+            """
+            message_lower = user_message.lower()
+            parsed_options = current_options.copy()
+            
+            # Parse length preferences
+            if any(keyword in message_lower for keyword in ['long', 'lengthy', 'extended', 'detailed']):
+                parsed_options['length'] = 'long'
+            elif any(keyword in message_lower for keyword in ['short', 'brief', 'concise', 'quick']):
+                parsed_options['length'] = 'short'
+            elif any(keyword in message_lower for keyword in ['medium', 'moderate']):
+                parsed_options['length'] = 'medium'
+            
+            # Parse hashtag count preferences
+            hashtag_patterns = [
+                (r'(\d+)\s*hashtags?', lambda m: int(m.group(1))),
+                (r'hashtags?.*?(\d+)', lambda m: int(m.group(1))),
+                (r'(\d+)\s*tags?', lambda m: int(m.group(1))),
+                (r'tags?.*?(\d+)', lambda m: int(m.group(1))),
+            ]
+            
+            hashtag_count = parsed_options.get('hashtag_count', 4)
+            
+            # Check for explicit numbers first
+            for pattern, extractor in hashtag_patterns:
+                match = re.search(pattern, user_message, re.IGNORECASE)
+                if match:
+                    try:
+                        count = extractor(match)
+                        if 0 <= count <= 10:
+                            hashtag_count = count
+                            break
+                    except:
+                        pass
+            
+            # Check for relative requests (more/fewer/no)
+            if re.search(r'\b(more|add|include|extra)\s+hashtags?\b', user_message, re.IGNORECASE):
+                hashtag_count = min(10, hashtag_count + 3)
+            elif re.search(r'\b(fewer|less)\s+hashtags?\b', user_message, re.IGNORECASE):
+                hashtag_count = max(0, hashtag_count - 2)
+            elif re.search(r'\b(no|without|zero)\s+hashtags?\b', user_message, re.IGNORECASE):
+                hashtag_count = 0
+            
+            parsed_options['hashtag_count'] = hashtag_count
+            return parsed_options
+        
+        # Override options with prompt preferences (prompt has priority)
+        request_options = request.options.copy() if request.options else {}
+        request_options = parse_prompt_preferences(request.message, request_options)
+        
+        # Detect if user wants a random/new topic
+        user_message_lower = request.message.lower().strip()
+        is_random_request = any(keyword in user_message_lower for keyword in [
+            'random', 'any', 'surprise me', 'pick a topic', 'choose a topic', 
+            'new topic', 'different topic', 'something new'
+        ]) or len(user_message_lower.split()) <= 3
+        
+        # Load conversation history if conversation_id is provided
+        conversation_history = []
+        previous_post_content = None
+        is_refinement_request = False
+        
+        if request.conversation_id:
+            # Load conversation messages
+            conv_messages = db.query(ConversationMessage).filter(
+                ConversationMessage.conversation_id == request.conversation_id
+            ).order_by(ConversationMessage.created_at.asc()).all()
+            
+            # Build conversation history for AI context
+            for msg in conv_messages:
+                conversation_history.append({
+                    "role": msg.role.value,  # "user" or "assistant"
+                    "content": msg.content
+                })
+            
+            # Get the most recent assistant message (previous post) if it exists
+            assistant_messages = [msg for msg in conv_messages if msg.role == MessageRole.ASSISTANT]
+            if assistant_messages:
+                previous_post_content = assistant_messages[-1].content
+            
+            # Detect if this is a refinement request
+            # Refinement keywords that indicate user wants to modify existing content
+            # More specific patterns that clearly indicate refinement
+            refinement_patterns = [
+                'make this', 'make it', 'make the', 'make that',
+                'shorter', 'longer', 'change the', 'change this', 'change it',
+                'improve this', 'improve it', 'edit this', 'edit it',
+                'refine this', 'refine it', 'adjust this', 'adjust it',
+                'modify this', 'modify it', 'update this', 'update it',
+                'revise this', 'revise it', 'rewrite this', 'rewrite it',
+                'remove this', 'remove it', 'remove that',
+                'keep this', 'keep it', 'keep that',
+                'make it more', 'make it less', 'make this more', 'make this less',
+                'change tone', 'change style', 'change format'
+            ]
+            
+            # Check if user message contains refinement patterns AND we have previous content
+            # Also check for pronouns/pointers that suggest referring to previous content
+            # But exclude if user explicitly wants a new/random topic
+            has_refinement_pattern = any(pattern in user_message_lower for pattern in refinement_patterns)
+            has_reference_pronouns = any(pronoun in user_message_lower for pronoun in ['this', 'it', 'that']) and len(user_message_lower.split()) <= 10
+            explicitly_new_topic = any(keyword in user_message_lower for keyword in [
+                'new topic', 'different topic', 'another topic', 'random topic', 
+                'new post', 'different post', 'another post'
+            ])
+            
+            if previous_post_content and (has_refinement_pattern or has_reference_pronouns) and not explicitly_new_topic:
+                is_refinement_request = True
+                # Override random request detection - refinement takes priority
+                is_random_request = False
+        
         # Build system prompt with user context
         # If TOON context is available, use it for token efficiency
         if toon_context:
@@ -88,41 +203,130 @@ async def generate_post(
             if additional_context and additional_context.strip():
                 additional_context_section = f"""
 
-## ADDITIONAL CONTEXT AND RULES (HIGHEST PRIORITY - MUST FOLLOW):
+## ADDITIONAL CONTEXT (HIGHEST PRIORITY):
 {additional_context}
-
-IMPORTANT: The above additional context and rules take precedence over all other context. Follow these instructions strictly when generating content.
+[These rules override all other instructions in case of conflict]
 """
             
-            system_prompt = f"""You are a LinkedIn content expert. Generate high-quality LinkedIn posts based on the user's profile context.
+            # Topic generation instruction
+            topic_instruction = ""
+            if is_random_request:
+                topic_instruction = """
+- User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
+"""
+            
+            # Add refinement context if this is a refinement request
+            refinement_context = ""
+            if is_refinement_request and previous_post_content:
+                refinement_context = f"""
 
-USER PROFILE CONTEXT (TOON format - token-efficient):
-{toon_context}{additional_context_section}
+## REFINEMENT REQUEST:
+The user wants to refine the previous post. Keep the SAME TOPIC and MAIN MESSAGE, but apply the requested changes.
+
+PREVIOUS POST CONTENT:
+{previous_post_content}
+
+IMPORTANT: 
+- Maintain the same core topic and message
+- Apply the user's requested changes (e.g., make it shorter, change tone, etc.)
+- Keep the same format unless explicitly asked to change
+- Preserve key insights and value from the original post
+"""
+            
+            # Get hashtag count from parsed options
+            hashtag_count = request_options.get('hashtag_count', 4)
+            length_pref = request_options.get('length', 'medium')
+            
+            system_prompt = f"""LinkedIn content expert. Generate posts matching user's style and expertise.
+
+## RULES:
+- Language: English only
+- Format: Small statements, blank line between each
+- Additional context: Overrides all if provided{additional_context_section}
+
+## CONTEXT USAGE:
+Profile context is for ALIGNMENT ONLY (tone, style, expertise level, audience) - NOT for topic selection.
+DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}{refinement_context}
+
+## GENERATION OPTIONS:
+- Length: {length_pref}
+- Hashtag count: {hashtag_count} (ALWAYS include this many hashtags unless user explicitly requests zero)
+
+## CRITICAL: Hashtags
+- ALWAYS include exactly {hashtag_count} relevant hashtags at the end of the post
+- Hashtags should be relevant to the content and industry
+- Only skip hashtags if user explicitly requests "no hashtags" or "zero hashtags"
+- Include hashtags in the metadata field as an array
+
+USER CONTEXT:
+{toon_context}
 
 WRITING STYLE:
 {profile.writing_style_md or "Professional, engaging, value-driven"}
 
-Generate content that:
-1. Matches the user's tone and expertise level
-2. Resonates with their target audience
-3. Follows their content strategy and goals
-4. Uses appropriate format (text/carousel/image/video)
-5. STRICTLY adheres to any additional context and rules provided above
+Generate content matching their tone/expertise/audience. Use small statements with spacing. English only.
 
 User request: {request.message}
 """
         else:
             # Fallback to legacy JSON-based prompt
-            system_prompt = build_post_generation_prompt(
+            base_prompt = build_post_generation_prompt(
                 profile_md=profile.profile_md or "",
                 writing_style_md=profile.writing_style_md or "",
                 context_json=profile.context_json or {},
                 user_message=request.message,
-                options=request.options
+                options=request_options
             )
+            # Add critical instructions to legacy prompt as well
+            additional_context = profile.context_json.get("additional_context", "") if profile.context_json else ""
+            additional_context_section = ""
+            if additional_context and additional_context.strip():
+                additional_context_section = f"""
+
+## ADDITIONAL CONTEXT (HIGHEST PRIORITY):
+{additional_context}
+[Overrides all other instructions in case of conflict]
+"""
+            
+            # Topic generation instruction
+            topic_instruction = ""
+            if is_random_request:
+                topic_instruction = """
+- User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
+"""
+            
+            # Add refinement context if this is a refinement request
+            refinement_context = ""
+            if is_refinement_request and previous_post_content:
+                refinement_context = f"""
+
+## REFINEMENT REQUEST:
+The user wants to refine the previous post. Keep the SAME TOPIC and MAIN MESSAGE, but apply the requested changes.
+
+PREVIOUS POST CONTENT:
+{previous_post_content}
+
+IMPORTANT: 
+- Maintain the same core topic and message
+- Apply the user's requested changes (e.g., make it shorter, change tone, etc.)
+- Keep the same format unless explicitly asked to change
+- Preserve key insights and value from the original post
+"""
+            
+            system_prompt = f"""{base_prompt}
+
+## RULES:
+- Language: English only
+- Format: Small statements, blank line between each
+- Additional context: Overrides all if provided{additional_context_section}
+
+## CONTEXT USAGE:
+Profile context is for ALIGNMENT ONLY (tone, style, expertise level, audience) - NOT for topic selection.
+DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}{refinement_context}
+"""
         
         # Add format-specific instructions
-        post_type = request.options.get('post_type', 'text')
+        post_type = request_options.get('post_type', 'text')
         
         # Normalize post type (handle variations)
         if post_type == 'text_with_image':
@@ -138,6 +342,11 @@ User request: {request.message}
             enforced_format = 'carousel'
             format_instructions = get_format_specific_instructions('carousel')
             system_prompt += f"\n\n{get_format_instructions('carousel')}"
+            system_prompt += f"\n## Format Instructions\n{format_instructions}"
+        elif post_type == 'video_script':
+            enforced_format = 'video_script'
+            format_instructions = get_format_specific_instructions('video_script')
+            system_prompt += f"\n\n{get_format_instructions('video_script')}"
             system_prompt += f"\n## Format Instructions\n{format_instructions}"
         elif post_type != 'auto':
             enforced_format = post_type
@@ -164,18 +373,20 @@ User request: {request.message}
             print(f"Enabling web search for request: {request.message[:50]}...")
         
         # Also check if user explicitly requested trending topics
-        topic_mode = request.options.get('topic_mode', 'auto')
+        topic_mode = request_options.get('topic_mode', 'auto')
         if topic_mode == 'trending':
             use_web_search = True
             print("Enabling web search for trending topic request")
         
         # Generate post
         try:
+            # Pass conversation history to AI (current message hasn't been saved yet, so all history is previous)
             raw_response = await generate_completion(
                 system_prompt=system_prompt,
                 user_message=request.message,
                 temperature=0.8,
-                use_search=use_web_search
+                use_search=use_web_search,
+                conversation_history=conversation_history if conversation_history else None
             )
         except Exception as e:
             error_trace = traceback.format_exc()
@@ -195,10 +406,75 @@ User request: {request.message}
                 cleaned_response = re.sub(r'\n?```$', '', cleaned_response)
             
             response_data = json.loads(cleaned_response)
-            post_content = response_data.get("post_content", raw_response)
+            
+            # Handle case where response_data might be the post_content directly
+            if isinstance(response_data, dict):
+                post_content = response_data.get("post_content", raw_response)
+                
+                # CRITICAL: If post_content contains JSON-like structure, try to parse it
+                if isinstance(post_content, str) and post_content.strip().startswith('{'):
+                    try:
+                        # Try to parse if it's a JSON string
+                        parsed_inner = json.loads(post_content)
+                        if isinstance(parsed_inner, dict) and "post_content" in parsed_inner:
+                            post_content = parsed_inner.get("post_content", post_content)
+                    except (json.JSONDecodeError, TypeError):
+                        # If parsing fails, keep original post_content
+                        pass
+            else:
+                # If response_data is not a dict, use it as post_content
+                post_content = response_data if isinstance(response_data, str) else str(response_data)
+            
+            # Ensure post_content is a string
+            if not isinstance(post_content, str):
+                # If post_content is still a dict or other type, try to extract or convert
+                if isinstance(post_content, dict):
+                    # Check if this is a video script dict structure (use post_type since actual_format not set yet)
+                    if post_type == 'video_script' and any(key in post_content for key in ['Hook', 'Introduction', 'Main Content', 'Summary', 'CTA']):
+                        # Convert video script dict to formatted string
+                        post_content = format_video_script_dict(post_content)
+                    else:
+                        # Try to get post_content from nested dict
+                        post_content = post_content.get("post_content", str(post_content))
+                else:
+                    post_content = str(post_content)
+            
+            # Final safety check: if post_content looks like a JSON object string, try to extract the actual content
+            if isinstance(post_content, str) and post_content.strip().startswith('{') and '"post_content"' in post_content:
+                try:
+                    # Try to parse and extract post_content from JSON string
+                    parsed_json = json.loads(post_content)
+                    if isinstance(parsed_json, dict) and "post_content" in parsed_json:
+                        extracted_content = parsed_json.get("post_content")
+                        if isinstance(extracted_content, str) and len(extracted_content) > 0:
+                            post_content = extracted_content
+                            print("Extracted post_content from JSON string")
+                except (json.JSONDecodeError, TypeError, AttributeError):
+                    # If parsing fails, keep original post_content
+                    pass
+            
+            # Final validation: Ensure post_content is not the entire JSON response
+            if isinstance(post_content, str):
+                # Check if post_content is actually a JSON string containing the full response
+                post_content_stripped = post_content.strip()
+                if post_content_stripped.startswith('{') and '"post_content"' in post_content_stripped and '"format_type"' in post_content_stripped:
+                    try:
+                        # Try to parse and extract the actual post_content
+                        parsed_full = json.loads(post_content_stripped)
+                        if isinstance(parsed_full, dict):
+                            actual_post_content = parsed_full.get("post_content")
+                            if isinstance(actual_post_content, str) and len(actual_post_content.strip()) > 0:
+                                print("WARNING: Extracted post_content from JSON string that was stored in post_content field")
+                                post_content = actual_post_content
+                                # Also update metadata if available
+                                if "metadata" in parsed_full:
+                                    metadata_dict = parsed_full.get("metadata", {})
+                    except (json.JSONDecodeError, TypeError, AttributeError):
+                        # If parsing fails, keep original post_content
+                        pass
             
             # Clean post_content: Remove any slide prompts or image descriptions that might have leaked in
-            if post_content:
+            if post_content and isinstance(post_content, str):
                 # Remove common patterns that indicate prompts leaked into content
                 lines = post_content.split('\n')
                 cleaned_lines = []
@@ -243,6 +519,8 @@ User request: {request.message}
                 format_type = 'image'
             elif post_type == 'carousel':
                 format_type = 'carousel'
+            elif post_type == 'video_script':
+                format_type = 'video_script'
             else:
                 format_type = response_data.get("format_type", post_type)
             
@@ -282,6 +560,9 @@ User request: {request.message}
                 format_type = 'carousel'
                 image_prompts = await generate_carousel_image_prompts(post_content, profile.context_json or {})
                 image_prompt = image_prompts[0] if image_prompts and len(image_prompts) > 0 else None
+            elif post_type == 'video_script':
+                format_type = 'video_script'
+                image_prompt = None
             else:
                 format_type = post_type
                 image_prompt = None
@@ -290,8 +571,24 @@ User request: {request.message}
         # Convert "auto" to actual format for database
         actual_format = format_type if format_type != "auto" else "text"
         
+        # Format video scripts with special markers for better presentation (after format_type is determined)
+        if actual_format == 'video_script' and post_content and isinstance(post_content, str):
+            # Only format if not already formatted (check for markers)
+            if not post_content.startswith('**HEADER**') and not post_content.startswith('*SCRIPT*'):
+                post_content = format_video_script_string(post_content)
+        
+        # Convert format string to PostFormat enum
+        format_enum_map = {
+            "text": PostFormat.TEXT,
+            "carousel": PostFormat.CAROUSEL,
+            "image": PostFormat.IMAGE,
+            "video": PostFormat.VIDEO,
+            "video_script": PostFormat.VIDEO_SCRIPT
+        }
+        format_enum = format_enum_map.get(actual_format, PostFormat.TEXT)
+        
         # Prepare generation options with AI-generated data
-        generation_options = request.options.copy() if request.options else {}
+        generation_options = request_options.copy()
         if actual_format == 'carousel' and image_prompts:
             generation_options["image_prompts"] = image_prompts  # Store array for carousel
             generation_options["image_prompt"] = image_prompt  # Also store first for compatibility
@@ -302,7 +599,7 @@ User request: {request.message}
         
         # Handle conversation
         conversation_id = request.conversation_id
-        if not conversation_id and request.options.get("create_conversation", True):
+        if not conversation_id and request_options.get("create_conversation", True):
             # Create new conversation
             title = await generate_conversation_title(request.message)
             conversation = Conversation(
@@ -330,7 +627,7 @@ User request: {request.message}
             conversation_id=conversation_id,
             topic=request.message[:500],
             content=post_content,
-            format=actual_format,
+            format=format_enum,
             generation_options=generation_options,  # Now includes image_prompt and metadata
             attachments=request.attachments
         )
@@ -361,9 +658,65 @@ User request: {request.message}
             db.add(assistant_message)
             db.commit()
         
-        # Build metadata
+        # Build metadata - ensure hashtags are always included
+        hashtags_from_metadata = metadata_dict.get("hashtags", [])
+        hashtag_count_requested = request_options.get('hashtag_count', 4)
+        
+        # Extract hashtags from post content to see what's actually there
+        hashtags_in_content = re.findall(r'#(\w+)', post_content)
+        
+        # If hashtags are missing or fewer than requested, try to get them from metadata or content
+        if hashtag_count_requested > 0:
+            # First, try to use hashtags from metadata (they should be formatted correctly)
+            # Filter out empty strings and invalid hashtags
+            valid_hashtags_from_metadata = []
+            if hashtags_from_metadata:
+                for tag in hashtags_from_metadata:
+                    if isinstance(tag, str) and tag.strip():
+                        # Ensure hashtag starts with #
+                        tag = tag.strip()
+                        if not tag.startswith('#'):
+                            tag = f"#{tag}"
+                        # Only add if it's a valid hashtag (has content after #)
+                        if len(tag) > 1:
+                            valid_hashtags_from_metadata.append(tag)
+            
+            # If we have valid hashtags from metadata, use them
+            if len(valid_hashtags_from_metadata) >= hashtag_count_requested:
+                hashtags_from_metadata = valid_hashtags_from_metadata[:hashtag_count_requested]
+            # If metadata doesn't have enough, try extracting from content
+            elif hashtags_in_content:
+                hashtags_from_metadata = [f"#{tag}" for tag in hashtags_in_content[:hashtag_count_requested]]
+            # If still not enough, we'll append what we have (even if less than requested)
+            elif valid_hashtags_from_metadata:
+                hashtags_from_metadata = valid_hashtags_from_metadata
+            
+            # CRITICAL: If hashtags are not in post_content, append them from metadata
+            if hashtags_from_metadata and len(hashtags_from_metadata) > 0:
+                # Check if hashtags are already in post_content (more robust check)
+                post_content_lower = post_content.lower()
+                hashtags_in_post = False
+                for tag in hashtags_from_metadata:
+                    tag_text = tag.lower().replace('#', '').strip()
+                    if tag_text and tag_text in post_content_lower:
+                        hashtags_in_post = True
+                        break
+                
+                # If hashtags are not in post_content, append them
+                if not hashtags_in_post:
+                    # Format hashtags nicely: add blank line before if not present, then hashtags
+                    hashtags_text = ' '.join(hashtags_from_metadata)
+                    if not post_content.strip().endswith('\n'):
+                        post_content = post_content.rstrip() + '\n\n' + hashtags_text
+                    else:
+                        post_content = post_content.rstrip() + hashtags_text
+                    print(f"Appended {len(hashtags_from_metadata)} hashtags to post_content: {hashtags_text}")
+            else:
+                # If no hashtags at all, log a warning
+                print(f"WARNING: No hashtags found in metadata or content. Requested: {hashtag_count_requested}")
+        
         metadata = PostMetadata(
-            hashtags=metadata_dict.get("hashtags", []),
+            hashtags=hashtags_from_metadata if hashtag_count_requested > 0 else [],
             tone=metadata_dict.get("tone", "professional"),
             estimated_engagement=metadata_dict.get("estimated_engagement", "medium")
         )
@@ -472,80 +825,301 @@ async def rate_generation(
         "message": "Rating saved"
     }
 
+def format_video_script_dict(script_dict: dict) -> str:
+    """
+    Convert a video script dictionary to a formatted string.
+    Handles various dict structures that AI might return.
+    """
+    lines = []
+    
+    # Hook section
+    hook_key = next((k for k in script_dict.keys() if 'hook' in k.lower()), None)
+    if hook_key:
+        lines.append("**HEADER** [Hook - 3-5 seconds]")
+        hook_content = script_dict[hook_key]
+        if isinstance(hook_content, str):
+            lines.append(f"*SCRIPT* {hook_content}")
+        else:
+            lines.append(f"*SCRIPT* {str(hook_content)}")
+        lines.append("")
+    
+    # Introduction section
+    intro_key = next((k for k in script_dict.keys() if 'introduction' in k.lower() or 'context' in k.lower()), None)
+    if intro_key:
+        lines.append("**HEADER** [Introduction - 10-15 seconds]")
+        intro_content = script_dict[intro_key]
+        if isinstance(intro_content, str):
+            lines.append(f"*SCRIPT* {intro_content}")
+        else:
+            lines.append(f"*SCRIPT* {str(intro_content)}")
+        lines.append("")
+    
+    # Main Content section
+    main_key = next((k for k in script_dict.keys() if 'main' in k.lower() and 'content' in k.lower()), None)
+    if main_key:
+        lines.append("**HEADER** [Main Content - 40-60 seconds]")
+        main_content = script_dict[main_key]
+        
+        if isinstance(main_content, list):
+            # Handle list of points
+            for i, point in enumerate(main_content, 1):
+                if isinstance(point, dict):
+                    point_title = point.get('point', point.get('title', f'Point {i}'))
+                    point_script = point.get('script', point.get('content', ''))
+                    visual_cues = point.get('visual_cues', point.get('visual', ''))
+                    
+                    lines.append(f"**SUBHEADER** Point {i}: {point_title}")
+                    if visual_cues:
+                        lines.append(f"*VISUAL* {visual_cues}")
+                    if point_script:
+                        lines.append(f"*SCRIPT* {point_script}")
+                    lines.append("")
+                else:
+                    lines.append(f"**SUBHEADER** Point {i}: {str(point)}")
+                    lines.append("")
+        elif isinstance(main_content, str):
+            lines.append(f"*SCRIPT* {main_content}")
+        else:
+            lines.append(f"*SCRIPT* {str(main_content)}")
+        lines.append("")
+    
+    # Summary section
+    summary_key = next((k for k in script_dict.keys() if 'summary' in k.lower() or 'takeaway' in k.lower()), None)
+    if summary_key:
+        lines.append("**HEADER** [Summary - 10-15 seconds]")
+        summary_content = script_dict[summary_key]
+        if isinstance(summary_content, str):
+            lines.append(f"*SCRIPT* {summary_content}")
+        else:
+            lines.append(f"*SCRIPT* {str(summary_content)}")
+        lines.append("")
+    
+    # CTA section
+    cta_key = next((k for k in script_dict.keys() if 'cta' in k.lower() or 'call' in k.lower() and 'action' in k.lower()), None)
+    if cta_key:
+        lines.append("**HEADER** [CTA - 5-10 seconds]")
+        cta_content = script_dict[cta_key]
+        if isinstance(cta_content, str):
+            lines.append(f"*SCRIPT* {cta_content}")
+        else:
+            lines.append(f"*SCRIPT* {str(cta_content)}")
+        lines.append("")
+    
+    # If no structured sections found, format the entire dict
+    if len(lines) == 0:
+        for key, value in script_dict.items():
+            lines.append(f"[{key}]")
+            if isinstance(value, (dict, list)):
+                lines.append(json.dumps(value, indent=2))
+            else:
+                lines.append(str(value))
+            lines.append("")
+    
+    return '\n'.join(lines).strip()
+
+def format_video_script_string(script_text: str) -> str:
+    """
+    Format a video script string to add markers for better presentation.
+    Adds **HEADER**, **SUBHEADER**, *VISUAL*, and *SCRIPT* markers.
+    """
+    lines = script_text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        trimmed = line.strip()
+        
+        # Check if line is a section header (starts with [Section Name])
+        if trimmed.startswith('[') and ']' in trimmed and any(keyword in trimmed.lower() for keyword in ['hook', 'introduction', 'context', 'main content', 'summary', 'takeaway', 'cta', 'call']):
+            formatted_lines.append(f"**HEADER** {trimmed}")
+        # Check if line is a point header (Point 1:, Point 2:, etc.)
+        elif trimmed.lower().startswith('point') and ':' in trimmed:
+            formatted_lines.append(f"**SUBHEADER** {trimmed}")
+        # Check if line contains visual cues (brackets with show, gesture, pause, etc.)
+        elif trimmed.startswith('[') and any(keyword in trimmed.lower() for keyword in ['show', 'gesture', 'pause', 'visual', 'screen', 'highlight']):
+            formatted_lines.append(f"*VISUAL* {trimmed}")
+        # Check if line is empty
+        elif not trimmed:
+            formatted_lines.append("")
+        # Otherwise, treat as script text
+        else:
+            formatted_lines.append(f"*SCRIPT* {trimmed}")
+    
+    return '\n'.join(formatted_lines)
+
 async def generate_image_prompt(post_content: str, context: dict) -> str:
     """
-    Generate AI image prompt for Canva/DALL-E
+    Generate AI image prompt for Canva/DALL-E that matches the post content and is LinkedIn-friendly
     """
     try:
+        # Extract key themes and concepts from the post content
+        industry = context.get('industry', 'business')
+        expertise = context.get('expertise_areas', [])
+        if isinstance(expertise, list):
+            expertise_str = ', '.join(expertise[:3]) if expertise else industry
+        else:
+            expertise_str = str(expertise) if expertise else industry
+        
         prompt = await generate_completion(
-            system_prompt="""Generate a detailed AI image prompt for Canva AI or DALL-E.
+            system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn posts. Your prompts create vivid, concrete visuals that perfectly match the post's content.
 
-Format:
-Create a [style] image featuring [main elements].
+VISUAL STRATEGY:
+- If post mentions specific tools/platforms/concrete scenarios: Use real-world visuals (photography style, dashboards on screens, offices, devices, professional photos)
+- If post is general/abstract/conceptual: Use friendly cartoon/illustration style with diverse professional characters doing actions that match the post's message
+- For before/after comparisons: Use split-screen with cartoon characters or illustrations showing the transformation
 
-Style: [professional/modern/clean/minimalist]
-Color scheme: [colors]
-Composition: [layout description]
-Key elements: [what to include]
-Text overlay: [if any]
-Dimensions: 1200x628px (LinkedIn optimal)
+Your prompts should:
+- Be specific and concrete (show actual tools, screens, people, settings OR cartoon characters doing relevant actions)
+- Use appropriate visual style based on content specificity
+- Include diverse professional characters (realistic OR cartoon style)
+- Be LinkedIn-optimized: 1200×628px, professional aesthetic, clear composition, engaging
+- Create visuals that enhance the post's message
 
-Make it specific and actionable.""",
-            user_message=f"Create an image prompt for this LinkedIn post:\n\n{post_content}\n\nIndustry: {context.get('industry', 'business')}",
-            temperature=0.7
+AVOID abstract descriptions like "data flow visualization". Instead use:
+- Specific content: "Salesforce dashboard on laptop screen" or "professionals reviewing analytics"
+- General content: "Friendly cartoon professional character [doing action that matches post]" or "Illustration showing [concept] with diverse characters"
+
+Write creative, detailed prompts that image generators can easily visualize. Output ONLY the final prompt text - no explanations.""",
+            user_message=f"""Create a creative, detailed image generation prompt for this LinkedIn post:
+
+POST CONTENT:
+{post_content}
+
+INDUSTRY: {industry}
+EXPERTISE: {expertise_str}
+
+Analyze the content:
+- If it mentions specific tools/platforms: Create real-world visual (photography, dashboards, devices)
+- If it's general/abstract: Create cartoon/illustration with characters doing actions matching the post
+- For comparisons: Use split-screen with characters showing transformation
+
+Create a vivid visual description that:
+- Directly represents the post's main message and key concepts
+- Uses appropriate style (realistic OR cartoon/illustration based on content)
+- Shows characters/people doing actions that match the post's concepts
+- Is optimized for LinkedIn (1200×628px, professional, engaging, mobile-friendly)
+
+Write the complete prompt as a single, detailed description ready for image generation.""",
+            temperature=0.8
         )
         
-        return prompt
-    except:
-        return "Professional LinkedIn post image, clean modern design, brand colors, 1200x628px"
+        # Clean up the prompt (remove markdown formatting if present)
+        prompt = prompt.strip()
+        if prompt.startswith("```"):
+            prompt = re.sub(r'^```.*?\n?', '', prompt)
+            prompt = re.sub(r'\n?```$', '', prompt)
+        prompt = prompt.strip()
+        
+        return prompt if prompt else "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
+    except Exception as e:
+        print(f"Error generating image prompt: {str(e)}")
+        return "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
 
 async def generate_carousel_image_prompts(post_content: str, context: dict) -> list[str]:
     """
-    Generate multiple AI image prompts for carousel slides
+    Generate multiple AI image prompts for carousel slides that match the post content and are LinkedIn-friendly
     """
     try:
         # Extract slide count from content (estimate based on structure)
         slide_count = max(4, min(8, post_content.count('\n\n') + 1))
         
+        industry = context.get('industry', 'business')
+        expertise = context.get('expertise_areas', [])
+        if isinstance(expertise, list):
+            expertise_str = ', '.join(expertise[:3]) if expertise else industry
+        else:
+            expertise_str = str(expertise) if expertise else industry
+        
         prompt = await generate_completion(
-            system_prompt="""Generate multiple detailed AI image prompts for a LinkedIn carousel post.
+            system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn carousel posts. Your prompts create a cohesive visual story with consistent theming.
 
-You need to create an array of image prompts, one for each slide.
+CRITICAL REQUIREMENTS:
 
-Format each prompt as:
-- Slide [number]: [detailed description]
+1. VISUAL CONSISTENCY (MOST IMPORTANT):
+   - ALL slides must use the SAME color palette (specify exact colors)
+   - ALL slides must use the SAME visual style (choose ONE: photography OR cartoon/illustration)
+   - ALL slides must use the SAME composition approach
+   - Create visual continuity - each slide feels like part of the same series
 
-Each prompt should:
-- Describe the visual concept for that specific slide
-- Include style (professional, modern, clean, minimalist)
-- Include color scheme
-- Include key visual elements
-- Include any text overlays
-- Be specific and actionable
-- Dimensions: 1200x628px (LinkedIn optimal)
+2. VISUAL STYLE SELECTION:
+   - If post mentions specific tools/platforms: Use real-world style (photography, dashboards, devices)
+   - If post is general/abstract: Use cartoon/illustration style with characters
+   - Choose ONE style for entire carousel and maintain it across all slides
 
-Return ONLY a JSON array of strings, like:
-["prompt for slide 1", "prompt for slide 2", "prompt for slide 3", ...]""",
-            user_message=f"Create {slide_count} image prompts for this LinkedIn carousel post:\n\n{post_content}\n\nIndustry: {context.get('industry', 'business')}\n\nGenerate exactly {slide_count} prompts, one for each slide.",
-            temperature=0.7
+3. CONCRETE VISUALS:
+   - Each slide represents ONE specific point from the post
+   - Real-world style: "Salesforce dashboard on laptop", "professionals in office"
+   - Cartoon style: "Friendly cartoon professional character [doing action matching slide's point]"
+   - Characters should be diverse, professional, doing actions that match each slide's concept
+   - Avoid abstract concepts - use either realistic visuals OR character illustrations
+
+4. VISUAL STORY PROGRESSION:
+   - Slide 1: Introduces the topic with established visual theme
+   - Slides 2-N: Each shows a specific point/concept, maintaining the theme
+   - Final slide: Summarizes or provides takeaway, maintains theme
+   - Slides build on each other visually like a story
+
+5. LINKEDIN OPTIMIZATION:
+   - Professional, polished, engaging aesthetic
+   - 1200×628px landscape format
+   - Text overlay space consideration
+
+Return ONLY a valid JSON array of strings. Each prompt should be creative, detailed, and ready for image generation. Output ONLY the JSON array - no explanations.""",
+            user_message=f"""Create {slide_count} creative, detailed image prompts for this LinkedIn carousel post:
+
+POST CONTENT:
+{post_content}
+
+INDUSTRY: {industry}
+EXPERTISE: {expertise_str}
+
+TASK:
+1. Analyze content: If specific tools/platforms mentioned → use real-world style. If general/abstract → use cartoon/illustration style with characters
+2. Break the post into {slide_count} logical sections/points (one per slide)
+3. Choose ONE consistent visual theme: same colors, same style (realistic OR cartoon), same composition for ALL slides
+4. Create {slide_count} prompts where:
+   - Each slide represents ONE specific point from the post
+   - All slides share the SAME color palette and visual style
+   - If using characters: They do actions matching each slide's point
+   - Slides build on each other visually (like a story)
+
+CRITICAL: All slides must be visually consistent - same colors, same style (realistic OR cartoon), same type of elements. They should feel like a cohesive series.
+
+Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
+            temperature=0.8
         )
         
         # Try to parse as JSON array
         try:
             import json
-            prompts = json.loads(prompt)
+            # Clean up markdown code blocks if present
+            cleaned_prompt = prompt.strip()
+            if cleaned_prompt.startswith("```"):
+                cleaned_prompt = re.sub(r'^```json\s*\n?', '', cleaned_prompt)
+                cleaned_prompt = re.sub(r'\n?```$', '', cleaned_prompt)
+            
+            prompts = json.loads(cleaned_prompt)
             if isinstance(prompts, list) and len(prompts) > 0:
+                # Ensure we have the right number of prompts
+                if len(prompts) >= slide_count:
+                    return prompts[:slide_count]
+                elif len(prompts) < slide_count:
+                    # Pad with variations of the last prompt
+                    while len(prompts) < slide_count:
+                        prompts.append(prompts[-1] if prompts else "Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, brand colors, 1200x628px")
+                    return prompts[:slide_count]
                 return prompts
-        except:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse carousel prompts as JSON: {str(e)}")
+            print(f"Raw response: {prompt[:200]}")
         
         # Fallback: split by lines or create default prompts
-        lines = [line.strip() for line in prompt.split('\n') if line.strip() and not line.strip().startswith('-')]
+        lines = [line.strip() for line in prompt.split('\n') if line.strip() and not line.strip().startswith('-') and not line.strip().startswith('Slide')]
         if len(lines) >= slide_count:
             return lines[:slide_count]
         
-        # Ultimate fallback: create generic prompts
-        return [f"Professional LinkedIn carousel slide {i+1}, clean modern design, brand colors, 1200x628px" for i in range(slide_count)]
-    except:
-        # Fallback: return default prompts
-        return ["Professional LinkedIn carousel slide, clean modern design, brand colors, 1200x628px" for _ in range(4)]
+        # Ultimate fallback: create generic but LinkedIn-friendly prompts
+        return [f"Professional LinkedIn carousel slide {i+1}, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for i in range(slide_count)]
+    except Exception as e:
+        print(f"Error generating carousel image prompts: {str(e)}")
+        # Fallback: return default LinkedIn-friendly prompts
+        return ["Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for _ in range(4)]

@@ -3,33 +3,23 @@ System prompts for AI content generation
 Based on the LinkedIn Content Helper rules
 """
 
-CONTENT_GENERATION_SYSTEM_PROMPT = """You are a LinkedIn content generation specialist. Your role is to help create authentic, high-quality LinkedIn posts.
+CONTENT_GENERATION_SYSTEM_PROMPT = """LinkedIn content specialist. Create authentic posts matching user's style.
 
-## Primary Rules:
-- **NEVER** generate generic LinkedIn content
-- **ALWAYS** match the person's authentic writing style
-- **MUST** use "Top Creator" format: Hook → Context → Insight → Takeaway
+## Rules:
+- Language: English only
+- Format: Small statements, blank line between each
+- Style: Match person's authentic voice
+- Structure: Hook → Context → Insight → Takeaway
 
-## For Posts (Top Creator Format):
-- **SINGLE-LINE FORMATTING** - One thought per line, never walls of text
-- **MOBILE-FIRST** - Lots of white space, easy to scan on phone
-- **HOOK FIRST** - First 1-2 lines must stop the scroll (bold claim, data, question)
-- **SHORT SENTENCES** - Max 15 words, average 8-12 words per sentence
-- **DATA-DRIVEN** - Include specific metrics/achievements from profile
-- **BULLET POINTS** - Use for lists and key points
-- **POWERFUL ENDING** - End with question, takeaway, or bold statement
-- **HASHTAGS** - 3-5 at end of post, separated from content
+## Post Format:
+- Small statements with spacing (blank line between each)
+- Hook first (1-2 lines that stop scroll)
+- Short sentences (max 15 words)
+- Bullet points for lists
+- Powerful ending (question/statement)
+- 3-5 hashtags at end
 
-## Quality Checklist:
-✅ Hook grabs attention in first 2 lines
-✅ Single line breaks between thoughts
-✅ Bullet points for lists
-✅ Max 15 words per sentence
-✅ White space for scannability
-✅ Powerful ending (question or statement)
-✅ 3-5 relevant hashtags at end
-
-Generate content that sounds EXACTLY like the person wrote it."""
+Generate content that sounds like they wrote it."""
 
 COMMENT_GENERATION_SYSTEM_PROMPT = """You are a LinkedIn comment specialist. Your role is to create authentic, valuable comments.
 
@@ -116,13 +106,19 @@ def build_post_generation_prompt(
 {trending_topics_section}
 ## User Preferences
 - Tone: {context_json.get('tone', 'professional')}
-- Hashtag count: {options.get('hashtag_count', 4)}
+- Hashtag count: {options.get('hashtag_count', 4)} (ALWAYS include this many hashtags unless user explicitly requests zero)
 - Post format: {options.get('format', 'text')}
 
 ## Generation Options
 - Post type: {options.get('post_type', 'auto')}
 - Length: {options.get('length', 'medium')}
 - Hook style: {options.get('hook_style', 'data_driven')}
+
+## CRITICAL: Hashtags
+- ALWAYS include exactly {options.get('hashtag_count', 4)} relevant hashtags at the end of the post
+- Hashtags should be relevant to the content and industry
+- Only skip hashtags if user explicitly requests "no hashtags" or "zero hashtags"
+- Include hashtags in the metadata field as an array
 
 Generate a post that sounds EXACTLY like this person wrote it, following their style perfectly."""
 

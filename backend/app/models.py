@@ -17,6 +17,7 @@ class PostFormat(str, enum.Enum):
     CAROUSEL = "carousel"
     IMAGE = "image"
     VIDEO = "video"
+    VIDEO_SCRIPT = "video_script"
 
 class SubscriptionPlan(str, enum.Enum):
     FREE = "free"

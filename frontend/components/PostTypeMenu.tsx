@@ -14,10 +14,11 @@ interface PostTypeMenuProps {
 }
 
 const postTypes = [
-  { value: "auto", label: "Auto-detect" },
+  { value: "auto", label: "Choose for me" },
+  { value: "image", label: "Text + Image" },
   { value: "text", label: "Text Only" },
   { value: "carousel", label: "Carousel" },
-  { value: "image", label: "Text + Image" },
+  { value: "video_script", label: "Video script" },
 ];
 
 export function PostTypeMenu({

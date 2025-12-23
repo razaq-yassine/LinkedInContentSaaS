@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS generated_posts (
     conversation_id VARCHAR(36),
     topic VARCHAR(500),
     content TEXT NOT NULL,
-    format ENUM('text', 'carousel', 'image', 'video') DEFAULT 'text',
+    format ENUM('text', 'carousel', 'image', 'video', 'video_script') DEFAULT 'text',
     generation_options JSON,
     attachments JSON,
     user_edited_content TEXT,

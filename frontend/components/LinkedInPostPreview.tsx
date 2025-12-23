@@ -127,6 +127,11 @@ export function LinkedInPostPreview({
 
   // Format post content with bold hashtags
   const formatPostContent = (content: string) => {
+    // Special formatting for video scripts
+    if (formatType === 'video_script') {
+      return formatVideoScript(content);
+    }
+    
     // Split by hashtags (including hashtags with numbers and underscores)
     // Regex matches # followed by word characters (letters, numbers, underscore)
     const parts = content.split(/(#[\w]+)/g);
@@ -136,6 +141,87 @@ export function LinkedInPostPreview({
       }
       return <span key={index}>{part}</span>;
     });
+  };
+
+  // Format video script with special styling
+  const formatVideoScript = (content: string) => {
+    const lines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    
+    lines.forEach((line, lineIndex) => {
+      const trimmedLine = line.trim();
+      
+      if (!trimmedLine) {
+        // Empty line - add spacing
+        elements.push(<br key={`br-${lineIndex}`} />);
+        return;
+      }
+      
+      // Check for header markers
+      if (trimmedLine.startsWith('**HEADER**')) {
+        const headerText = trimmedLine.replace('**HEADER**', '').trim();
+        elements.push(
+          <div key={`header-${lineIndex}`} className="mt-4 mb-2">
+            <strong className="font-bold text-black text-sm">{headerText}</strong>
+          </div>
+        );
+        return;
+      }
+      
+      // Check for subheader markers
+      if (trimmedLine.startsWith('**SUBHEADER**')) {
+        const subheaderText = trimmedLine.replace('**SUBHEADER**', '').trim();
+        elements.push(
+          <div key={`subheader-${lineIndex}`} className="mt-3 mb-1">
+            <strong className="font-semibold text-[#0A66C2] text-xs">{subheaderText}</strong>
+          </div>
+        );
+        return;
+      }
+      
+      // Check for visual cue markers
+      if (trimmedLine.startsWith('*VISUAL*')) {
+        const visualText = trimmedLine.replace('*VISUAL*', '').trim();
+        elements.push(
+          <div key={`visual-${lineIndex}`} className="mb-2">
+            <span className="text-[#666666] text-[10px] italic bg-[#F3F2F0] px-2 py-1 rounded">
+              📹 {visualText}
+            </span>
+          </div>
+        );
+        return;
+      }
+      
+      // Check for script markers
+      if (trimmedLine.startsWith('*SCRIPT*')) {
+        const scriptText = trimmedLine.replace('*SCRIPT*', '').trim();
+        elements.push(
+          <div key={`script-${lineIndex}`} className="mb-2">
+            <span className="text-black italic leading-relaxed">{scriptText}</span>
+          </div>
+        );
+        return;
+      }
+      
+      // Fallback for lines without markers (legacy format or plain text)
+      // Check if it looks like a header (starts with [)
+      if (trimmedLine.startsWith('[') && trimmedLine.includes(']')) {
+        elements.push(
+          <div key={`legacy-header-${lineIndex}`} className="mt-4 mb-2">
+            <strong className="font-bold text-black text-sm">{trimmedLine}</strong>
+          </div>
+        );
+      } else {
+        // Regular script text
+        elements.push(
+          <div key={`text-${lineIndex}`} className="mb-2">
+            <span className="text-black italic leading-relaxed">{trimmedLine}</span>
+          </div>
+        );
+      }
+    });
+    
+    return <>{elements}</>;
   };
 
   return (

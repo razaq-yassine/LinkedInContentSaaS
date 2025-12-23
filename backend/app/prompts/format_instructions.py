@@ -3,68 +3,110 @@ Format-specific instructions for different post types
 """
 
 # Image Post Instructions
-IMAGE_POST_INSTRUCTIONS = """## CRITICAL: Format Enforcement - TEXT + IMAGE POST
+IMAGE_POST_INSTRUCTIONS = """## TEXT + IMAGE POST
 
-You MUST generate a TEXT + IMAGE post with SEPARATE fields:
+Generate TWO separate fields:
 
-1. post_content: The actual LinkedIn post text that will be displayed.
-   - This is what users will READ on LinkedIn
-   - DO NOT include image descriptions or prompts here
-   - DO NOT mention 'image' or 'visual' in the post content
-   - Write it as a normal LinkedIn post
+1. post_content: LinkedIn post text (users read this)
+   - Normal post, small statements with spacing
+   - NO image descriptions/prompts in content
 
-2. image_prompt: A DETAILED image generation prompt (REQUIRED - cannot be null)
-   - This is ONLY for AI image generation, NOT shown to users
-   - Describe what the image should look like
-   - Include style, colors, composition, elements
-   - Even if the user's request doesn't mention images, you MUST create an appropriate image prompt
+2. image_prompt: Image generation prompt (REQUIRED, for AI only)
+   - If content is specific (mentions tools/platforms/concrete scenarios): Use real-world visuals (dashboards, offices, devices, professional photos)
+   - If content is general/abstract/conceptual: Use friendly cartoon/illustration style with characters doing actions that match the post's message
+   - For before/after comparisons: Use split-screen with cartoon characters or illustrations showing the transformation
+   - Characters should be diverse, professional, and doing actions that directly represent the post's concepts
+   - LinkedIn-optimized: 1200×628px, professional, engaging, mobile-friendly
+   - Output ONLY the final prompt text - no explanations
 
-IMPORTANT: post_content and image_prompt are COMPLETELY SEPARATE. The post_content should be a normal LinkedIn post, and image_prompt is metadata for image generation."""
+Keep them SEPARATE but image_prompt must create concrete visuals matching post content."""
 
 # Carousel Post Instructions
-CAROUSEL_POST_INSTRUCTIONS = """## CRITICAL: Format Enforcement - TEXT + CAROUSEL POST
+CAROUSEL_POST_INSTRUCTIONS = """## TEXT + CAROUSEL POST
 
-You MUST generate a TEXT + CAROUSEL post with SEPARATE fields:
+Generate TWO separate fields:
 
-1. post_content: The actual LinkedIn post text that will be displayed.
-   - This is what users will READ on LinkedIn
-   - DO NOT include slide prompts, slide descriptions, or image prompts here
-   - DO NOT list slides or mention 'slide 1', 'slide 2', etc.
-   - Write it as a normal LinkedIn post (not structured as slides)
-   - The post content is independent of the carousel slides
+1. post_content: LinkedIn post text (users read this)
+   - Normal post, NOT structured as slides
+   - NO slide descriptions/prompts in content
 
-2. image_prompts: An ARRAY of detailed image generation prompts (REQUIRED - array with 4-8 prompts)
-   - Each prompt describes ONE slide image
-   - These are ONLY for AI image generation, NOT shown in post content
-   - Each prompt should describe the visual for that specific slide
-   - All prompts should have CONSISTENT THEMING (same color scheme, style, visual language)
-   - Even if the user's request doesn't mention carousel, you MUST create multiple image prompts with consistent theming
+2. image_prompts: Array of 4-8 image prompts (REQUIRED, for AI only)
+   - CRITICAL: ALL slides must use SAME color palette, SAME visual style, SAME composition
+   - Choose ONE visual style for entire carousel:
+     * If content is specific: Real-world visuals (photography, dashboards, devices)
+     * If content is general/abstract: Cartoon/illustration style with characters
+   - Break down post into logical sections (one per slide)
+   - Each slide represents ONE specific point from post
+   - Visual progression: slides build like a story (not random images)
+   - If using characters: They should be diverse, professional, doing actions matching each slide's point
+   - Create cohesive series with consistent theming
+   - Output ONLY JSON array - no explanations
 
-IMPORTANT: post_content is the LinkedIn post text (shown to users). image_prompts is an array of slide image descriptions (used for generation only). They are COMPLETELY SEPARATE."""
+Keep them SEPARATE but image_prompts must create consistent visual story matching post structure."""
+
+# Video Script Post Instructions
+VIDEO_SCRIPT_INSTRUCTIONS = """## VIDEO SCRIPT POST
+
+Generate a comprehensive video script for LinkedIn:
+
+1. post_content: Complete video script (what users will read/follow)
+   - Hook (first 3-5 seconds): Attention-grabbing opening that makes viewers want to watch
+   - Main content: Structured in clear sections with natural transitions
+   - Key points: Break down main message into digestible segments
+   - Visual cues: Include brief notes on what to show/do during each section
+   - CTA ending: Clear call-to-action that encourages engagement
+   - Duration guidance: Aim for 60-90 seconds (optimal LinkedIn video length)
+   - Natural language: Write as if speaking, not reading (conversational tone)
+   - Pacing notes: Include pauses, emphasis points, and transitions
+
+2. Structure:
+   - Opening Hook (3-5 seconds)
+   - Introduction/Context (10-15 seconds)
+   - Main Content Points (40-60 seconds)
+   - Summary/Key Takeaway (10-15 seconds)
+   - Call-to-Action (5-10 seconds)
+
+The script should be engaging, valuable, and optimized for LinkedIn video format."""
 
 # JSON Format Templates
 CAROUSEL_JSON_FORMAT = """{
-    "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post, NOT slide descriptions. Do NOT include slide prompts or mention slides here.",
+    "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post, NOT slide descriptions. Do NOT include slide prompts or mention slides here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
     "format_type": "carousel",
     "image_prompts": [
-        "Detailed image generation prompt for slide 1 - describe visual style, colors, composition",
-        "Detailed image generation prompt for slide 2 - describe visual style, colors, composition",
-        "Detailed image generation prompt for slide 3 - describe visual style, colors, composition",
-        "Continue for 4-8 slides total, all with consistent theming"
+        "Slide 1: Detailed prompt with consistent theme - represents first point/concept from post. Include exact colors/style that will be used for ALL slides.",
+        "Slide 2: Detailed prompt with SAME theme/colors/style - represents second point/concept, builds on slide 1 visually",
+        "Slide 3: Detailed prompt with SAME theme/colors/style - represents third point/concept, continues visual story",
+        "Continue for 4-8 slides total. CRITICAL: All slides must use SAME color palette, SAME style, SAME visual elements. Each slide represents ONE specific point from post. Slides should build a visual narrative, not be random images."
     ],
     "metadata": {
-        "hashtags": ["tag1", "tag2", "tag3"],
+        "hashtags": ["#tag1", "#tag2", "#tag3"],
         "tone": "professional|casual|thought-leader|educator",
         "estimated_engagement": "low|medium|high"
     }
 }
 
-CRITICAL: post_content is the LinkedIn post text (what users see). image_prompts is an array of slide image descriptions (for generation only). Keep them SEPARATE."""
+CRITICAL: post_content is the LinkedIn post text (what users see). image_prompts must create a cohesive visual story with consistent theming across ALL slides.
+
+IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
 
 IMAGE_JSON_FORMAT = """{
-    "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post. Do NOT include image descriptions or prompts here.",
+    "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post. Use small statements with blank lines between them. Do NOT include image descriptions or prompts here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
     "format_type": "image",
-    "image_prompt": "Detailed image generation prompt - describe what the image should look like, style, colors, composition, elements. This is ONLY for AI image generation, NOT shown in the post.",
+    "image_prompt": "Detailed image generation prompt. If post mentions specific tools/platforms: use real-world visuals (dashboards, offices, devices). If post is general/abstract: use friendly cartoon/illustration style with diverse professional characters doing actions that match the post's message. For before/after comparisons: use split-screen with cartoon characters showing transformation. Include: visual style (realistic photography OR cartoon illustration), specific color palette, composition, concrete visual elements. LinkedIn-friendly, professional, engaging, 1200x628px. This is ONLY for AI image generation, NOT shown in the post.",
+    "metadata": {
+        "hashtags": ["#tag1", "#tag2", "#tag3"],
+        "tone": "professional|casual|thought-leader|educator",
+        "estimated_engagement": "low|medium|high"
+    }
+}
+
+CRITICAL: post_content is the LinkedIn post text (what users see). image_prompt must create a concrete visual - use cartoon/illustration characters when content is general/abstract, use real-world visuals when content is specific.
+
+IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
+
+VIDEO_SCRIPT_JSON_FORMAT = """{
+    "post_content": "Complete video script formatted as readable text:\n\n[Hook - 3-5 seconds]\nYour attention-grabbing opening line here. Make it conversational and engaging.\n\n[Introduction - 10-15 seconds]\nSet up the context and why this topic matters. Establish credibility.\n\n[Main Content - 40-60 seconds]\nBreak down your main points:\n\nPoint 1: [Brief description]\n[Visual cue: what to show]\nYour script text here with natural pauses and conversational flow.\n\nPoint 2: [Brief description]\n[Visual cue: what to show]\nYour script text here.\n\nPoint 3: [Brief description]\n[Visual cue: what to show]\nYour script text here.\n\n[Summary - 10-15 seconds]\nReinforce the key takeaway. Tie back to the hook if possible.\n\n[CTA - 5-10 seconds]\nClear call-to-action that encourages engagement.\n\nTotal duration: 60-90 seconds. Write naturally as if speaking, not reading.",
+    "format_type": "video_script",
     "metadata": {
         "hashtags": ["tag1", "tag2", "tag3"],
         "tone": "professional|casual|thought-leader|educator",
@@ -72,31 +114,33 @@ IMAGE_JSON_FORMAT = """{
     }
 }
 
-CRITICAL: post_content is the LinkedIn post text (what users see). image_prompt is the image description (for generation only). Keep them SEPARATE."""
+CRITICAL: post_content MUST be a single formatted string, NOT a dictionary or structured object. Format it as readable text with clear sections marked by brackets like [Hook], [Introduction], etc. Users will read this script when creating their video."""
 
 TEXT_JSON_FORMAT = """{
-    "post_content": "your post content here",
-    "format_type": "text|carousel|image",
+    "post_content": "your post content here with hashtags at the end like #tag1 #tag2 #tag3",
+    "format_type": "text|carousel|image|video_script",
     "image_prompt": "detailed image prompt if format is image or carousel, otherwise null",
     "metadata": {
-        "hashtags": ["tag1", "tag2", "tag3"],
+        "hashtags": ["#tag1", "#tag2", "#tag3"],
         "tone": "professional|casual|thought-leader|educator",
         "estimated_engagement": "low|medium|high"
     }
-}"""
+}
+
+CRITICAL: post_content MUST include the hashtags at the end of the text. Hashtags should appear BOTH in post_content (as text) AND in metadata.hashtags (as array)."""
 
 # Response Format Requirements
 RESPONSE_FORMAT_REQUIREMENTS = """
-## CRITICAL: Response Format Requirements
-You MUST respond with ONLY a valid JSON object in this exact format:
+## Response Format
+Respond with ONLY valid JSON (no markdown blocks).
 
-## Key Rules:
-- post_content: This is what LinkedIn users will READ. It should be a normal LinkedIn post text.
-- For image posts: image_prompt is SEPARATE from post_content. Do NOT mention image prompts in post_content.
-- For carousel posts: image_prompts array is SEPARATE from post_content. Do NOT include slide descriptions in post_content.
-- The post_content should be written as if it's a standalone LinkedIn post, independent of the image prompts.
-
-Do NOT include any markdown code blocks or explanations. Output ONLY the JSON object."""
+Rules:
+- post_content: Normal LinkedIn post text (what users read)
+- image_prompt/image_prompts: SEPARATE from post_content (for generation only)
+- Write post_content as standalone post, independent of image prompts
+- CRITICAL: metadata.hashtags MUST be an array with the exact number of hashtags requested (default: 4)
+- Hashtags should be relevant to the content and industry
+- Only use empty array if user explicitly requested zero hashtags"""
 
 def get_format_instructions(post_type: str) -> str:
     """Get format-specific instructions"""
@@ -104,6 +148,8 @@ def get_format_instructions(post_type: str) -> str:
         return IMAGE_POST_INSTRUCTIONS
     elif post_type == 'carousel':
         return CAROUSEL_POST_INSTRUCTIONS
+    elif post_type == 'video_script':
+        return VIDEO_SCRIPT_INSTRUCTIONS
     return ""
 
 def get_json_format(post_type: str) -> str:
@@ -112,6 +158,8 @@ def get_json_format(post_type: str) -> str:
         return CAROUSEL_JSON_FORMAT
     elif post_type == 'image' or post_type == 'text_with_image':
         return IMAGE_JSON_FORMAT
+    elif post_type == 'video_script':
+        return VIDEO_SCRIPT_JSON_FORMAT
     return TEXT_JSON_FORMAT
 
 
