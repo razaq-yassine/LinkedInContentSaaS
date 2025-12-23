@@ -5,6 +5,13 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConversationList } from "@/components/ConversationList";
 import { 
   PenSquare, 
@@ -15,7 +22,10 @@ import {
   Menu, 
   X,
   LogOut,
-  Sparkles
+  Sparkles,
+  MoreVertical,
+  CreditCard,
+  User
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 
@@ -114,7 +124,6 @@ export default function DashboardLayout({
     { href: "/history", label: "Posts Planning", icon: Calendar },
     { href: "/comments", label: "Comments", icon: MessageSquare },
     { href: "/context", label: "Profile Context", icon: Sparkles },
-    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   if (!user) {
@@ -187,29 +196,85 @@ export default function DashboardLayout({
 
           {/* User Profile */}
           <div className="border-t border-[#E0DFDC] p-4">
-            <div className="flex items-center gap-3">
-              <Avatar className="w-10 h-10">
-                {user.linkedin_profile_picture && (
-                  <AvatarImage src={user.linkedin_profile_picture} alt={user.name || "User"} />
-                )}
-                <AvatarFallback className="bg-[#0A66C2] text-white font-semibold">
-                  {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-black truncate">
-                  {user.name || "User"}
-                </p>
-                <p className="text-xs text-[#666666] truncate">{user.email}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 hover:bg-[#F3F2F0] rounded-lg transition-colors"
-                title="Logout"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 w-full hover:bg-[#F3F2F0] rounded-lg p-2 transition-colors">
+                  <Avatar className="w-10 h-10">
+                    {user.linkedin_profile_picture && (
+                      <AvatarImage src={user.linkedin_profile_picture} alt={user.name || "User"} />
+                    )}
+                    <AvatarFallback className="bg-[#0A66C2] text-white font-semibold">
+                      {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-semibold text-black truncate">
+                      {user.name || "User"}
+                    </p>
+                    <p className="text-xs text-[#666666] truncate">
+                      {user.email}
+                    </p>
+                  </div>
+                  <MoreVertical className="w-5 h-5 text-[#666666] flex-shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="end" 
+                side="top"
+                className="w-64 bg-white border border-[#E0DFDC] shadow-lg"
+                sideOffset={8}
               >
-                <LogOut className="w-4 h-4 text-[#666666]" />
-              </button>
-            </div>
+                {/* Profile Header */}
+                <div className="px-3 py-3 bg-[#E7F3FF]">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-12 h-12">
+                      {user.linkedin_profile_picture && (
+                        <AvatarImage src={user.linkedin_profile_picture} alt={user.name || "User"} />
+                      )}
+                      <AvatarFallback className="bg-[#0A66C2] text-white font-semibold text-lg">
+                        {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-semibold text-black truncate">
+                        {user.name || "User"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <DropdownMenuSeparator className="bg-[#E0DFDC]" />
+                
+                {/* Menu Items */}
+                <div className="py-1">
+                  <DropdownMenuItem 
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] focus:bg-[#F3F2F0]"
+                    onClick={() => router.push('/billing')}
+                  >
+                    <CreditCard className="w-5 h-5 text-black" />
+                    <span className="text-base font-medium text-black">Billing</span>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] focus:bg-[#F3F2F0]"
+                    onClick={() => router.push('/settings')}
+                  >
+                    <Settings className="w-5 h-5 text-black" />
+                    <span className="text-base font-medium text-black">Settings</span>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator className="bg-[#E0DFDC] my-1" />
+                  
+                  <DropdownMenuItem 
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] focus:bg-[#F3F2F0]"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="w-5 h-5 text-black" />
+                    <span className="text-base font-medium text-black">Logout</span>
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </aside>

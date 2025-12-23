@@ -1,60 +1,115 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api-client";
 import { LinkedInConnect } from "@/components/LinkedInConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
+import { Lock, Shield, CheckCircle2, AlertCircle, Info } from "lucide-react";
 
 export default function SettingsPage() {
-  const [preferences, setPreferences] = useState<any>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  const [isOAuthUser, setIsOAuthUser] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadPreferences();
+    loadUserInfo();
   }, []);
 
-  const loadPreferences = async () => {
+  const loadUserInfo = async () => {
     try {
-      const response = await api.user.getPreferences();
-      setPreferences(response.data.preferences);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setHasPassword(data.has_password);
+        setIsOAuthUser(data.google_connected || data.linkedin_connected);
+      }
     } catch (error) {
-      console.error("Failed to load preferences:", error);
+      console.error('Failed to load user info:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const validatePassword = (password: string) => {
+    const errors = [];
+    if (password.length < 8) errors.push("At least 8 characters");
+    if (!/[A-Z]/.test(password)) errors.push("One uppercase letter");
+    if (!/[a-z]/.test(password)) errors.push("One lowercase letter");
+    if (!/\d/.test(password)) errors.push("One number");
+    return errors;
+  };
+
+  const passwordErrors = newPassword ? validatePassword(newPassword) : [];
+  const passwordsMatch = newPassword === confirmPassword;
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage(null);
+
+    if (passwordErrors.length > 0) {
+      setPasswordMessage({ type: 'error', text: 'Password does not meet requirements' });
+      return;
+    }
+
+    if (!passwordsMatch) {
+      setPasswordMessage({ type: 'error', text: 'Passwords do not match' });
+      return;
+    }
+
+    setPasswordLoading(true);
     try {
-      await api.user.updatePreferences(preferences);
-      alert("Preferences saved successfully!");
+      // Use set-password endpoint if user doesn't have password yet
+      const endpoint = hasPassword ? '/api/auth/change-password' : '/api/auth/set-password';
+      const body = hasPassword 
+        ? { current_password: currentPassword, new_password: newPassword }
+        : { new_password: newPassword };
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setPasswordMessage({ type: 'success', text: hasPassword ? 'Password changed successfully!' : 'Password set successfully! You can now login with email and password.' });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setHasPassword(true);
+      } else {
+        setPasswordMessage({ type: 'error', text: data.detail || 'Failed to change password' });
+      }
     } catch (error: any) {
-      alert("Failed to save: " + (error.response?.data?.detail || error.message));
+      setPasswordMessage({ type: 'error', text: error.message || 'An error occurred' });
     } finally {
-      setSaving(false);
+      setPasswordLoading(false);
     }
   };
 
-  const updateDistribution = (key: string, value: number) => {
-    setPreferences((prev: any) => ({
-      ...prev,
-      post_type_distribution: {
-        ...prev.post_type_distribution,
-        [key]: value,
-      },
-    }));
-  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F3F2F0] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#F3F2F0] via-white to-[#F3F2F0] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#0A66C2] mx-auto mb-4"></div>
           <p className="text-[#666666]">Loading settings...</p>
@@ -64,189 +119,219 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F2F0] py-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#F3F2F0] via-white to-[#F3F2F0] py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        <h1 className="text-3xl font-bold text-black mb-8">Settings</h1>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-black mb-2">Account Settings</h1>
+          <p className="text-[#666666]">Manage your connected accounts and security settings</p>
+        </div>
 
-        <Tabs defaultValue="preferences" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-white border border-[#E0DFDC] p-1 rounded-lg">
-            <TabsTrigger 
-              value="preferences"
-              className="data-[state=active]:bg-[#0A66C2] data-[state=active]:text-white"
-            >
-              Preferences
-            </TabsTrigger>
-            <TabsTrigger 
-              value="profile"
-              className="data-[state=active]:bg-[#0A66C2] data-[state=active]:text-white"
-            >
-              Profile
-            </TabsTrigger>
-            <TabsTrigger 
-              value="account"
-              className="data-[state=active]:bg-[#0A66C2] data-[state=active]:text-white"
-            >
-              Account
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="preferences" className="mt-6">
-            <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
-              <h2 className="text-2xl font-bold text-black mb-6">Post Type Distribution</h2>
-              <p className="text-sm text-[#666666] mb-6">
-                Adjust how often each post format should be suggested when using auto mode
-              </p>
-              
-              <div className="space-y-8">
-                {Object.entries(preferences?.post_type_distribution || {}).map(([key, value]: [string, any]) => {
-                  const labels: Record<string, string> = {
-                    text_only: "Text Only",
-                    text_with_image: "Text + Image",
-                    carousel: "Carousel",
-                    video: "Video",
-                  };
-                  const numValue = Number(value);
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between mb-3">
-                        <Label className="text-sm font-semibold text-black">
-                          {labels[key] || key}
-                        </Label>
-                        <span className="text-sm font-bold text-[#0A66C2]">
-                          {numValue}%
-                        </span>
-                      </div>
-                      {/* Visual bar */}
-                      <div className="h-2 bg-[#E0DFDC] rounded-full mb-2 overflow-hidden">
-                        <div
-                          className="h-full bg-[#0A66C2] transition-all duration-300"
-                          style={{ width: `${numValue}%` }}
-                        />
-                      </div>
-                      <Slider
-                        value={[numValue]}
-                        onValueChange={(v) => updateDistribution(key, v[0])}
-                        max={100}
-                        step={5}
-                        className="mt-2"
-                      />
-                    </div>
-                  );
-                })}
+        <div className="space-y-6">
+          {/* Connected Accounts Section */}
+          <div className="overflow-hidden rounded-lg border border-[#E0DFDC] shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <div className="bg-gradient-to-r from-[#0A66C2] to-[#004182] p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Connected Accounts</h2>
+                  <p className="text-white/80 text-sm">Link your social media accounts</p>
+                </div>
               </div>
-
-              <div className="mt-10 pt-8 border-t border-[#E0DFDC]">
-                <h3 className="font-bold text-lg text-black mb-6">Other Preferences</h3>
-                <div className="space-y-6">
+            </div>
+            <div className="bg-white p-8">
+              <div className="space-y-4">
+                <LinkedInConnect />
+                <GoogleConnect />
+              </div>
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="flex justify-between mb-3">
-                      <Label className="text-sm font-semibold text-black">
-                        Default Hashtag Count
-                      </Label>
-                      <span className="text-sm font-bold text-[#0A66C2]">
-                        {preferences?.hashtag_count || 4}
-                      </span>
+                    <p className="text-sm font-medium text-blue-900">Why connect accounts?</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Connecting your accounts allows seamless content sharing and profile synchronization.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Password Section */}
+          <div className="overflow-hidden rounded-lg border border-[#E0DFDC] shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <div className="bg-gradient-to-r from-[#0A66C2] to-[#004182] p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                  <Lock className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Password & Security</h2>
+                  <p className="text-white/80 text-sm">
+                    {hasPassword ? 'Update your password to keep your account secure' : 'Set a password to enable email login'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-8">
+              {/* Info banner for OAuth users without password */}
+              {!hasPassword && isOAuthUser && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Set a Password</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        You logged in with {isOAuthUser ? 'social login' : 'OAuth'}. Set a password to enable login with your email address.
+                      </p>
                     </div>
-                    <Slider
-                      value={[preferences?.hashtag_count || 4]}
-                      onValueChange={(v) =>
-                        setPreferences((prev: any) => ({ ...prev, hashtag_count: v[0] }))
-                      }
-                      max={10}
-                      step={1}
-                      className="mt-2"
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handlePasswordChange} className="space-y-6">
+                {/* Current Password - Only show if user has password */}
+                {hasPassword && (
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password" className="text-sm font-semibold text-black flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-[#0A66C2]" />
+                      Current Password
+                    </Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter your current password"
+                      className="border-[#E0DFDC] focus:border-[#0A66C2] focus:ring-[#0A66C2] transition-colors"
+                      required
                     />
                   </div>
-                </div>
-              </div>
-            </Card>
-          </TabsContent>
+                )}
 
-          <TabsContent value="profile" className="mt-6">
-            <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
-              <h2 className="text-2xl font-bold text-black mb-4">Profile Information</h2>
-              <p className="text-[#666666] mb-6">
-                View and manage your profile data and writing style
-              </p>
-              <div className="space-y-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start border-[#E0DFDC] hover:border-[#0A66C2]" 
-                  disabled
-                >
-                  📄 View Profile Markdown
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start border-[#E0DFDC] hover:border-[#0A66C2]" 
-                  disabled
-                >
-                  ✍️ View Writing Style
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start border-[#E0DFDC] hover:border-[#0A66C2]" 
-                  disabled
-                >
-                  📎 Update CV
-                </Button>
-              </div>
-              <p className="text-xs text-[#999999] mt-6">
-                Profile management features coming soon
-              </p>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="account" className="mt-6">
-            <div className="space-y-6">
-              {/* Connected Accounts Section */}
-              <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
-                <h2 className="text-2xl font-bold text-black mb-6">Connected Accounts</h2>
-                <p className="text-[#666666] mb-6">
-                  Manage your linked social accounts
-                </p>
-                <div className="space-y-4">
-                  <LinkedInConnect />
-                  <GoogleConnect />
-                </div>
-              </Card>
-              
-              <Card className="p-8 bg-white border border-[#E0DFDC] shadow-linkedin-md">
-                <h2 className="text-2xl font-bold text-black mb-4">Subscription</h2>
-                <p className="text-[#666666] mb-6">
-                  Manage your subscription plan
-                </p>
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-semibold text-black mb-2">Current Plan</h3>
-                    <div className="bg-[#F3F2F0] p-4 rounded-lg">
-                      <p className="text-lg font-bold text-[#0A66C2]">Free Plan</p>
-                      <p className="text-sm text-[#666666] mt-1">5 posts per month</p>
+                {/* New Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="new-password" className="text-sm font-semibold text-black flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-[#0A66C2]" />
+                    {hasPassword ? 'New Password' : 'Password'}
+                  </Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder={hasPassword ? "Enter your new password" : "Enter your password"}
+                    className="border-[#E0DFDC] focus:border-[#0A66C2] focus:ring-[#0A66C2] transition-colors"
+                    required
+                  />
+                  {newPassword && passwordErrors.length > 0 && (
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs font-medium text-amber-900 mb-2">Password must contain:</p>
+                      <ul className="space-y-1">
+                        {passwordErrors.map((error, idx) => (
+                          <li key={idx} className="text-xs text-amber-700 flex items-center gap-2">
+                            <AlertCircle className="w-3 h-3" />
+                            {error}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
+                  )}
+                  {newPassword && passwordErrors.length === 0 && (
+                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-xs text-green-700 flex items-center gap-2">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Password meets all requirements
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password" className="text-sm font-semibold text-black flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-[#0A66C2]" />
+                    {hasPassword ? 'Confirm New Password' : 'Confirm Password'}
+                  </Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder={hasPassword ? "Confirm your new password" : "Confirm your password"}
+                    className="border-[#E0DFDC] focus:border-[#0A66C2] focus:ring-[#0A66C2] transition-colors"
+                    required
+                  />
+                  {confirmPassword && !passwordsMatch && (
+                    <p className="text-xs text-red-600 flex items-center gap-2 mt-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Passwords do not match
+                    </p>
+                  )}
+                  {confirmPassword && passwordsMatch && (
+                    <p className="text-xs text-green-600 flex items-center gap-2 mt-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Passwords match
+                    </p>
+                  )}
+                </div>
+
+                {/* Message Display */}
+                {passwordMessage && (
+                  <div className={`p-4 rounded-lg border ${
+                    passwordMessage.type === 'success' 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <p className={`text-sm flex items-center gap-2 ${
+                      passwordMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {passwordMessage.type === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4" />
+                      )}
+                      {passwordMessage.text}
+                    </p>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-[#E0DFDC] hover:border-[#0A66C2]" 
-                    disabled
+                )}
+
+                {/* Submit Button */}
+                <div className="pt-4">
+                  <Button
+                    type="submit"
+                    disabled={passwordLoading || passwordErrors.length > 0 || !passwordsMatch || (hasPassword === true && !currentPassword)}
+                    className="w-full bg-gradient-to-r from-[#0A66C2] to-[#004182] hover:from-[#004182] hover:to-[#0A66C2] text-white font-semibold py-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Upgrade Plan
+                    {passwordLoading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        {hasPassword ? 'Updating Password...' : 'Setting Password...'}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Lock className="w-4 h-4" />
+                        {hasPassword ? 'Update Password' : 'Set Password'}
+                      </span>
+                    )}
                   </Button>
                 </div>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+              </form>
 
-        {/* Fixed Save Button */}
-        <div className="fixed bottom-0 left-0 right-0 lg:left-[280px] bg-white border-t border-[#E0DFDC] p-4 shadow-linkedin-lg">
-          <div className="max-w-4xl mx-auto flex justify-end">
-            <Button 
-              onClick={handleSave} 
-              disabled={saving}
-              className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full px-8"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
+              {/* Security Tips */}
+              <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs font-medium text-gray-900 mb-2">🔐 Security Tips:</p>
+                <ul className="space-y-1 text-xs text-gray-600">
+                  <li>• Use a unique password you don't use elsewhere</li>
+                  <li>• Consider using a password manager</li>
+                  <li>• Change your password regularly</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>

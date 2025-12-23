@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from .config import get_settings
 from .database import engine, Base
-from .routers import auth, onboarding, generation, comments, admin, user, conversations, images, pdfs
+from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription
 
 settings = get_settings()
 
@@ -18,10 +18,11 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:3000"],
+    allow_origins=[settings.frontend_url, "http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Create uploads directory if it doesn't exist
@@ -37,9 +38,11 @@ app.include_router(generation.router, prefix="/api/generate", tags=["generation"
 app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
 app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(user.router, prefix="/api/user", tags=["user"])
+app.include_router(admin_auth.router, prefix="/api/admin/auth", tags=["admin-auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(pdfs.router, prefix="/api/pdfs", tags=["pdfs"])
+app.include_router(subscription.router, prefix="/api/subscription", tags=["subscription"])
 
 @app.on_event("startup")
 async def startup_event():

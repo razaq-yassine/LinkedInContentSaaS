@@ -1,0 +1,7 @@
+IMPORTANT: Add this line to your frontend/.env.local file:
+
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+Current file location: LinkedInContentSaaS/frontend/.env.local
+
+This is required for the admin login to work properly.

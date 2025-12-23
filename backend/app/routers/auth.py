@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -14,7 +14,8 @@ from ..schemas.auth import (
     MockLoginRequest, LoginResponse, UserResponse,
     RegisterRequest, RegisterResponse, LoginRequest,
     ForgotPasswordRequest, ResetPasswordRequest, VerifyEmailRequest,
-    ResendVerificationRequest, MessageResponse
+    ResendVerificationRequest, MessageResponse, ChangePasswordRequest,
+    SetPasswordRequest
 )
 from ..config import get_settings
 from ..services.linkedin_service import LinkedInService
@@ -28,6 +29,104 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth_states = {}
 google_oauth_states = {}
+
+def create_popup_response(success: bool, message_type: str, error_message: str = None):
+    """Create HTML response that sends message to popup opener and closes popup"""
+    if success:
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Authentication Successful</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    margin: 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }}
+                .container {{
+                    text-align: center;
+                    color: white;
+                }}
+                .checkmark {{
+                    font-size: 64px;
+                    margin-bottom: 20px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="checkmark">✓</div>
+                <h1>Connected Successfully!</h1>
+                <p>You can close this window now.</p>
+            </div>
+            <script>
+                if (window.opener) {{
+                    window.opener.postMessage({{
+                        type: '{message_type}',
+                        success: true
+                    }}, window.location.origin);
+                    setTimeout(() => window.close(), 1500);
+                }} else {{
+                    document.body.innerHTML = '<div class="container"><h1>Success!</h1><p>Please close this window and return to the application.</p></div>';
+                }}
+            </script>
+        </body>
+        </html>
+        """
+    else:
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Authentication Failed</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    margin: 0;
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                }}
+                .container {{
+                    text-align: center;
+                    color: white;
+                }}
+                .error-icon {{
+                    font-size: 64px;
+                    margin-bottom: 20px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="error-icon">✕</div>
+                <h1>Connection Failed</h1>
+                <p>{error_message or 'An error occurred during authentication.'}</p>
+                <p>You can close this window now.</p>
+            </div>
+            <script>
+                if (window.opener) {{
+                    window.opener.postMessage({{
+                        type: '{message_type}',
+                        success: false,
+                        message: '{error_message or "Authentication failed"}'
+                    }}, window.location.origin);
+                    setTimeout(() => window.close(), 3000);
+                }} else {{
+                    document.body.innerHTML = '<div class="container"><h1>Error</h1><p>Please close this window and return to the application.</p></div>';
+                }}
+            </script>
+        </body>
+        </html>
+        """
+    return HTMLResponse(content=html_content)
 
 def create_access_token(data: dict):
     """Create JWT access token"""
@@ -396,6 +495,57 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
     raise HTTPException(status_code=404, detail="User not found")
 
 
+@router.post("/set-password", response_model=MessageResponse)
+async def set_password(
+    request: SetPasswordRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Set password for OAuth users who don't have a password yet"""
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="Password already set. Use change-password endpoint to update it."
+        )
+    
+    user.password_hash = pwd_context.hash(request.new_password)
+    db.commit()
+    
+    return MessageResponse(success=True, message="Password set successfully")
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    request: ChangePasswordRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Change password for authenticated user"""
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="No password set. Use set-password endpoint first."
+        )
+    
+    if not pwd_context.verify(request.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    user.password_hash = pwd_context.hash(request.new_password)
+    db.commit()
+    
+    return MessageResponse(success=True, message="Password changed successfully")
+
+
 # ============== GOOGLE OAUTH ==============
 
 @router.get("/google/login")
@@ -431,6 +581,41 @@ async def google_login():
     }
 
 
+@router.get("/google/connect")
+async def google_connect(
+    user_id: str = Depends(get_current_user_id)
+):
+    """Initiate Google OAuth flow for connecting account (requires auth)"""
+    if not settings.google_client_id:
+        raise HTTPException(status_code=501, detail="Google OAuth is not configured")
+    
+    state = secrets.token_urlsafe(32)
+    google_oauth_states[state] = {
+        "user_id": user_id,
+        "redirect_context": "settings",
+        "created_at": datetime.utcnow()
+    }
+    
+    # Google OAuth URL
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    
+    query_string = "&".join(f"{k}={v}" for k, v in params.items())
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query_string}"
+    
+    return {
+        "authorization_url": auth_url,
+        "state": state
+    }
+
+
 @router.get("/google/callback")
 async def google_callback(
     code: str = Query(...),
@@ -442,6 +627,8 @@ async def google_callback(
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     
     state_data = google_oauth_states.pop(state)
+    user_id = state_data.get("user_id")
+    redirect_context = state_data.get("redirect_context", "login")
     
     if datetime.utcnow() - state_data["created_at"] > timedelta(minutes=5):
         raise HTTPException(status_code=400, detail="State expired")
@@ -478,26 +665,22 @@ async def google_callback(
         google_name = userinfo.get("name")
         google_picture = userinfo.get("picture")
         
-        # Find or create user
-        user = db.query(User).filter(User.google_id == google_id).first()
-        
-        if not user:
-            # Check if user exists with this email
-            user = db.query(User).filter(User.email == google_email).first()
+        # Handle LOGIN context (create or find user by email)
+        if redirect_context == "login":
+            # ALWAYS check by email first (unified authentication)
+            user = None
+            if google_email:
+                user = db.query(User).filter(User.email == google_email).first()
             
-            if user:
-                # Link Google account to existing user
-                user.google_id = google_id
-            else:
-                # Create new user
+            if not user:
+                # No account with this email exists - create new user
                 user_id = str(uuid.uuid4())
                 user = User(
                     id=user_id,
                     email=google_email,
                     name=google_name,
-                    google_id=google_id,
-                    email_verified=True,  # Google emails are verified
-                    account_type="person"
+                    account_type="person",
+                    email_verified=True  # Google emails are verified
                 )
                 db.add(user)
                 
@@ -516,6 +699,40 @@ async def google_callback(
                     posts_limit=5
                 )
                 db.add(subscription)
+            
+            # If account exists with this email, authenticate into it
+            user_id = user.id
+        else:
+            # Regular connect flow - user must exist
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Check if Google email matches a different account
+            if google_email and google_email != user.email:
+                existing_user = db.query(User).filter(User.email == google_email).first()
+                if existing_user and existing_user.id != user_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"This Google account is already associated with another account ({google_email})"
+                    )
+        
+        # Check if this Google ID is already connected to a different user
+        existing_user = db.query(User).filter(User.google_id == google_id).first()
+        if existing_user and existing_user.id != user_id:
+            # Disconnect from old user (keep their email intact)
+            existing_user.google_id = None
+        
+        # Link Google to this user
+        user.google_id = google_id
+        
+        # Update name only if not set
+        if not user.name and google_name:
+            user.name = google_name
+        
+        # Ensure email is never null
+        if not user.email and google_email:
+            user.email = google_email
         
         db.commit()
         db.refresh(user)
@@ -523,29 +740,36 @@ async def google_callback(
         # Get profile for onboarding status
         profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
         
-        # Create JWT token
-        access_token_jwt = create_access_token(data={"sub": user.id, "email": user.email})
-        
-        # Build user data for frontend
-        import json
-        import urllib.parse
-        
-        user_data = {
-            "access_token": access_token_jwt,
-            "user_id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "google_profile_picture": google_picture,
-            "linkedin_connected": user.linkedin_connected or False,
-            "onboarding_completed": profile.onboarding_completed if profile else False,
-            "email_verified": True
-        }
-        user_data_encoded = urllib.parse.quote(json.dumps(user_data))
-        redirect_url = f"{settings.frontend_url}/login/callback?data={user_data_encoded}"
-        
-        return RedirectResponse(url=redirect_url, status_code=302)
+        # Determine response based on context
+        if redirect_context == "login":
+            # For login context, use redirect (full page flow)
+            import json
+            import urllib.parse
+            
+            access_token_jwt = create_access_token(data={"sub": user.id, "email": user.email})
+            
+            user_data = {
+                "access_token": access_token_jwt,
+                "user_id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "google_profile_picture": google_picture,
+                "linkedin_connected": user.linkedin_connected or False,
+                "onboarding_completed": profile.onboarding_completed if profile else False,
+                "email_verified": True
+            }
+            user_data_encoded = urllib.parse.quote(json.dumps(user_data))
+            redirect_url = f"{settings.frontend_url}/login/callback?data={user_data_encoded}"
+            
+            return RedirectResponse(url=redirect_url, status_code=302)
+        else:
+            # For settings context (account linking), use popup response
+            return create_popup_response(True, "google-oauth-success")
         
     except Exception as e:
+        # For settings context, return popup error response
+        if redirect_context == "settings":
+            return create_popup_response(False, "google-oauth-error", str(e))
         raise HTTPException(status_code=500, detail=f"Google login failed: {str(e)}")
 
 
@@ -565,6 +789,33 @@ async def google_status(
             "email": user.email,
             "name": user.name
         } if user.google_id else None
+    }
+
+
+@router.post("/google/disconnect")
+async def google_disconnect(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Disconnect Google account"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if user has another way to login (password or LinkedIn)
+    if not user.password_hash and not user.linkedin_connected:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot disconnect Google account. Please set a password or connect LinkedIn first to maintain access to your account."
+        )
+    
+    user.google_id = None
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Google account disconnected successfully"
     }
 
 
@@ -589,6 +840,8 @@ async def get_current_user(user_id: str = Depends(get_current_user_id), db: Sess
         linkedin_id=user.linkedin_id,
         linkedin_profile_picture=linkedin_profile_picture,
         linkedin_connected=user.linkedin_connected or False,
+        google_connected=user.google_id is not None,
+        has_password=user.password_hash is not None,
         account_type=user.account_type.value,
         onboarding_completed=profile.onboarding_completed if profile else False,
         email_verified=user.email_verified if hasattr(user, 'email_verified') else True
@@ -659,61 +912,71 @@ async def linkedin_callback(
         linkedin_email = linkedin_profile.get("email")
         linkedin_name = linkedin_profile.get("name")
         
-        # Handle LOGIN context (create or find user by LinkedIn)
+        # Handle LOGIN context (create or find user by email)
         if redirect_context == "login":
-            # Check if user exists with this LinkedIn ID
-            user = db.query(User).filter(User.linkedin_id == linkedin_id).first()
+            # ALWAYS check by email first (unified authentication)
+            user = None
+            if linkedin_email:
+                user = db.query(User).filter(User.email == linkedin_email).first()
             
             if not user:
-                # Check if user exists with this email
-                if linkedin_email:
-                    user = db.query(User).filter(User.email == linkedin_email).first()
+                # No account with this email exists - create new user
+                new_user_id = str(uuid.uuid4())
+                user = User(
+                    id=new_user_id,
+                    email=linkedin_email or f"{linkedin_id}@linkedin.user",
+                    name=linkedin_name,
+                    account_type="person",
+                    email_verified=True  # LinkedIn emails are verified
+                )
+                db.add(user)
                 
-                if not user:
-                    # Create new user
-                    new_user_id = str(uuid.uuid4())
-                    user = User(
-                        id=new_user_id,
-                        email=linkedin_email or f"{linkedin_id}@linkedin.user",
-                        name=linkedin_name,
-                        account_type="person"
-                    )
-                    db.add(user)
-                    
-                    # Create profile
-                    profile = UserProfile(
-                        user_id=new_user_id,
-                        onboarding_step=1,
-                        onboarding_completed=False
-                    )
-                    db.add(profile)
-                    
-                    # Create subscription
-                    subscription = Subscription(
-                        user_id=new_user_id,
-                        plan="free",
-                        posts_limit=5
-                    )
-                    db.add(subscription)
+                # Create profile
+                profile = UserProfile(
+                    user_id=new_user_id,
+                    onboarding_step=1,
+                    onboarding_completed=False
+                )
+                db.add(profile)
+                
+                # Create subscription
+                subscription = Subscription(
+                    user_id=new_user_id,
+                    plan="free",
+                    posts_limit=5
+                )
+                db.add(subscription)
             
+            # If account exists with this email, authenticate into it
             user_id = user.id
         else:
             # Regular connect flow - user must exist
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
+            
+            # Check if LinkedIn email matches a different account
+            if linkedin_email and linkedin_email != user.email:
+                existing_user = db.query(User).filter(User.email == linkedin_email).first()
+                if existing_user and existing_user.id != user_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"This LinkedIn account is already associated with another account ({linkedin_email})"
+                    )
         
-        # Check if this LinkedIn account is already connected to a different user
+        # Check if this LinkedIn ID is already connected to a different user
         existing_user = db.query(User).filter(User.linkedin_id == linkedin_id).first()
         if existing_user and existing_user.id != user_id:
-            # Disconnect from old user
+            # Disconnect from old user (keep their email intact)
             existing_user.linkedin_id = None
             existing_user.linkedin_access_token = None
             existing_user.linkedin_refresh_token = None
             existing_user.linkedin_token_expires_at = None
+            existing_user.linkedin_profile_data = None
             existing_user.linkedin_connected = False
             existing_user.linkedin_last_sync = None
         
+        # Link LinkedIn to this user
         user.linkedin_id = linkedin_id
         user.linkedin_access_token = access_token
         user.linkedin_refresh_token = refresh_token
@@ -722,8 +985,13 @@ async def linkedin_callback(
         user.linkedin_connected = True
         user.linkedin_last_sync = datetime.utcnow()
         
-        if not user.name:
-            user.name = linkedin_profile.get("name")
+        # Update name only if not set
+        if not user.name and linkedin_name:
+            user.name = linkedin_name
+        
+        # Ensure email is never null
+        if not user.email and linkedin_email:
+            user.email = linkedin_email
         
         db.commit()
         
@@ -746,12 +1014,12 @@ async def linkedin_callback(
         # Get profile for onboarding status
         profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
         
-        # Determine redirect URL based on context
+        # Determine response based on context
         import json
         import urllib.parse
         
         if redirect_context == "login":
-            # Create JWT token for login
+            # For login context, still use redirect (full page flow)
             access_token_jwt = create_access_token(data={"sub": user.id, "email": user.email})
             
             # Build user data for frontend
@@ -766,17 +1034,21 @@ async def linkedin_callback(
             }
             user_data_encoded = urllib.parse.quote(json.dumps(user_data))
             redirect_url = f"{settings.frontend_url}/login/callback?data={user_data_encoded}"
+            return RedirectResponse(url=redirect_url, status_code=302)
         elif redirect_context == "onboarding":
+            # For onboarding, still use redirect
             posts_json = json.dumps(posts_data)
             posts_encoded = urllib.parse.quote(posts_json)
             redirect_url = f"{settings.frontend_url}/onboarding?linkedin_connected=true&posts={posts_encoded}"
+            return RedirectResponse(url=redirect_url, status_code=302)
         else:
-            redirect_url = f"{settings.frontend_url}/settings?linkedin_connected=true"
-        
-        # Redirect to frontend
-        return RedirectResponse(url=redirect_url, status_code=302)
+            # For settings context (account linking), use popup response
+            return create_popup_response(True, "linkedin-oauth-success")
         
     except Exception as e:
+        # For settings context, return popup error response
+        if redirect_context == "settings":
+            return create_popup_response(False, "linkedin-oauth-error", str(e))
         raise HTTPException(status_code=500, detail=f"LinkedIn connection failed: {str(e)}")
 
 @router.post("/linkedin/disconnect")
@@ -789,16 +1061,26 @@ async def linkedin_disconnect(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Check if user has another way to login (password or Google)
+    if not user.password_hash and not user.google_id:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot disconnect LinkedIn account. Please set a password or connect Google first to maintain access to your account."
+        )
+    
+    user.linkedin_id = None
     user.linkedin_access_token = None
     user.linkedin_refresh_token = None
     user.linkedin_token_expires_at = None
+    user.linkedin_profile_data = None
     user.linkedin_connected = False
+    user.linkedin_last_sync = None
     
     db.commit()
     
     return {
         "success": True,
-        "message": "LinkedIn account disconnected"
+        "message": "LinkedIn account disconnected successfully"
     }
 
 @router.get("/linkedin/status")

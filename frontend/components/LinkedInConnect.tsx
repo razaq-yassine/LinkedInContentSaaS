@@ -35,11 +35,57 @@ export function LinkedInConnect() {
       const response = await api.auth.linkedInConnect();
       const authUrl = response.data.authorization_url;
       
-      window.location.href = authUrl;
+      // Open OAuth in popup window
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+        authUrl,
+        'LinkedIn OAuth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+      );
+
+      // Listen for OAuth completion message
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        
+        if (event.data.type === 'linkedin-oauth-success') {
+          popup?.close();
+          window.removeEventListener('message', messageListener);
+          setLoading(false);
+          checkConnectionStatus();
+          alert('LinkedIn account connected successfully!');
+        } else if (event.data.type === 'linkedin-oauth-error') {
+          popup?.close();
+          window.removeEventListener('message', messageListener);
+          setLoading(false);
+          alert(event.data.message || 'Failed to connect LinkedIn');
+        }
+      };
+
+      window.addEventListener('message', messageListener);
+
+      // Check if popup was blocked
+      if (!popup || popup.closed) {
+        window.removeEventListener('message', messageListener);
+        setLoading(false);
+        alert('Popup was blocked. Please allow popups for this site.');
+        return;
+      }
+
+      // Fallback: Check if popup was closed manually
+      const popupCheckInterval = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(popupCheckInterval);
+          window.removeEventListener('message', messageListener);
+          setLoading(false);
+        }
+      }, 500);
     } catch (error: any) {
       console.error("LinkedIn connection failed:", error);
       alert(error.response?.data?.detail || "Failed to connect LinkedIn");
-    } finally {
       setLoading(false);
     }
   };
@@ -66,7 +112,7 @@ export function LinkedInConnect() {
   const handleSyncPosts = async () => {
     setSyncing(true);
     try {
-      const response = await api.auth.linkedInSyncPosts();
+      const response = await api.auth.syncLinkedInPosts();
       alert(`Successfully synced ${response.data.posts_count} posts!`);
       setLastSync(new Date().toISOString());
     } catch (error: any) {
@@ -78,81 +124,59 @@ export function LinkedInConnect() {
   };
 
   return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-[#0A66C2] rounded-lg flex items-center justify-center">
-            <Linkedin className="w-6 h-6 text-white" />
+    <Card className="p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 bg-[#0A66C2] rounded-lg flex items-center justify-center flex-shrink-0">
+            <Linkedin className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h3 className="font-semibold text-lg">LinkedIn Account</h3>
-            <p className="text-sm text-gray-600">
-              {connected
-                ? "Connected - Access your profile and posts"
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base">LinkedIn Account</h3>
+            <p className="text-xs text-gray-600 truncate">
+              {connected && profileData
+                ? `Connected - ${profileData.email || profileData.name}`
                 : "Connect to import your profile and posts"}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {connected && (
+            <CheckCircle className="w-5 h-5 text-green-500" />
+          )}
           {!connected ? (
             <Button
               onClick={handleConnect}
               disabled={loading}
               className="bg-[#0A66C2] hover:bg-[#004182]"
+              size="sm"
             >
               <Linkedin className="w-4 h-4 mr-2" />
-              {loading ? "Connecting..." : "Connect LinkedIn"}
+              {loading ? "Connecting..." : "Connect"}
             </Button>
           ) : (
-            <CheckCircle className="w-6 h-6 text-green-500" />
+            <>
+              <Button
+                onClick={handleSyncPosts}
+                disabled={syncing}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`w-3 h-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Sync"}
+              </Button>
+              <Button
+                onClick={handleDisconnect}
+                disabled={loading}
+                variant="destructive"
+                size="sm"
+              >
+                Disconnect
+              </Button>
+            </>
           )}
         </div>
       </div>
-
-      {connected && profileData && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-3 mb-3">
-            <Avatar className="w-12 h-12">
-              {profileData.picture && (
-                <AvatarImage src={profileData.picture} alt={profileData.name || "LinkedIn User"} />
-              )}
-              <AvatarFallback className="bg-[#0A66C2] text-white font-semibold">
-                {profileData.name?.[0]?.toUpperCase() || "L"}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-semibold text-sm">{profileData.name}</p>
-              <p className="text-sm text-gray-600">{profileData.email}</p>
-            </div>
-          </div>
-          {lastSync && (
-            <p className="text-sm text-gray-600">
-              Last synced: {new Date(lastSync).toLocaleString()}
-            </p>
-          )}
-        </div>
-      )}
-
-      {connected && (
-        <div className="mt-4 flex gap-3">
-          <Button
-            onClick={handleSyncPosts}
-            disabled={syncing}
-            variant="outline"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing..." : "Sync Posts"}
-          </Button>
-          <Button
-            onClick={handleDisconnect}
-            disabled={loading}
-            variant="destructive"
-          >
-            Disconnect
-          </Button>
-        </div>
-      )}
     </Card>
   );
 }

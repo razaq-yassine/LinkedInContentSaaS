@@ -259,3 +259,41 @@ class UserToken(Base):
     # Relationships
     user = relationship("User")
 
+
+class AdminRole(str, enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+
+
+class Admin(Base):
+    """Admin users with access to dashboard"""
+    __tablename__ = "admins"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False)
+    role = Column(SQLEnum(AdminRole), default=AdminRole.ADMIN)
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SubscriptionPlanConfig(Base):
+    """Configurable subscription plans"""
+    __tablename__ = "subscription_plan_configs"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    plan_name = Column(String(100), unique=True, nullable=False, index=True)
+    display_name = Column(String(255), nullable=False)
+    description = Column(Text)
+    price_monthly = Column(Integer, default=0)
+    price_yearly = Column(Integer, default=0)
+    posts_limit = Column(Integer, default=5)
+    features = Column(JSON)
+    is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

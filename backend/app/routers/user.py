@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, List
 
 from ..database import get_db
-from ..models import UserProfile
+from ..models import UserProfile, Subscription
 from ..routers.auth import get_current_user_id
 from ..schemas.user import UserPreferences, UserProfileResponse, UpdatePreferencesRequest
 from ..services.ai_service import find_trending_topics, generate_evergreen_content_ideas
@@ -239,5 +239,30 @@ async def generate_content_ideas(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to generate content ideas: {str(e)}")
+
+
+@router.get("/subscription")
+async def get_user_subscription(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get user's current subscription details
+    """
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user_id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    return {
+        "plan": subscription.plan.value if hasattr(subscription.plan, 'value') else subscription.plan,
+        "posts_this_month": subscription.posts_this_month,
+        "posts_limit": subscription.posts_limit,
+        "stripe_customer_id": subscription.stripe_customer_id,
+        "stripe_subscription_id": subscription.stripe_subscription_id,
+        "period_end": subscription.period_end
+    }
 
 
