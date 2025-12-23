@@ -80,6 +80,13 @@ async def generate_post(
                 except:
                     pass
         
+        # Detect if user wants a random/new topic
+        user_message_lower = request.message.lower().strip()
+        is_random_request = any(keyword in user_message_lower for keyword in [
+            'random', 'any', 'surprise me', 'pick a topic', 'choose a topic', 
+            'new topic', 'different topic', 'something new'
+        ]) or len(user_message_lower.split()) <= 3
+        
         # Build system prompt with user context
         # If TOON context is available, use it for token efficiency
         if toon_context:
@@ -88,38 +95,77 @@ async def generate_post(
             if additional_context and additional_context.strip():
                 additional_context_section = f"""
 
-## ADDITIONAL CONTEXT AND RULES (HIGHEST PRIORITY - MUST FOLLOW):
+## ADDITIONAL CONTEXT (HIGHEST PRIORITY):
 {additional_context}
-
-IMPORTANT: The above additional context and rules take precedence over all other context. Follow these instructions strictly when generating content.
+[These rules override all other instructions in case of conflict]
 """
             
-            system_prompt = f"""You are a LinkedIn content expert. Generate high-quality LinkedIn posts based on the user's profile context.
+            # Topic generation instruction
+            topic_instruction = ""
+            if is_random_request:
+                topic_instruction = """
+- User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
+"""
+            
+            system_prompt = f"""LinkedIn content expert. Generate posts matching user's style and expertise.
 
-USER PROFILE CONTEXT (TOON format - token-efficient):
-{toon_context}{additional_context_section}
+## RULES:
+- Language: English only
+- Format: Small statements, blank line between each
+- Additional context: Overrides all if provided{additional_context_section}
+
+## CONTEXT USAGE:
+Profile context is for ALIGNMENT ONLY (tone, style, expertise level, audience) - NOT for topic selection.
+DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}
+
+USER CONTEXT:
+{toon_context}
 
 WRITING STYLE:
 {profile.writing_style_md or "Professional, engaging, value-driven"}
 
-Generate content that:
-1. Matches the user's tone and expertise level
-2. Resonates with their target audience
-3. Follows their content strategy and goals
-4. Uses appropriate format (text/carousel/image/video)
-5. STRICTLY adheres to any additional context and rules provided above
+Generate content matching their tone/expertise/audience. Use small statements with spacing. English only.
 
 User request: {request.message}
 """
         else:
             # Fallback to legacy JSON-based prompt
-            system_prompt = build_post_generation_prompt(
+            base_prompt = build_post_generation_prompt(
                 profile_md=profile.profile_md or "",
                 writing_style_md=profile.writing_style_md or "",
                 context_json=profile.context_json or {},
                 user_message=request.message,
                 options=request.options
             )
+            # Add critical instructions to legacy prompt as well
+            additional_context = profile.context_json.get("additional_context", "") if profile.context_json else ""
+            additional_context_section = ""
+            if additional_context and additional_context.strip():
+                additional_context_section = f"""
+
+## ADDITIONAL CONTEXT (HIGHEST PRIORITY):
+{additional_context}
+[Overrides all other instructions in case of conflict]
+"""
+            
+            # Topic generation instruction
+            topic_instruction = ""
+            if is_random_request:
+                topic_instruction = """
+- User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
+"""
+            
+            system_prompt = f"""{base_prompt}
+
+## RULES:
+- Language: English only
+- Format: Small statements, blank line between each
+- Additional context: Overrides all if provided{additional_context_section}
+
+## CONTEXT USAGE:
+Profile context is for ALIGNMENT ONLY (tone, style, expertise level, audience) - NOT for topic selection.
+DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}
+"""
         
         # Add format-specific instructions
         post_type = request.options.get('post_type', 'text')
@@ -474,78 +520,178 @@ async def rate_generation(
 
 async def generate_image_prompt(post_content: str, context: dict) -> str:
     """
-    Generate AI image prompt for Canva/DALL-E
+    Generate AI image prompt for Canva/DALL-E that matches the post content and is LinkedIn-friendly
     """
     try:
+        # Extract key themes and concepts from the post content
+        industry = context.get('industry', 'business')
+        expertise = context.get('expertise_areas', [])
+        if isinstance(expertise, list):
+            expertise_str = ', '.join(expertise[:3]) if expertise else industry
+        else:
+            expertise_str = str(expertise) if expertise else industry
+        
         prompt = await generate_completion(
-            system_prompt="""Generate a detailed AI image prompt for Canva AI or DALL-E.
+            system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn posts. Your prompts create vivid, concrete visuals that perfectly match the post's content.
 
-Format:
-Create a [style] image featuring [main elements].
+VISUAL STRATEGY:
+- If post mentions specific tools/platforms/concrete scenarios: Use real-world visuals (photography style, dashboards on screens, offices, devices, professional photos)
+- If post is general/abstract/conceptual: Use friendly cartoon/illustration style with diverse professional characters doing actions that match the post's message
+- For before/after comparisons: Use split-screen with cartoon characters or illustrations showing the transformation
 
-Style: [professional/modern/clean/minimalist]
-Color scheme: [colors]
-Composition: [layout description]
-Key elements: [what to include]
-Text overlay: [if any]
-Dimensions: 1200x628px (LinkedIn optimal)
+Your prompts should:
+- Be specific and concrete (show actual tools, screens, people, settings OR cartoon characters doing relevant actions)
+- Use appropriate visual style based on content specificity
+- Include diverse professional characters (realistic OR cartoon style)
+- Be LinkedIn-optimized: 1200×628px, professional aesthetic, clear composition, engaging
+- Create visuals that enhance the post's message
 
-Make it specific and actionable.""",
-            user_message=f"Create an image prompt for this LinkedIn post:\n\n{post_content}\n\nIndustry: {context.get('industry', 'business')}",
-            temperature=0.7
+AVOID abstract descriptions like "data flow visualization". Instead use:
+- Specific content: "Salesforce dashboard on laptop screen" or "professionals reviewing analytics"
+- General content: "Friendly cartoon professional character [doing action that matches post]" or "Illustration showing [concept] with diverse characters"
+
+Write creative, detailed prompts that image generators can easily visualize. Output ONLY the final prompt text - no explanations.""",
+            user_message=f"""Create a creative, detailed image generation prompt for this LinkedIn post:
+
+POST CONTENT:
+{post_content}
+
+INDUSTRY: {industry}
+EXPERTISE: {expertise_str}
+
+Analyze the content:
+- If it mentions specific tools/platforms: Create real-world visual (photography, dashboards, devices)
+- If it's general/abstract: Create cartoon/illustration with characters doing actions matching the post
+- For comparisons: Use split-screen with characters showing transformation
+
+Create a vivid visual description that:
+- Directly represents the post's main message and key concepts
+- Uses appropriate style (realistic OR cartoon/illustration based on content)
+- Shows characters/people doing actions that match the post's concepts
+- Is optimized for LinkedIn (1200×628px, professional, engaging, mobile-friendly)
+
+Write the complete prompt as a single, detailed description ready for image generation.""",
+            temperature=0.8
         )
         
-        return prompt
-    except:
-        return "Professional LinkedIn post image, clean modern design, brand colors, 1200x628px"
+        # Clean up the prompt (remove markdown formatting if present)
+        prompt = prompt.strip()
+        if prompt.startswith("```"):
+            prompt = re.sub(r'^```.*?\n?', '', prompt)
+            prompt = re.sub(r'\n?```$', '', prompt)
+        prompt = prompt.strip()
+        
+        return prompt if prompt else "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
+    except Exception as e:
+        print(f"Error generating image prompt: {str(e)}")
+        return "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
 
 async def generate_carousel_image_prompts(post_content: str, context: dict) -> list[str]:
     """
-    Generate multiple AI image prompts for carousel slides
+    Generate multiple AI image prompts for carousel slides that match the post content and are LinkedIn-friendly
     """
     try:
         # Extract slide count from content (estimate based on structure)
         slide_count = max(4, min(8, post_content.count('\n\n') + 1))
         
+        industry = context.get('industry', 'business')
+        expertise = context.get('expertise_areas', [])
+        if isinstance(expertise, list):
+            expertise_str = ', '.join(expertise[:3]) if expertise else industry
+        else:
+            expertise_str = str(expertise) if expertise else industry
+        
         prompt = await generate_completion(
-            system_prompt="""Generate multiple detailed AI image prompts for a LinkedIn carousel post.
+            system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn carousel posts. Your prompts create a cohesive visual story with consistent theming.
 
-You need to create an array of image prompts, one for each slide.
+CRITICAL REQUIREMENTS:
 
-Format each prompt as:
-- Slide [number]: [detailed description]
+1. VISUAL CONSISTENCY (MOST IMPORTANT):
+   - ALL slides must use the SAME color palette (specify exact colors)
+   - ALL slides must use the SAME visual style (choose ONE: photography OR cartoon/illustration)
+   - ALL slides must use the SAME composition approach
+   - Create visual continuity - each slide feels like part of the same series
 
-Each prompt should:
-- Describe the visual concept for that specific slide
-- Include style (professional, modern, clean, minimalist)
-- Include color scheme
-- Include key visual elements
-- Include any text overlays
-- Be specific and actionable
-- Dimensions: 1200x628px (LinkedIn optimal)
+2. VISUAL STYLE SELECTION:
+   - If post mentions specific tools/platforms: Use real-world style (photography, dashboards, devices)
+   - If post is general/abstract: Use cartoon/illustration style with characters
+   - Choose ONE style for entire carousel and maintain it across all slides
 
-Return ONLY a JSON array of strings, like:
-["prompt for slide 1", "prompt for slide 2", "prompt for slide 3", ...]""",
-            user_message=f"Create {slide_count} image prompts for this LinkedIn carousel post:\n\n{post_content}\n\nIndustry: {context.get('industry', 'business')}\n\nGenerate exactly {slide_count} prompts, one for each slide.",
-            temperature=0.7
+3. CONCRETE VISUALS:
+   - Each slide represents ONE specific point from the post
+   - Real-world style: "Salesforce dashboard on laptop", "professionals in office"
+   - Cartoon style: "Friendly cartoon professional character [doing action matching slide's point]"
+   - Characters should be diverse, professional, doing actions that match each slide's concept
+   - Avoid abstract concepts - use either realistic visuals OR character illustrations
+
+4. VISUAL STORY PROGRESSION:
+   - Slide 1: Introduces the topic with established visual theme
+   - Slides 2-N: Each shows a specific point/concept, maintaining the theme
+   - Final slide: Summarizes or provides takeaway, maintains theme
+   - Slides build on each other visually like a story
+
+5. LINKEDIN OPTIMIZATION:
+   - Professional, polished, engaging aesthetic
+   - 1200×628px landscape format
+   - Text overlay space consideration
+
+Return ONLY a valid JSON array of strings. Each prompt should be creative, detailed, and ready for image generation. Output ONLY the JSON array - no explanations.""",
+            user_message=f"""Create {slide_count} creative, detailed image prompts for this LinkedIn carousel post:
+
+POST CONTENT:
+{post_content}
+
+INDUSTRY: {industry}
+EXPERTISE: {expertise_str}
+
+TASK:
+1. Analyze content: If specific tools/platforms mentioned → use real-world style. If general/abstract → use cartoon/illustration style with characters
+2. Break the post into {slide_count} logical sections/points (one per slide)
+3. Choose ONE consistent visual theme: same colors, same style (realistic OR cartoon), same composition for ALL slides
+4. Create {slide_count} prompts where:
+   - Each slide represents ONE specific point from the post
+   - All slides share the SAME color palette and visual style
+   - If using characters: They do actions matching each slide's point
+   - Slides build on each other visually (like a story)
+
+CRITICAL: All slides must be visually consistent - same colors, same style (realistic OR cartoon), same type of elements. They should feel like a cohesive series.
+
+Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
+            temperature=0.8
         )
         
         # Try to parse as JSON array
         try:
             import json
-            prompts = json.loads(prompt)
+            # Clean up markdown code blocks if present
+            cleaned_prompt = prompt.strip()
+            if cleaned_prompt.startswith("```"):
+                cleaned_prompt = re.sub(r'^```json\s*\n?', '', cleaned_prompt)
+                cleaned_prompt = re.sub(r'\n?```$', '', cleaned_prompt)
+            
+            prompts = json.loads(cleaned_prompt)
             if isinstance(prompts, list) and len(prompts) > 0:
+                # Ensure we have the right number of prompts
+                if len(prompts) >= slide_count:
+                    return prompts[:slide_count]
+                elif len(prompts) < slide_count:
+                    # Pad with variations of the last prompt
+                    while len(prompts) < slide_count:
+                        prompts.append(prompts[-1] if prompts else "Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, brand colors, 1200x628px")
+                    return prompts[:slide_count]
                 return prompts
-        except:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse carousel prompts as JSON: {str(e)}")
+            print(f"Raw response: {prompt[:200]}")
         
         # Fallback: split by lines or create default prompts
-        lines = [line.strip() for line in prompt.split('\n') if line.strip() and not line.strip().startswith('-')]
+        lines = [line.strip() for line in prompt.split('\n') if line.strip() and not line.strip().startswith('-') and not line.strip().startswith('Slide')]
         if len(lines) >= slide_count:
             return lines[:slide_count]
         
-        # Ultimate fallback: create generic prompts
-        return [f"Professional LinkedIn carousel slide {i+1}, clean modern design, brand colors, 1200x628px" for i in range(slide_count)]
-    except:
-        # Fallback: return default prompts
-        return ["Professional LinkedIn carousel slide, clean modern design, brand colors, 1200x628px" for _ in range(4)]
+        # Ultimate fallback: create generic but LinkedIn-friendly prompts
+        return [f"Professional LinkedIn carousel slide {i+1}, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for i in range(slide_count)]
+    except Exception as e:
+        print(f"Error generating carousel image prompts: {str(e)}")
+        # Fallback: return default LinkedIn-friendly prompts
+        return ["Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for _ in range(4)]
