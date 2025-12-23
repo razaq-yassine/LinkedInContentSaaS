@@ -155,7 +155,7 @@ export default function GeneratePage() {
 
   // Get the effective default tone (from context if available, otherwise fallback)
   const effectiveDefaultTone = contextTone || DEFAULT_TONE;
-  
+
   // Check if options are changed from defaults (excluding postType which is managed separately)
   const areOptionsChanged =
     tone !== effectiveDefaultTone ||
@@ -184,11 +184,11 @@ export default function GeneratePage() {
       const response = await api.user.getProfile();
       const contextJson = response.data?.context_json;
       setHasContext(!!contextJson && Object.keys(contextJson).length > 0);
-      
+
       // Extract tone from TOON context
       if (contextJson?.tone) {
         let toneFromContext = contextJson.tone.toLowerCase().trim();
-        
+
         // Normalize tone values to match select options
         const toneMap: Record<string, string> = {
           'professional': 'professional',
@@ -203,15 +203,15 @@ export default function GeneratePage() {
           'strategic': 'thought-leader',
           'visionary': 'thought-leader',
         };
-        
+
         // Map to known tone or use as-is if it matches
         const normalizedTone = toneMap[toneFromContext] || toneFromContext;
-        
+
         // Only use if it's one of our valid options
         const validTones = ['professional', 'casual', 'thought-leader', 'educator'];
         if (validTones.includes(normalizedTone)) {
           setContextTone(normalizedTone);
-          
+
           // If user hasn't saved a custom tone preference, use context tone
           const saved = localStorage.getItem("generationOptions");
           if (!saved) {
@@ -540,7 +540,7 @@ export default function GeneratePage() {
   // Parse user prompt for length and hashtag preferences
   const parsePromptPreferences = (userMessage: string) => {
     const messageLower = userMessage.toLowerCase();
-    
+
     // Parse length preferences
     let parsedLength = length; // Default to current setting
     if (messageLower.includes('long') || messageLower.includes('lengthy') || messageLower.includes('extended')) {
@@ -550,10 +550,10 @@ export default function GeneratePage() {
     } else if (messageLower.includes('medium') || messageLower.includes('moderate')) {
       parsedLength = 'medium';
     }
-    
+
     // Parse hashtag count preferences
     let parsedHashtagCount = hashtagCount; // Default to current setting
-    
+
     // Look for explicit hashtag count requests
     const hashtagPatterns = [
       /(\d+)\s*hashtags?/i,
@@ -569,7 +569,7 @@ export default function GeneratePage() {
       /no\s+hashtags?/i,
       /without\s+hashtags?/i,
     ];
-    
+
     for (const pattern of hashtagPatterns) {
       const match = userMessage.match(pattern);
       if (match) {
@@ -595,7 +595,7 @@ export default function GeneratePage() {
         }
       }
     }
-    
+
     return {
       length: parsedLength,
       hashtag_count: parsedHashtagCount,
@@ -619,7 +619,7 @@ export default function GeneratePage() {
     try {
       // Parse user prompt for preferences (overrides current settings)
       const promptPreferences = parsePromptPreferences(userMessage);
-      
+
       const options = {
         post_type: postType,
         tone,
@@ -772,10 +772,10 @@ export default function GeneratePage() {
   };
 
   const topCreators = [
-    { name: "Alex Hormozi", initials: "AH" },
-    { name: "Justin Welsh", initials: "JW" },
-    { name: "Sahil Bloom", initials: "SB" },
-    { name: "Dickie Bush", initials: "DB" },
+    { name: "Alex Hormozi", initials: "AH", image: "/creators/alex-hormozi.jpg" },
+    { name: "Justin Welsh", initials: "JW", image: "/creators/justin-welsh.jpg" },
+    { name: "Sahil Bloom", initials: "SB", image: "/creators/sahil-bloom.jpg" },
+    { name: "Dickie Bush", initials: "DB", image: "/creators/dickie-bush.jpg" },
   ];
 
   return (
@@ -784,12 +784,13 @@ export default function GeneratePage() {
       <div className="bg-white border-b border-[#E0DFDC] py-3 px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-center gap-3">
           <Sparkles className="w-5 h-5 text-[#0A66C2]" />
-          <span className="text-sm font-medium text-[#666666]">
+          <span className="text-base font-medium text-[#666666]">
             Trained on posts of top LinkedIn creators
           </span>
           <div className="flex -space-x-2">
             {topCreators.map((creator, idx) => (
-              <Avatar key={idx} className="w-7 h-7 border-2 border-white">
+              <Avatar key={idx} className="w-9 h-9 border-2 border-white">
+                <AvatarImage src={creator.image} alt={creator.name} />
                 <AvatarFallback className="bg-[#0A66C2] text-white text-xs font-semibold">
                   {creator.initials}
                 </AvatarFallback>
@@ -810,18 +811,18 @@ export default function GeneratePage() {
                 <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <Sparkles className="w-10 h-10 text-purple-600" />
                 </div>
-                
+
                 {/* Heading */}
                 <h2 className="text-3xl font-bold text-black mb-3">
                   Need inspiration?
                 </h2>
-                
+
                 {/* Description */}
                 <p className="text-lg text-[#666666] mb-8 max-w-lg mx-auto leading-relaxed">
-                  Let AI generate a unique LinkedIn post tailored to your expertise and style. 
+                  Let AI generate a unique LinkedIn post tailored to your expertise and style.
                   Click below to get started instantly.
                 </p>
-                
+
                 {/* Inspiration Button */}
                 <div className="mb-8">
                   <Button
@@ -871,14 +872,12 @@ export default function GeneratePage() {
                           `}
                         >
                           <IconComponent
-                            className={`w-6 h-6 ${
-                              isSelected ? "text-purple-600" : "text-[#666666]"
-                            }`}
+                            className={`w-6 h-6 ${isSelected ? "text-purple-600" : "text-[#666666]"
+                              }`}
                           />
                           <span
-                            className={`text-xs font-medium text-center px-1 ${
-                              isSelected ? "text-purple-600" : "text-[#666666]"
-                            }`}
+                            className={`text-xs font-medium text-center px-1 ${isSelected ? "text-purple-600" : "text-[#666666]"
+                              }`}
                           >
                             {type.label}
                           </span>
@@ -894,7 +893,7 @@ export default function GeneratePage() {
                     })}
                   </div>
                 </div>
-                
+
                 {/* Helper text */}
                 <p className="text-sm text-[#999999]">
                   Or type your own topic in the input below
@@ -1219,9 +1218,8 @@ export default function GeneratePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowPostTypeMenu(!showPostTypeMenu)}
-                    className={`text-[#666666] hover:bg-[#F3F2F0] ${
-                      showPostTypeMenu ? "bg-[#F3F2F0]" : ""
-                    }`}
+                    className={`text-[#666666] hover:bg-[#F3F2F0] ${showPostTypeMenu ? "bg-[#F3F2F0]" : ""
+                      }`}
                   >
                     {(() => {
                       const iconMap: Record<string, typeof FileText> = {
@@ -1241,11 +1239,10 @@ export default function GeneratePage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setUseTrendingTopic(!useTrendingTopic)}
-                  className={`${
-                    useTrendingTopic
-                      ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
-                      : "text-[#666666] hover:bg-orange-50 hover:text-orange-600"
-                  }`}
+                  className={`${useTrendingTopic
+                    ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
+                    : "text-[#666666] hover:bg-orange-50 hover:text-orange-600"
+                    }`}
                 >
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Trending
@@ -1255,11 +1252,10 @@ export default function GeneratePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowOptions(!showOptions)}
-                    className={`${
-                      areOptionsChanged
-                        ? "text-purple-600 bg-purple-50 hover:bg-purple-100"
-                        : "text-[#666666] hover:bg-purple-50 hover:text-purple-600"
-                    }`}
+                    className={`${areOptionsChanged
+                      ? "text-purple-600 bg-purple-50 hover:bg-purple-100"
+                      : "text-[#666666] hover:bg-purple-50 hover:text-purple-600"
+                      }`}
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
                     Options
