@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Globe } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 interface GenerationOptionsMenuProps {
   open: boolean;
@@ -37,7 +37,6 @@ export function GenerationOptionsMenu({
   triggerRef,
 }: GenerationOptionsMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [internetSearch, setInternetSearch] = useState(false);
 
   // Close menu when clicking outside (but not when clicking on select dropdowns)
   useEffect(() => {
@@ -125,33 +124,6 @@ export function GenerationOptionsMenu({
 
         {/* Content */}
         <div className="px-4 py-3 space-y-3">
-          {/* Internet Search Toggle */}
-          <div className="flex items-center justify-between p-2.5 bg-white/60 rounded-lg border border-purple-100 hover:border-purple-300 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                <Globe className="w-4 h-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-black">Web Search</p>
-                <p className="text-[10px] text-[#666666]">Access real-time web information</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setInternetSearch(!internetSearch)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                internetSearch ? "bg-green-600" : "bg-gray-300"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
-                  internetSearch ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-purple-200" />
 
           {/* Generation Options - Compact Grid */}
           <div className="grid grid-cols-2 gap-2.5">

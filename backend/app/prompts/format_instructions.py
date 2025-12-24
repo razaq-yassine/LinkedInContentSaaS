@@ -40,9 +40,21 @@ Generate TWO separate fields:
    - Visual progression: slides build like a story (not random images)
    - If using characters: They should be diverse, professional, doing actions matching each slide's point
    - Create cohesive series with consistent theming
+   
+   - CRITICAL FOR EDUCATIONAL/TUTORIAL CONTENT:
+     * If post is educational (explains how to do something, teaches concepts, provides solutions):
+       - Each slide MUST include TEXT OVERLAYS with clear explanations
+       - Include step-by-step instructions in text if applicable
+       - Add key concepts, solutions, or takeaways as text on the slide
+       - Text should be readable, well-positioned, and complement visuals
+       - For "how to" posts: Include numbered steps or sequential instructions in text overlays
+       - For explanatory posts: Include definitions, concepts, or solutions in text overlays
+       - Visuals support the text - slides cannot be images only
+       - Example: "Slide showing [visual concept] with text overlay explaining: '[key explanation or step]'"
+   
    - Output ONLY JSON array - no explanations
 
-Keep them SEPARATE but image_prompts must create consistent visual story matching post structure."""
+Keep them SEPARATE but image_prompts must create consistent visual story matching post structure. For educational content, ensure text overlays are included in prompts."""
 
 # Video Script Post Instructions
 VIDEO_SCRIPT_INSTRUCTIONS = """## VIDEO SCRIPT POST
@@ -73,10 +85,10 @@ CAROUSEL_JSON_FORMAT = """{
     "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post, NOT slide descriptions. Do NOT include slide prompts or mention slides here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
     "format_type": "carousel",
     "image_prompts": [
-        "Slide 1: Detailed prompt with consistent theme - represents first point/concept from post. Include exact colors/style that will be used for ALL slides.",
-        "Slide 2: Detailed prompt with SAME theme/colors/style - represents second point/concept, builds on slide 1 visually",
-        "Slide 3: Detailed prompt with SAME theme/colors/style - represents third point/concept, continues visual story",
-        "Continue for 4-8 slides total. CRITICAL: All slides must use SAME color palette, SAME style, SAME visual elements. Each slide represents ONE specific point from post. Slides should build a visual narrative, not be random images."
+        "Slide 1: Detailed prompt with consistent theme - represents first point/concept from post. Include exact colors/style that will be used for ALL slides. If educational: Include text overlay with explanation/solution/step.",
+        "Slide 2: Detailed prompt with SAME theme/colors/style - represents second point/concept, builds on slide 1 visually. If educational: Include text overlay with explanation/solution/step.",
+        "Slide 3: Detailed prompt with SAME theme/colors/style - represents third point/concept, continues visual story. If educational: Include text overlay with explanation/solution/step.",
+        "Continue for 4-8 slides total. CRITICAL: All slides must use SAME color palette, SAME style, SAME visual elements. Each slide represents ONE specific point from post. Slides should build a visual narrative, not be random images. If post is educational/tutorial/how-to: Each slide MUST include text overlays with explanations, steps, or solutions - slides cannot be images only."
     ],
     "metadata": {
         "hashtags": ["#tag1", "#tag2", "#tag3"],
@@ -86,6 +98,12 @@ CAROUSEL_JSON_FORMAT = """{
 }
 
 CRITICAL: post_content is the LinkedIn post text (what users see). image_prompts must create a cohesive visual story with consistent theming across ALL slides.
+
+EDUCATIONAL CONTENT REQUIREMENT: If the post is educational (explains how to do something, teaches concepts, provides solutions), each image_prompt MUST explicitly request text overlays with:
+- Clear explanations of what is being taught
+- Step-by-step instructions if applicable  
+- Key solutions or takeaways
+- Specific educational content that helps viewers understand
 
 IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
 

@@ -20,6 +20,7 @@ pdf_generation_progress: Dict[str, Dict] = {}
 class CarouselPDFGenerationRequest(BaseModel):
     post_id: str
     prompts: List[str]  # Array of prompts for each slide
+    slide_indices: Optional[List[int]] = None  # Optional: indices of slides to regenerate
 
 class PDFGenerationResponse(BaseModel):
     pdf_id: str
@@ -98,8 +99,45 @@ async def generate_carousel_pdf(
             detail="Post must be a carousel type"
         )
     
+    # Check if this is a partial regeneration
+    is_partial_regeneration = request.slide_indices is not None and len(request.slide_indices) > 0
+    
+    # Get existing PDF if partial regeneration
+    existing_slide_images = []
+    existing_prompts = []
+    if is_partial_regeneration:
+        current_pdf = db.query(GeneratedPDF).filter(
+            GeneratedPDF.post_id == request.post_id,
+            GeneratedPDF.is_current == True
+        ).first()
+        
+        if not current_pdf:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No current PDF found for partial regeneration"
+            )
+        
+        existing_slide_images = current_pdf.slide_images if current_pdf.slide_images else []
+        existing_prompts = current_pdf.prompts if current_pdf.prompts else []
+        
+        # Validate slide indices
+        max_index = len(existing_slide_images) - 1
+        for idx in request.slide_indices:
+            if idx < 0 or idx > max_index:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid slide index: {idx}. Valid range: 0-{max_index}"
+                )
+        
+        # Validate prompts match slide indices
+        if len(request.prompts) != len(request.slide_indices):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Number of prompts ({len(request.prompts)}) must match number of slide indices ({len(request.slide_indices)})"
+            )
+    
     # Initialize progress tracking
-    total_slides = len(request.prompts)
+    total_slides = len(request.prompts) if not is_partial_regeneration else len(request.slide_indices)
     pdf_generation_progress[request.post_id] = {
         "status": "generating",
         "current": 0,
@@ -114,11 +152,16 @@ async def generate_carousel_pdf(
                 detail="At least one prompt is required for carousel generation"
             )
         
-        # Generate images for all prompts
-        slide_images = []
+        # Generate images for prompts (either all or selected slides)
+        new_slide_images = []
         model_used = None
         
-        for i, prompt in enumerate(request.prompts):
+        prompts_to_process = request.prompts
+        if is_partial_regeneration:
+            # Only process prompts for selected slides
+            prompts_to_process = request.prompts
+        
+        for i, prompt in enumerate(prompts_to_process):
             try:
                 # Update progress
                 pdf_generation_progress[request.post_id]["current"] = i + 1
@@ -139,7 +182,7 @@ async def generate_carousel_pdf(
                 if not image_data or len(image_data) < 100:  # Basic validation
                     raise ValueError(f"Invalid image data for slide {i + 1}")
                 
-                slide_images.append(image_data)
+                new_slide_images.append(image_data)
                 if not model_used:
                     model_used = result.get("metadata", {}).get("model", "cloudflare")
             except HTTPException:
@@ -156,12 +199,29 @@ async def generate_carousel_pdf(
                 )
         
         # Validate we have images
-        if not slide_images or len(slide_images) == 0:
+        if not new_slide_images or len(new_slide_images) == 0:
             pdf_generation_progress[request.post_id]["status"] = "error"
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="No images were generated successfully"
             )
+        
+        # Merge slides if partial regeneration
+        if is_partial_regeneration:
+            # Create a copy of existing slides
+            merged_slide_images = existing_slide_images.copy()
+            merged_prompts = existing_prompts.copy()
+            
+            # Replace slides at specified indices
+            for i, slide_idx in enumerate(request.slide_indices):
+                merged_slide_images[slide_idx] = new_slide_images[i]
+                merged_prompts[slide_idx] = request.prompts[i]
+            
+            slide_images = merged_slide_images
+            final_prompts = merged_prompts
+        else:
+            slide_images = new_slide_images
+            final_prompts = request.prompts
         
         # Update progress: merging PDF
         pdf_generation_progress[request.post_id]["status"] = "merging"
@@ -170,7 +230,7 @@ async def generate_carousel_pdf(
         try:
             pdf_result = await create_carousel_pdf(
                 slide_images=slide_images,
-                slide_prompts=request.prompts,
+                slide_prompts=final_prompts,
                 model=model_used or "cloudflare"
             )
         except Exception as pdf_error:
@@ -198,7 +258,7 @@ async def generate_carousel_pdf(
             pdf_data=pdf_result["pdf"],
             slide_images=pdf_result.get("slide_images", []),  # Store slide images for preview
             slide_count=pdf_result["slide_count"],
-            prompts=request.prompts,
+            prompts=final_prompts,
             model=model_used or "cloudflare",
             pdf_metadata=pdf_result["metadata"],
             is_current=True
@@ -219,7 +279,7 @@ async def generate_carousel_pdf(
             slide_images=pdf_result.get("slide_images", []),
             format=pdf_result["format"],
             slide_count=pdf_result["slide_count"],
-            prompts=request.prompts,
+            prompts=final_prompts,
             model=model_used or "cloudflare",
             post_id=request.post_id,
             is_current=True

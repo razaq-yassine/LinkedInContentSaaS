@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import sqlalchemy as sa
 from .config import get_settings
 from .database import engine, Base
 from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription
@@ -46,9 +47,30 @@ app.include_router(subscription.router, prefix="/api/subscription", tags=["subsc
 
 @app.on_event("startup")
 async def startup_event():
-    """Create database tables on startup"""
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
+    """
+    Database initialization on startup.
+    
+    In development: Creates tables if they don't exist (for convenience).
+    In production: Only verifies connection. Migrations should be run separately.
+    
+    Note: For production deployments, run migrations manually:
+    alembic upgrade head
+    """
+    # Check if we're in development mode
+    # In production, migrations should be run as a separate deployment step
+    if settings.dev_mode or "sqlite" in settings.database_url.lower():
+        # Development: Auto-create tables for convenience
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created/verified (development mode)")
+    else:
+        # Production: Just verify connection
+        try:
+            with engine.connect() as conn:
+                conn.execute(sa.text("SELECT 1"))
+            print("✅ Database connection verified")
+        except Exception as e:
+            print(f"⚠️  Database connection warning: {e}")
+            print("💡 Make sure migrations are up to date: alembic upgrade head")
 
 @app.get("/")
 async def root():
@@ -64,5 +86,9 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    import os
+    # Use random port from environment or default to 8753
+    port = int(os.getenv("PORT", "8753"))
+    print(f"🚀 Starting backend server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
 

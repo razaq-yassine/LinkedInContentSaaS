@@ -36,7 +36,7 @@ cd "$(dirname "$0")"
 if ! mysql -u root -e "USE linkedin_content_saas" &> /dev/null; then
     echo -e "${YELLOW}Database not found. Initializing...${NC}"
     
-    # Activate venv and run seed script
+    # Activate venv and run Alembic migrations
     cd backend
     if [ ! -d "venv" ]; then
         echo -e "${YELLOW}Creating Python virtual environment...${NC}"
@@ -46,8 +46,8 @@ if ! mysql -u root -e "USE linkedin_content_saas" &> /dev/null; then
     source venv/bin/activate
     pip install -q -r requirements.txt
     
-    cd ..
-    python database/seed_data.py
+    # Run Alembic migrations and seeds
+    python migrate.py init
 else
     echo -e "${GREEN}✅ Database exists${NC}"
 fi

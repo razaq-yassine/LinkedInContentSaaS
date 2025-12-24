@@ -19,7 +19,8 @@ import {
   Image,
   Layers,
   Check,
-  Video
+  Video,
+  Globe
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -40,6 +41,7 @@ import { Slider } from "@/components/ui/slider";
 import { ContextConfigModal } from "@/components/ContextConfigModal";
 import { GenerationOptionsMenu } from "@/components/GenerationOptionsMenu";
 import { PostTypeMenu } from "@/components/PostTypeMenu";
+import { SlideSelectionModal } from "@/components/SlideSelectionModal";
 
 interface Message {
   id: string;
@@ -57,6 +59,255 @@ interface Message {
   };
 }
 
+// Utility function to detect and parse JSON content from existing messages
+function parseJsonContent(content: string): {
+  post_content: string;
+  format_type?: string;
+  image_prompt?: string;
+  image_prompts?: string[];
+  metadata?: {
+    hashtags?: string[];
+    tone?: string;
+    estimated_engagement?: string;
+  };
+} | null {
+  if (!content || typeof content !== 'string') {
+    return null;
+  }
+
+  let cleaned = content.trim();
+  console.log('🔍 parseJsonContent - Step 1 - Initial:', {
+    starts_with: cleaned.substring(0, 50),
+    length: cleaned.length,
+    has_backticks: cleaned.includes('```')
+  });
+  
+  // Remove markdown code blocks if present
+  // Handle ```json ... ``` or ``` ... ```
+  // Also handle cases where there might be quotes around it: "```json\n{..."
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    // Remove surrounding quotes
+    cleaned = cleaned.slice(1, -1);
+    // Unescape newlines and quotes
+    cleaned = cleaned.replace(/\\n/g, '\n');
+    cleaned = cleaned.replace(/\\"/g, '"');
+    cleaned = cleaned.replace(/\\'/g, "'");
+    cleaned = cleaned.trim();
+    console.log('🔍 Step 2 - After removing quotes:', {
+      starts_with: cleaned.substring(0, 50),
+      length: cleaned.length
+    });
+  }
+  
+  if (cleaned.includes('```')) {
+    // Remove opening code block marker (handle both ```json and ```)
+    // Use more aggressive regex to handle various formats
+    const before = cleaned;
+    cleaned = cleaned.replace(/^```json\s*\n?/i, '');
+    cleaned = cleaned.replace(/^```\s*\n?/, '');
+    // Remove closing code block marker (match at end, possibly with newline before)
+    cleaned = cleaned.replace(/\n?```\s*$/m, '');
+    // Also remove any trailing ``` that might be on a separate line
+    cleaned = cleaned.replace(/\n```\s*$/m, '');
+    cleaned = cleaned.trim();
+    console.log('🔍 Step 3 - After removing markdown:', {
+      before_length: before.length,
+      after_length: cleaned.length,
+      starts_with: cleaned.substring(0, 50),
+      still_has_backticks: cleaned.includes('```')
+    });
+  }
+  
+  // Check if it looks like JSON - find the first { and last }
+  // This is more robust than regex matching
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  
+  console.log('🔍 Step 4 - Brace positions:', {
+    firstBrace,
+    lastBrace,
+    preview_before: cleaned.substring(0, 100),
+    preview_after: cleaned.substring(Math.max(0, cleaned.length - 100))
+  });
+  
+  if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
+    console.log('⚠️ No valid JSON braces found:', {
+      firstBrace,
+      lastBrace,
+      preview: cleaned.substring(0, 100)
+    });
+    return null;
+  }
+  
+  // Extract just the JSON part (from first { to last })
+  cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  
+  console.log('🔍 Step 5 - Extracted JSON:', {
+    length: cleaned.length,
+    first_100: cleaned.substring(0, 100),
+    last_100: cleaned.substring(Math.max(0, cleaned.length - 100)),
+    has_post_content: cleaned.includes('"post_content"'),
+    has_format_type: cleaned.includes('"format_type"')
+  });
+  
+  // Check if it contains JSON-like structure
+  if (!cleaned.includes('"post_content"') && !cleaned.includes('"format_type"')) {
+    console.log('⚠️ No post_content or format_type found');
+    return null;
+  }
+
+  try {
+    console.log('🔍 Step 6 - Attempting JSON.parse...');
+    const parsed = JSON.parse(cleaned);
+    console.log('✅ Step 7 - JSON parsed successfully:', {
+      has_post_content: !!parsed.post_content,
+      format_type: parsed.format_type,
+      keys: Object.keys(parsed)
+    });
+    
+    if (typeof parsed !== 'object' || parsed === null) {
+      console.log('⚠️ Parsed result is not an object:', typeof parsed);
+      return null;
+    }
+
+    // Extract post_content
+    const post_content = parsed.post_content;
+    if (!post_content || typeof post_content !== 'string') {
+      console.log('⚠️ post_content is missing or not a string:', {
+        has_post_content: !!parsed.post_content,
+        type: typeof parsed.post_content,
+        keys: Object.keys(parsed)
+      });
+      return null;
+    }
+
+    // Extract other fields
+    const result: {
+      post_content: string;
+      format_type?: string;
+      image_prompt?: string;
+      image_prompts?: string[];
+      metadata?: {
+        hashtags?: string[];
+        tone?: string;
+        estimated_engagement?: string;
+      };
+    } = {
+      post_content: post_content,
+    };
+
+    if (parsed.format_type && typeof parsed.format_type === 'string') {
+      result.format_type = parsed.format_type;
+    }
+
+    if (parsed.image_prompt && typeof parsed.image_prompt === 'string') {
+      result.image_prompt = parsed.image_prompt;
+    }
+
+    if (parsed.image_prompts && Array.isArray(parsed.image_prompts)) {
+      result.image_prompts = parsed.image_prompts;
+    }
+
+    if (parsed.metadata && typeof parsed.metadata === 'object') {
+      result.metadata = {
+        hashtags: parsed.metadata.hashtags || [],
+        tone: parsed.metadata.tone,
+        estimated_engagement: parsed.metadata.estimated_engagement,
+      };
+    }
+
+    console.log('✅ Extracted content from JSON:', {
+      format_type: result.format_type,
+      has_image_prompts: !!result.image_prompts?.length,
+      has_metadata: !!result.metadata,
+    });
+
+    return result;
+  } catch (e: any) {
+    // Not valid JSON - this is expected for non-JSON content, so use warn instead of error
+    // Only log detailed info if it actually looked like JSON
+    const lookedLikeJson = cleaned.includes('"post_content"') || cleaned.includes('"format_type"');
+    
+    if (lookedLikeJson) {
+      console.warn('⚠️ JSON parsing failed in parseJsonContent (will attempt fix):', {
+        error: e?.message || String(e) || 'Unknown error',
+        error_name: e?.name || 'Unknown',
+        cleaned_preview: cleaned.substring(0, 200),
+        cleaned_length: cleaned.length
+      });
+    }
+    
+    // Try to find and fix common JSON issues
+    // The most common issue is unescaped newlines in string values
+    try {
+      console.log('🔧 Attempting to fix JSON by escaping newlines in strings...');
+      
+      // Smart fix: escape newlines only inside string values (between quotes)
+      let fixed = '';
+      let inString = false;
+      let escapeNext = false;
+      
+      for (let i = 0; i < cleaned.length; i++) {
+        const char = cleaned[i];
+        const prevChar = i > 0 ? cleaned[i - 1] : '';
+        
+        if (escapeNext) {
+          fixed += char;
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escapeNext = true;
+          fixed += char;
+          continue;
+        }
+        
+        if (char === '"' && prevChar !== '\\') {
+          inString = !inString;
+          fixed += char;
+          continue;
+        }
+        
+        if (inString) {
+          // Inside a string - escape newlines
+          if (char === '\n') {
+            fixed += '\\n';
+          } else if (char === '\r') {
+            fixed += '\\r';
+          } else {
+            fixed += char;
+          }
+        } else {
+          // Outside a string - keep as is
+          fixed += char;
+        }
+      }
+      
+      console.log('🔧 Fixed JSON preview:', fixed.substring(0, 300));
+      const parsedFixed = JSON.parse(fixed);
+      
+      if (parsedFixed && parsedFixed.post_content) {
+        console.log('✅ Successfully fixed and parsed JSON!');
+        return {
+          post_content: parsedFixed.post_content,
+          format_type: parsedFixed.format_type,
+          image_prompt: parsedFixed.image_prompt,
+          image_prompts: parsedFixed.image_prompts,
+          metadata: parsedFixed.metadata,
+        };
+      }
+    } catch (fixError: any) {
+      console.log('⚠️ Fix attempt failed:', {
+        error: fixError?.message || String(fixError),
+        error_name: fixError?.name
+      });
+    }
+    
+    return null;
+  }
+}
+
 export default function GeneratePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -65,12 +316,13 @@ export default function GeneratePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>("Crafting your post...");
   const [user, setUser] = useState<any>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showContextModal, setShowContextModal] = useState(false);
   const [hasContext, setHasContext] = useState(false);
-  const [useTrendingTopic, setUseTrendingTopic] = useState(false);
   const [showPostTypeMenu, setShowPostTypeMenu] = useState(false);
+  const [showMobileButtons, setShowMobileButtons] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const optionsButtonRef = useRef<HTMLButtonElement>(null);
   const postTypeButtonRef = useRef<HTMLButtonElement>(null);
@@ -89,12 +341,15 @@ export default function GeneratePage() {
   const [generatingPDFs, setGeneratingPDFs] = useState<Record<string, boolean>>({}); // post_id -> boolean
   const [pdfProgress, setPdfProgress] = useState<Record<string, { current: number; total: number }>>({}); // post_id -> progress
   const [showPdfHistory, setShowPdfHistory] = useState<Record<string, boolean>>({}); // post_id -> boolean
+  const [regeneratingSlideIndex, setRegeneratingSlideIndex] = useState<Record<string, number | null>>({}); // post_id -> slide index being regenerated
+  const [showSlideSelectionModal, setShowSlideSelectionModal] = useState<Record<string, boolean>>({}); // post_id -> boolean
+  const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({}); // post_id -> current slide index
 
   // Generation options
   // Default values
   const DEFAULT_POST_TYPE = "auto";
   const DEFAULT_TONE = "professional";
-  const DEFAULT_LENGTH = "short";
+  const DEFAULT_LENGTH = "medium";
   const DEFAULT_HASHTAG_COUNT = 4;
 
   // Load saved options from localStorage
@@ -105,6 +360,8 @@ export default function GeneratePage() {
         tone: DEFAULT_TONE,
         length: DEFAULT_LENGTH,
         hashtagCount: DEFAULT_HASHTAG_COUNT,
+        useTrendingTopic: false,
+        internetSearch: false,
       };
     }
 
@@ -117,6 +374,8 @@ export default function GeneratePage() {
           tone: parsed.tone || DEFAULT_TONE,
           length: parsed.length || DEFAULT_LENGTH,
           hashtagCount: parsed.hashtagCount ?? DEFAULT_HASHTAG_COUNT,
+          useTrendingTopic: parsed.useTrendingTopic ?? false,
+          internetSearch: parsed.internetSearch ?? false,
         };
       } catch {
         return {
@@ -124,6 +383,8 @@ export default function GeneratePage() {
           tone: DEFAULT_TONE,
           length: DEFAULT_LENGTH,
           hashtagCount: DEFAULT_HASHTAG_COUNT,
+          useTrendingTopic: false,
+          internetSearch: false,
         };
       }
     }
@@ -132,6 +393,8 @@ export default function GeneratePage() {
       tone: DEFAULT_TONE,
       length: DEFAULT_LENGTH,
       hashtagCount: DEFAULT_HASHTAG_COUNT,
+      useTrendingTopic: false,
+      internetSearch: false,
     };
   };
 
@@ -140,6 +403,8 @@ export default function GeneratePage() {
   const [tone, setTone] = useState(savedOptions.tone);
   const [length, setLength] = useState(savedOptions.length);
   const [hashtagCount, setHashtagCount] = useState(savedOptions.hashtagCount);
+  const [useTrendingTopic, setUseTrendingTopic] = useState(savedOptions.useTrendingTopic);
+  const [internetSearch, setInternetSearch] = useState(savedOptions.internetSearch);
   const [contextTone, setContextTone] = useState<string | null>(null);
 
   // Save options to localStorage whenever they change
@@ -149,9 +414,11 @@ export default function GeneratePage() {
       tone,
       length,
       hashtagCount,
+      useTrendingTopic,
+      internetSearch,
     };
     localStorage.setItem("generationOptions", JSON.stringify(options));
-  }, [postType, tone, length, hashtagCount]);
+  }, [postType, tone, length, hashtagCount, useTrendingTopic, internetSearch]);
 
   // Get the effective default tone (from context if available, otherwise fallback)
   const effectiveDefaultTone = contextTone || DEFAULT_TONE;
@@ -250,17 +517,56 @@ export default function GeneratePage() {
       const response = await api.conversations.get(id);
       const conversation = response.data;
       // Convert conversation messages to UI messages (includes both user and assistant)
-      const uiMessages: Message[] = conversation.messages.map((msg: any) => ({
+      const uiMessages: Message[] = conversation.messages.map((msg: any) => {
+        // Safeguard: Check if content is JSON and extract all fields if needed
+        let content = msg.content;
+        let formatType = msg.format;
+        let imagePrompt = msg.image_prompt;
+        let imagePrompts = msg.image_prompts;
+        let metadata = msg.metadata;
+        
+        // Use the parseJsonContent utility function
+        if (typeof content === 'string' && content.trim().length > 0) {
+          const trimmed = content.trim();
+          // Only try to parse if it looks like JSON (for assistant messages)
+          if (msg.role === 'assistant' && (trimmed.startsWith('{') || trimmed.startsWith('```') || trimmed.includes('"post_content"'))) {
+            try {
+              const parsed = parseJsonContent(content);
+              if (parsed && parsed.post_content) {
+                content = parsed.post_content;
+                formatType = parsed.format_type || formatType;
+                imagePrompt = parsed.image_prompt || imagePrompt;
+                imagePrompts = parsed.image_prompts || imagePrompts;
+                metadata = parsed.metadata || metadata;
+                console.log("✅ Extracted content from JSON in conversation message:", {
+                  format_type: formatType,
+                  has_image_prompts: !!imagePrompts?.length,
+                  has_metadata: !!metadata
+                });
+              }
+            } catch (parseError: any) {
+              // If parsing fails, just use the original content
+              console.warn("⚠️ Failed to parse JSON content in loadConversation:", {
+                error: parseError?.message || String(parseError),
+                message_id: msg.id,
+                role: msg.role
+              });
+            }
+          }
+        }
+        
+        return {
         id: msg.id,
         role: msg.role, // "user" or "assistant"
-        content: msg.content,
-        post_content: msg.role === "assistant" ? msg.content : undefined,
-        format_type: msg.format,
-        image_prompt: msg.image_prompt,
-        image_prompts: msg.image_prompts, // For carousel posts
+          content: content,
+          post_content: msg.role === "assistant" ? content : undefined,
+          format_type: formatType,
+          image_prompt: imagePrompt,
+          image_prompts: imagePrompts, // For carousel posts
         post_id: msg.post_id, // Post ID from backend
-        metadata: msg.metadata,
-      }));
+          metadata: metadata,
+        };
+      });
       setMessages(uiMessages);
 
       // Build post ID mapping and load images/PDFs
@@ -280,8 +586,12 @@ export default function GeneratePage() {
         }
       }
       setPostIdMap(newPostIdMap);
-    } catch (error) {
-      console.error("Failed to load conversation:", error);
+    } catch (error: any) {
+      // Only log if it's not a network error (backend might be down)
+      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
+        console.error("Failed to load conversation:", error);
+      }
+      // Silently fail for network errors - backend might not be running
     }
   };
 
@@ -327,9 +637,15 @@ export default function GeneratePage() {
   const loadImageHistory = async (postId: string) => {
     try {
       const response = await api.images.getHistory(postId);
+      // Sort by created_at descending (newest first) to ensure correct order
+      const sortedImages = [...response.data.images].sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA; // Descending order (newest first)
+      });
       setImageHistory(prev => ({
         ...prev,
-        [postId]: response.data.images.map((img: any) => ({
+        [postId]: sortedImages.map((img: any) => ({
           ...img,
           image: `data:image/png;base64,${img.image}`
         }))
@@ -423,9 +739,15 @@ export default function GeneratePage() {
     try {
       const response = await api.pdfs.getHistory(postId);
       if (response.data && response.data.pdfs) {
+        // Sort by created_at descending (newest first) to ensure correct order
+        const sortedPdfs = [...response.data.pdfs].sort((a: any, b: any) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateB - dateA; // Descending order (newest first)
+        });
         setPdfHistory(prev => ({
           ...prev,
-          [postId]: response.data.pdfs.map((pdf: any) => ({
+          [postId]: sortedPdfs.map((pdf: any) => ({
             ...pdf,
             pdf: `data:application/pdf;base64,${pdf.pdf}`,
             slide_images: pdf.slide_images || []
@@ -458,6 +780,7 @@ export default function GeneratePage() {
 
     setMessages((prev) => [...prev, userMessageObj]);
     setLoading(true);
+    setLoadingMessage("Crafting your post...");
 
     try {
       const options = {
@@ -534,6 +857,7 @@ export default function GeneratePage() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+      setLoadingMessage("Crafting your post..."); // Reset to default
     }
   };
 
@@ -616,6 +940,20 @@ export default function GeneratePage() {
     setMessages((prev) => [...prev, userMessageObj]);
     setLoading(true);
 
+    // Set initial loading message based on web search status
+    const isWebSearchEnabled = useTrendingTopic || internetSearch;
+    if (isWebSearchEnabled) {
+      setLoadingMessage("Searching on the web...");
+      // After 3 seconds, switch to crafting message
+      // Note: We don't check loading state here since the timeout is short
+      // and the message update is harmless even if loading stopped
+      setTimeout(() => {
+        setLoadingMessage("Crafting your post...");
+      }, 3000);
+    } else {
+      setLoadingMessage("Crafting your post...");
+    }
+
     try {
       // Parse user prompt for preferences (overrides current settings)
       const promptPreferences = parsePromptPreferences(userMessage);
@@ -625,6 +963,8 @@ export default function GeneratePage() {
         tone,
         length: promptPreferences.length, // Use parsed length (prompt has priority)
         hashtag_count: promptPreferences.hashtag_count, // Use parsed hashtag count (prompt has priority)
+        use_trending_topic: useTrendingTopic,
+        use_web_search: internetSearch,
       };
 
       const response = await api.generate.post(
@@ -718,6 +1058,7 @@ export default function GeneratePage() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+      setLoadingMessage("Crafting your post..."); // Reset to default
     }
   };
 
@@ -727,6 +1068,7 @@ export default function GeneratePage() {
 
     const userMessage = messages[userMessageIndex].content;
     setLoading(true);
+    setLoadingMessage("Crafting your post...");
 
     try {
       const options = {
@@ -780,18 +1122,19 @@ export default function GeneratePage() {
 
   return (
     <div className="min-h-screen bg-[#F3F2F0]">
-      {/* Top Banner */}
-      <div className="bg-white border-b border-[#E0DFDC] py-3 px-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-center gap-3">
-          <Sparkles className="w-5 h-5 text-[#0A66C2]" />
-          <span className="text-base font-medium text-[#666666]">
+      {/* Top Banner - Only show when no conversation */}
+      {messages.length === 0 && (
+        <div className="bg-white border-b border-[#E0DFDC] py-2 sm:py-3 px-3 sm:px-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#0A66C2] flex-shrink-0" />
+            <span className="text-xs sm:text-base font-medium text-[#666666]">
             Trained on posts of top LinkedIn creators
           </span>
           <div className="flex -space-x-2">
             {topCreators.map((creator, idx) => (
-              <Avatar key={idx} className="w-9 h-9 border-2 border-white">
+                <Avatar key={idx} className="w-7 h-7 sm:w-9 sm:h-9 border-2 border-white">
                 <AvatarImage src={creator.image} alt={creator.name} />
-                <AvatarFallback className="bg-[#0A66C2] text-white text-xs font-semibold">
+                  <AvatarFallback className="bg-[#0A66C2] text-white text-[10px] sm:text-xs font-semibold">
                   {creator.initials}
                 </AvatarFallback>
               </Avatar>
@@ -799,56 +1142,35 @@ export default function GeneratePage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Messages */}
-        <div className="space-y-6 mb-6">
+      <div className={`max-w-4xl mx-auto px-3 sm:px-4 ${messages.length === 0 ? 'h-[calc(100vh-60px)] sm:h-[calc(100vh-80px)]' : 'h-[calc(100vh-40px)] sm:h-[calc(100vh-60px)]'} flex flex-col`}>
+        {/* Messages - Scrollable Area */}
+        <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 py-4 sm:py-8 pb-4 pr-1 sm:pr-2">
           {messages.length === 0 && (
-            <div className="text-center py-20">
+            <div className="text-center py-10 sm:py-20 px-2">
               <div className="max-w-2xl mx-auto">
                 {/* Icon */}
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <Sparkles className="w-10 h-10 text-purple-600" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg">
+                  <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-purple-600" />
                 </div>
 
                 {/* Heading */}
-                <h2 className="text-3xl font-bold text-black mb-3">
+                <h2 className="text-2xl sm:text-3xl font-bold text-black mb-2 sm:mb-3">
                   Need inspiration?
                 </h2>
 
                 {/* Description */}
-                <p className="text-lg text-[#666666] mb-8 max-w-lg mx-auto leading-relaxed">
+                <p className="text-base sm:text-lg text-[#666666] mb-6 sm:mb-8 max-w-lg mx-auto leading-relaxed px-2">
                   Let AI generate a unique LinkedIn post tailored to your expertise and style.
                   Click below to get started instantly.
                 </p>
 
-                {/* Inspiration Button */}
-                <div className="mb-8">
-                  <Button
-                    onClick={handleInspiration}
-                    disabled={loading}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full px-10 py-7 text-lg font-semibold shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                    size="lg"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        Generate random post for me
-                      </>
-                    )}
-                  </Button>
-                </div>
-
                 {/* Post Type Selection Cards */}
-                <div className="mb-8">
-                  <p className="text-sm text-[#666666] mb-4 text-center">Select post type:</p>
-                  <div className="flex items-center justify-center gap-3 flex-wrap">
+                <div className="mb-4 sm:mb-6 px-2">
+                  <p className="text-xs sm:text-sm text-[#666666] mb-3 sm:mb-4 text-center">Content type:</p>
+                  <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
                     {[
                       { value: "auto", label: "Choose for me", icon: Zap },
                       { value: "image", label: "Text + Image", icon: Image },
@@ -863,8 +1185,8 @@ export default function GeneratePage() {
                           key={type.value}
                           onClick={() => setPostType(type.value)}
                           className={`
-                            relative w-24 h-24 rounded-xl border-2 transition-all duration-200
-                            flex flex-col items-center justify-center gap-2
+                            relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 transition-all duration-200
+                            flex flex-col items-center justify-center gap-1 sm:gap-2
                             ${isSelected
                               ? "bg-gradient-to-br from-purple-50 to-blue-50 border-purple-500 shadow-lg scale-105"
                               : "bg-white border-[#E0DFDC] hover:border-purple-300 hover:shadow-md"
@@ -872,19 +1194,19 @@ export default function GeneratePage() {
                           `}
                         >
                           <IconComponent
-                            className={`w-6 h-6 ${isSelected ? "text-purple-600" : "text-[#666666]"
+                            className={`w-4 h-4 sm:w-6 sm:h-6 ${isSelected ? "text-purple-600" : "text-[#666666]"
                               }`}
                           />
                           <span
-                            className={`text-xs font-medium text-center px-1 ${isSelected ? "text-purple-600" : "text-[#666666]"
+                            className={`text-[10px] sm:text-xs font-medium text-center px-1 leading-tight ${isSelected ? "text-purple-600" : "text-[#666666]"
                               }`}
                           >
                             {type.label}
                           </span>
                           {isSelected && (
-                            <div className="absolute top-1.5 right-1.5">
-                              <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
-                                <Check className="w-3 h-3 text-white" />
+                            <div className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5">
+                              <div className="w-4 h-4 sm:w-5 sm:h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
                               </div>
                             </div>
                           )}
@@ -894,40 +1216,113 @@ export default function GeneratePage() {
                   </div>
                 </div>
 
+                {/* Inspiration Button */}
+                <div className="mb-4 sm:mb-6 px-2">
+                  <Button
+                    onClick={handleInspiration}
+                    disabled={loading}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full px-6 py-5 sm:px-10 sm:py-7 text-base sm:text-lg font-semibold shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none w-full sm:w-auto"
+                    size="lg"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                        Generate random post for me
+                      </>
+                    )}
+                  </Button>
+                </div>
+
                 {/* Helper text */}
-                <p className="text-sm text-[#999999]">
+                <p className="text-xs sm:text-sm text-[#999999] px-2">
                   Or type your own topic in the input below
                 </p>
               </div>
             </div>
           )}
 
-          {messages.map((msg, idx) => (
+          {messages.map((msg, idx) => {
+            // Check if content is JSON and extract data if needed
+            let displayContent = msg.post_content || msg.content;
+            let displayFormatType = msg.format_type;
+            let displayImagePrompt = msg.image_prompt;
+            let displayImagePrompts = msg.image_prompts;
+            let displayMetadata = msg.metadata;
+
+            // ALWAYS check if content or post_content is JSON and try to parse it
+            // This handles cases where JSON was stored in the database
+            const contentToCheck = msg.post_content || msg.content;
+            if (typeof contentToCheck === 'string' && contentToCheck.trim().length > 0) {
+              const trimmed = contentToCheck.trim();
+              
+              // More aggressive check: if it contains JSON-like structure, try to parse
+              const looksLikeJson = trimmed.startsWith('{') || 
+                                   trimmed.startsWith('```') ||
+                                   trimmed.startsWith('"```') ||
+                                   (trimmed.includes('"post_content"') && (trimmed.includes('"format_type"') || trimmed.includes('format_type')));
+              
+              if (looksLikeJson) {
+                console.log('🔍 Attempting to parse JSON content:', {
+                  starts_with: trimmed.substring(0, 50),
+                  length: trimmed.length
+                });
+                
+                const parsed = parseJsonContent(contentToCheck);
+                if (parsed && parsed.post_content && parsed.post_content.trim().length > 0) {
+                  console.log('✅ Successfully parsed JSON content:', {
+                    original_length: contentToCheck.length,
+                    extracted_content_length: parsed.post_content.length,
+                    format_type: parsed.format_type,
+                    has_image_prompts: !!parsed.image_prompts?.length,
+                    has_metadata: !!parsed.metadata
+                  });
+                  displayContent = parsed.post_content;
+                  displayFormatType = parsed.format_type || displayFormatType;
+                  displayImagePrompt = parsed.image_prompt || displayImagePrompt;
+                  displayImagePrompts = parsed.image_prompts || displayImagePrompts;
+                  displayMetadata = parsed.metadata || displayMetadata;
+                } else {
+                  console.warn('⚠️ Failed to parse JSON content:', {
+                    starts_with: trimmed.substring(0, 100),
+                    length: trimmed.length,
+                    has_post_content_key: trimmed.includes('"post_content"'),
+                    parsed_result: parsed
+                  });
+                }
+              }
+            }
+
+            return (
             <div key={msg.id}>
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                  <div className="max-w-[600px] bg-[#0A66C2] text-white rounded-2xl px-5 py-3 shadow-linkedin-sm">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    <div className="max-w-[85%] sm:max-w-[600px] bg-[#0A66C2] text-white rounded-xl sm:rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-linkedin-sm">
+                      <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
                       {msg.content}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="flex justify-start">
-                  <div className="max-w-[700px] w-full space-y-4">
+                    <div className="max-w-[95%] sm:max-w-[700px] w-full space-y-3 sm:space-y-4">
                     {/* LinkedIn Post Preview */}
-                    {msg.post_content ? (
+                      {displayContent ? (
                       <LinkedInPostPreview
-                        postContent={msg.post_content}
-                        formatType={msg.format_type || "text"}
-                        imagePrompt={msg.image_prompt}
-                        imagePrompts={msg.image_prompts}
+                          postContent={displayContent}
+                          formatType={displayFormatType || "text"}
+                          imagePrompt={displayImagePrompt}
+                          imagePrompts={displayImagePrompts}
                         userProfile={{
                           name: user?.name || "Your Name",
                           headline: "Professional | Content Creator",
                           avatar: user?.linkedin_profile_picture,
                         }}
-                        onCopyText={() => copyToClipboard(msg.post_content || msg.content)}
+                        onCopyText={() => copyToClipboard(displayContent)}
                         onCopyImagePrompt={() => {
                           if (msg.image_prompt) {
                             copyToClipboard(msg.image_prompt);
@@ -967,12 +1362,24 @@ export default function GeneratePage() {
                             setGeneratingImages(prev => ({ ...prev, [postId]: false }));
                           }
                         }}
-                        onRegeneratePDF={async () => {
+                        onRegeneratePDF={async (slideIndices?: number[]) => {
                           const postId = postIdMap[msg.id] || msg.id;
                           if (!msg.image_prompts || msg.image_prompts.length === 0) return;
 
+                          // If no slide indices provided or empty array, show selection modal
+                          // Also handle case where event object might be passed instead of undefined
+                          if (slideIndices === undefined || slideIndices === null || !Array.isArray(slideIndices) || slideIndices.length === 0) {
+                            setShowSlideSelectionModal(prev => ({ ...prev, [postId]: true }));
+                            return;
+                          }
+
+                          // Determine prompts to use based on slide indices
+                          const promptsToRegenerate = slideIndices.length === msg.image_prompts.length
+                            ? msg.image_prompts // Regenerate all
+                            : slideIndices.map(idx => msg.image_prompts![idx]);
+
                           setGeneratingPDFs(prev => ({ ...prev, [postId]: true }));
-                          setPdfProgress(prev => ({ ...prev, [postId]: { current: 0, total: msg.image_prompts!.length } }));
+                          setPdfProgress(prev => ({ ...prev, [postId]: { current: 0, total: promptsToRegenerate.length } }));
 
                           // Start polling for progress
                           const progressInterval = setInterval(async () => {
@@ -981,7 +1388,7 @@ export default function GeneratePage() {
                               const progress = progressResponse.data;
                               setPdfProgress(prev => ({
                                 ...prev,
-                                [postId]: { current: progress.current || 0, total: progress.total || msg.image_prompts!.length }
+                                [postId]: { current: progress.current || 0, total: progress.total || promptsToRegenerate.length }
                               }));
 
                               if (progress.completed || progress.status === 'completed') {
@@ -993,7 +1400,11 @@ export default function GeneratePage() {
                           }, 1000); // Poll every second
 
                           try {
-                            const response = await api.pdfs.generateCarousel(postId, msg.image_prompts);
+                            const response = await api.pdfs.generateCarousel(
+                              postId,
+                              promptsToRegenerate,
+                              slideIndices.length === msg.image_prompts.length ? undefined : slideIndices
+                            );
                             const pdfData = response.data.pdf;
                             const slideImages = response.data.slide_images || [];
 
@@ -1019,7 +1430,59 @@ export default function GeneratePage() {
                             alert(`PDF regeneration failed: ${error.response?.data?.detail || error.message}`);
                           } finally {
                             setGeneratingPDFs(prev => ({ ...prev, [postId]: false }));
-                            setPdfProgress(prev => ({ ...prev, [postId]: { current: msg.image_prompts!.length, total: msg.image_prompts!.length } }));
+                            setPdfProgress(prev => ({ ...prev, [postId]: { current: promptsToRegenerate.length, total: promptsToRegenerate.length } }));
+                          }
+                        }}
+                        onRegenerateSlide={async (slideIndex: number) => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          if (!msg.image_prompts || msg.image_prompts.length === 0) return;
+                          if (slideIndex < 0 || slideIndex >= msg.image_prompts.length) return;
+
+                          // Store the current slide index before regeneration
+                          const slideIndexToMaintain = slideIndex;
+
+                          // Set regenerating state for this specific slide
+                          setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: slideIndex }));
+
+                          try {
+                            const promptForSlide = msg.image_prompts[slideIndex];
+                            const response = await api.pdfs.generateCarousel(
+                              postId,
+                              [promptForSlide],
+                              [slideIndex]
+                            );
+                            const slideImages = response.data.slide_images || [];
+
+                            // Replace ALL slides with the new PDF slides (backend returns all slides)
+                            if (slideImages.length > 0) {
+                              // Update slide index FIRST to ensure CarouselSlider receives correct initialSlide
+                              setCurrentSlideIndex(prev => ({
+                                ...prev,
+                                [postId]: slideIndexToMaintain
+                              }));
+
+                              // Then update slides - this will trigger CarouselSlider to use the updated initialSlide
+                              setCurrentPDFSlides(prev => ({
+                                ...prev,
+                                [postId]: slideImages
+                              }));
+                            }
+
+                            // Also update PDF
+                            const pdfData = response.data.pdf;
+                            setCurrentPDFs(prev => ({
+                              ...prev,
+                              [postId]: `data:application/pdf;base64,${pdfData}`
+                            }));
+
+                            // Reload PDF history
+                            await loadPdfHistory(postId);
+                          } catch (error: any) {
+                            console.error("Slide regeneration failed:", error);
+                            alert(`Slide regeneration failed: ${error.response?.data?.detail || error.message}`);
+                          } finally {
+                            // Clear regenerating state
+                            setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: null }));
                           }
                         }}
                         onDownloadPDF={() => {
@@ -1059,6 +1522,11 @@ export default function GeneratePage() {
                           setShowImageHistory(prev => ({ ...prev, [postId]: true }));
                           loadImageHistory(postId);
                         }}
+                        onShowPdfHistory={() => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          setShowPdfHistory(prev => ({ ...prev, [postId]: true }));
+                          loadPdfHistory(postId);
+                        }}
                         onRegenerate={() => handleRegenerate(idx)}
                         onSchedule={() => {
                           // TODO: Open schedule modal
@@ -1092,6 +1560,18 @@ export default function GeneratePage() {
                           const postId = postIdMap[msg.id] || msg.id;
                           return pdfProgress[postId];
                         })()}
+                        regeneratingSlideIndex={(() => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          return regeneratingSlideIndex[postId] ?? null;
+                        })()}
+                        currentSlideIndex={(() => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          return currentSlideIndex[postId] ?? 0;
+                        })()}
+                        onSlideChange={(slideIndex: number) => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          setCurrentSlideIndex(prev => ({ ...prev, [postId]: slideIndex }));
+                        }}
                         imageHistory={(() => {
                           const postId = postIdMap[msg.id] || msg.id;
                           return imageHistory[postId] || [];
@@ -1140,23 +1620,27 @@ export default function GeneratePage() {
                     ) : (
                       <div className="bg-white rounded-lg px-5 py-3 shadow-linkedin-sm border border-[#E0DFDC]">
                         <p className="text-sm text-black whitespace-pre-wrap">
-                          {msg.content}
+                          {displayContent}
                         </p>
                       </div>
                     )}
 
                     {/* Metadata Tags */}
-                    {msg.metadata && (
+                    {displayMetadata && (
                       <div className="flex items-center gap-2 text-xs">
+                        {displayMetadata.tone && (
                         <span className="px-2.5 py-1 bg-[#F3F2F0] text-[#666666] rounded-full font-medium">
-                          {msg.metadata.tone}
+                            {displayMetadata.tone}
                         </span>
+                        )}
+                        {displayMetadata.estimated_engagement && (
                         <span className="px-2.5 py-1 bg-[#F3F2F0] text-[#666666] rounded-full font-medium">
-                          {msg.metadata.estimated_engagement} engagement
+                            {displayMetadata.estimated_engagement} engagement
                         </span>
-                        {msg.metadata.hashtags && msg.metadata.hashtags.length > 0 && (
+                        )}
+                        {displayMetadata.hashtags && displayMetadata.hashtags.length > 0 && (
                           <span className="px-2.5 py-1 bg-[#E7F3FF] text-[#0A66C2] rounded-full font-medium">
-                            {msg.metadata.hashtags.length} hashtags
+                            {displayMetadata.hashtags.length} hashtags
                           </span>
                         )}
                       </div>
@@ -1165,15 +1649,19 @@ export default function GeneratePage() {
                 </div>
               )}
             </div>
-          ))}
+          );
+          })}
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white rounded-lg px-5 py-4 shadow-linkedin-sm border border-[#E0DFDC]">
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce delay-100" />
-                  <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce delay-200" />
+              <div className="bg-white rounded-lg px-4 py-3 sm:px-5 sm:py-4 shadow-linkedin-sm border border-[#E0DFDC]">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span className="text-sm text-[#666666] font-medium">{loadingMessage}</span>
                 </div>
               </div>
             </div>
@@ -1182,13 +1670,20 @@ export default function GeneratePage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="sticky bottom-0 pb-6 z-10">
-          <div className="bg-white rounded-2xl shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden">
+        {/* Input Area - Fixed at Bottom */}
+        <div className="flex-shrink-0 pt-4 sm:pt-6 pb-4 sm:pb-6 z-10 bg-[#F3F2F0]">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden">
             <Textarea
               placeholder="Describe what you want to post about..."
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (e.target.value.trim()) {
+                  setShowMobileButtons(true);
+                }
+              }}
+              onFocus={() => setShowMobileButtons(true)}
+              onClick={() => setShowMobileButtons(true)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -1196,21 +1691,21 @@ export default function GeneratePage() {
                 }
               }}
               rows={3}
-              className="border-0 resize-none focus-visible:ring-0 text-base px-5 py-4"
+              className="border-0 resize-none focus-visible:ring-0 text-sm sm:text-base px-4 py-3 sm:px-5 sm:py-4"
             />
-            <div className="px-4 py-3 bg-[#F9F9F9] border-t border-[#E0DFDC] flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className={`px-3 py-2 sm:px-4 sm:py-3 bg-[#F9F9F9] border-t border-[#E0DFDC] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 ${showMobileButtons ? 'flex' : 'hidden sm:flex'}`}>
+              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowContextModal(true)}
-                  className={`text-[#666666] ${hasContext ? 'hover:bg-green-50' : ''}`}
+                  className={`${hasContext ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'text-[#666666] hover:bg-green-50'} text-xs sm:text-sm px-2 sm:px-3`}
                 >
                   Context
                   {hasContext ? (
-                    <CheckCircle2 className="w-4 h-4 ml-2 text-green-600" />
+                    <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 text-green-600 flex-shrink-0" />
                   ) : (
-                    <CheckCircle2 className="w-4 h-4 ml-2 text-gray-400" />
+                    <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 text-gray-400 flex-shrink-0" />
                   )}
                 </Button>
                 <div ref={postTypeButtonRef} className="inline-block">
@@ -1219,7 +1714,7 @@ export default function GeneratePage() {
                     size="sm"
                     onClick={() => setShowPostTypeMenu(!showPostTypeMenu)}
                     className={`text-[#666666] hover:bg-[#F3F2F0] ${showPostTypeMenu ? "bg-[#F3F2F0]" : ""
-                      }`}
+                      } text-xs sm:text-sm px-2 sm:px-3`}
                   >
                     {(() => {
                       const iconMap: Record<string, typeof FileText> = {
@@ -1230,7 +1725,7 @@ export default function GeneratePage() {
                         video_script: Video,
                       };
                       const IconComponent = iconMap[postType] || FileText;
-                      return <IconComponent className="w-4 h-4 mr-2" />;
+                      return <IconComponent className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />;
                     })()}
                     {postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType === "video_script" ? "Video script" : postType}
                   </Button>
@@ -1238,14 +1733,34 @@ export default function GeneratePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setUseTrendingTopic(!useTrendingTopic)}
+                  onClick={() => {
+                    const newTrendingState = !useTrendingTopic;
+                    setUseTrendingTopic(newTrendingState);
+                    // Auto-enable web search when Trending is toggled on
+                    if (newTrendingState) {
+                      setInternetSearch(true);
+                    }
+                    // When Trending is toggled off, web search remains on (don't auto-disable)
+                  }}
                   className={`${useTrendingTopic
                     ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
                     : "text-[#666666] hover:bg-orange-50 hover:text-orange-600"
-                    }`}
+                    } text-xs sm:text-sm px-2 sm:px-3`}
                 >
-                  <TrendingUp className="w-4 h-4 mr-2" />
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                   Trending
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setInternetSearch(!internetSearch)}
+                  className={`${internetSearch
+                    ? "text-green-600 bg-green-50 hover:bg-green-100"
+                    : "text-[#666666] hover:bg-green-50 hover:text-green-600"
+                    } text-xs sm:text-sm px-2 sm:px-3`}
+                >
+                  <Globe className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                  Web Search
                 </Button>
                 <div ref={optionsButtonRef} className="inline-block">
                   <Button
@@ -1255,9 +1770,9 @@ export default function GeneratePage() {
                     className={`${areOptionsChanged
                       ? "text-purple-600 bg-purple-50 hover:bg-purple-100"
                       : "text-[#666666] hover:bg-purple-50 hover:text-purple-600"
-                      }`}
+                      } text-xs sm:text-sm px-2 sm:px-3`}
                   >
-                    <Sparkles className="w-4 h-4 mr-2" />
+                    <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                     Options
                   </Button>
                 </div>
@@ -1265,11 +1780,12 @@ export default function GeneratePage() {
               <Button
                 onClick={handleSend}
                 disabled={loading || !input.trim()}
-                className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full px-6"
+                className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full px-4 sm:px-6 text-xs sm:text-sm sm:text-base whitespace-nowrap"
               >
-                <Send className="w-4 h-4 mr-2" />
+                <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                 Generate
               </Button>
+            </div>
             </div>
           </div>
 
@@ -1307,7 +1823,92 @@ export default function GeneratePage() {
             }
           }}
         />
-      </div>
+
+        {/* Slide Selection Modals */}
+        {messages.map((msg) => {
+          const postId = postIdMap[msg.id] || msg.id;
+          const isOpen = showSlideSelectionModal[postId] || false;
+          const slides = currentPDFSlides[postId] || [];
+          const prompts = msg.image_prompts || [];
+
+          if (msg.format_type !== 'carousel' || !isOpen || slides.length === 0) {
+            return null;
+          }
+
+          return (
+            <SlideSelectionModal
+              key={`slide-modal-${postId}`}
+              isOpen={isOpen}
+              onClose={() => setShowSlideSelectionModal(prev => ({ ...prev, [postId]: false }))}
+              slides={slides}
+              prompts={prompts}
+              onConfirm={(selectedIndices) => {
+                setShowSlideSelectionModal(prev => ({ ...prev, [postId]: false }));
+                // Trigger regeneration with selected indices
+                const regenerateHandler = async () => {
+                  const postId = postIdMap[msg.id] || msg.id;
+                  if (!msg.image_prompts || msg.image_prompts.length === 0) return;
+
+                  const promptsToRegenerate = selectedIndices.length === msg.image_prompts.length
+                    ? msg.image_prompts
+                    : selectedIndices.map(idx => msg.image_prompts![idx]);
+
+                  setGeneratingPDFs(prev => ({ ...prev, [postId]: true }));
+                  setPdfProgress(prev => ({ ...prev, [postId]: { current: 0, total: promptsToRegenerate.length } }));
+
+                  const progressInterval = setInterval(async () => {
+                    try {
+                      const progressResponse = await api.pdfs.getProgress(postId);
+                      const progress = progressResponse.data;
+                      setPdfProgress(prev => ({
+                        ...prev,
+                        [postId]: { current: progress.current || 0, total: progress.total || promptsToRegenerate.length }
+                      }));
+
+                      if (progress.completed || progress.status === 'completed') {
+                        clearInterval(progressInterval);
+                      }
+                    } catch (error) {
+                      // Ignore progress polling errors
+                    }
+                  }, 1000);
+
+                  try {
+                    const response = await api.pdfs.generateCarousel(
+                      postId,
+                      promptsToRegenerate,
+                      selectedIndices.length === msg.image_prompts.length ? undefined : selectedIndices
+                    );
+                    const pdfData = response.data.pdf;
+                    const slideImages = response.data.slide_images || [];
+
+                    clearInterval(progressInterval);
+
+                    setCurrentPDFs(prev => ({
+                      ...prev,
+                      [postId]: `data:application/pdf;base64,${pdfData}`
+                    }));
+
+                    setCurrentPDFSlides(prev => ({
+                      ...prev,
+                      [postId]: slideImages
+                    }));
+
+                    await loadPdfHistory(postId);
+                  } catch (error: any) {
+                    clearInterval(progressInterval);
+                    console.error("PDF regeneration failed:", error);
+                    alert(`PDF regeneration failed: ${error.response?.data?.detail || error.message}`);
+                  } finally {
+                    setGeneratingPDFs(prev => ({ ...prev, [postId]: false }));
+                    setPdfProgress(prev => ({ ...prev, [postId]: { current: promptsToRegenerate.length, total: promptsToRegenerate.length } }));
+                  }
+                };
+                regenerateHandler();
+              }}
+            />
+          );
+        })}
     </div>
   );
 }

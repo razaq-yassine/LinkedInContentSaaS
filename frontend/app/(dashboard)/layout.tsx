@@ -73,8 +73,12 @@ export default function DashboardLayout({
     try {
       const response = await api.conversations.list();
       setConversations(response.data);
-    } catch (error) {
-      console.error("Failed to load conversations:", error);
+    } catch (error: any) {
+      // Only log if it's not a network error (backend might be down)
+      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
+        console.error("Failed to load conversations:", error);
+      }
+      // Silently fail for network errors - backend might not be running
     }
   };
 
@@ -288,23 +292,23 @@ export default function DashboardLayout({
       )}
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-[#E0DFDC] px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-[#E0DFDC] px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between">
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-2 hover:bg-[#F3F2F0] rounded-lg transition-colors"
+          className="p-1.5 sm:p-2 hover:bg-[#F3F2F0] rounded-lg transition-colors"
         >
           {isSidebarOpen ? (
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           ) : (
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           )}
         </button>
-        <span className="text-lg font-bold text-black">ContentAI</span>
-        <div className="w-10" />
+        <span className="text-base sm:text-lg font-bold text-black">ContentAI</span>
+        <div className="w-8 sm:w-10" />
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-[280px] pt-16 lg:pt-0">{children}</main>
+      <main className="flex-1 lg:ml-[280px] pt-14 sm:pt-16 lg:pt-0">{children}</main>
     </div>
   );
 }

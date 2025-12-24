@@ -81,10 +81,24 @@ async def get_conversation(
     
     messages = []
     for msg in conv_messages:
+        # Safeguard: Check if content is JSON and extract post_content if needed
+        content = msg.content
+        if isinstance(content, str) and content.strip().startswith('{') and '"post_content"' in content:
+            try:
+                import json
+                parsed = json.loads(content)
+                if isinstance(parsed, dict) and "post_content" in parsed:
+                    extracted = parsed.get("post_content")
+                    if isinstance(extracted, str) and len(extracted.strip()) > 0:
+                        content = extracted
+                        print(f"Extracted post_content from JSON in conversation message {msg.id}")
+            except:
+                pass
+        
         message_data = {
             "id": msg.id,
             "role": msg.role.value,
-            "content": msg.content,
+            "content": content,
             "created_at": msg.created_at
         }
         

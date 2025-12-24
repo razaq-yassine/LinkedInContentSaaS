@@ -361,29 +361,57 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         # Add JSON response instruction
         system_prompt += f"\n\n{RESPONSE_FORMAT_REQUIREMENTS}\n{json_format}"
         
-        # Determine if web search should be used
-        # Use web search for trending topics, current events, statistics, or research-heavy requests
+        # Determine if web search should be used and how
         use_web_search = False
-        search_keywords = ['trending', 'current', 'latest', 'recent', 'statistics', 'data', 'research', 'news', 'update']
-        message_lower = request.message.lower()
+        use_trending_topic = request_options.get('use_trending_topic', False)
+        use_web_search_flag = request_options.get('use_web_search', False)
         
-        # Check if message contains search-worthy keywords
-        if any(keyword in message_lower for keyword in search_keywords):
+        # Modify user message based on flags
+        # Note: Trending takes priority if both flags are set
+        modified_user_message = request.message
+        
+        # If "Trending" is clicked: use web search to find trending topics or latest info
+        # This takes priority over the web search toggle
+        if use_trending_topic:
             use_web_search = True
-            print(f"Enabling web search for request: {request.message[:50]}...")
+            # Modify the message to emphasize trending/latest information
+            if is_random_request or len(user_message_lower.split()) <= 3:
+                # User wants a random topic - find trending topics
+                modified_user_message = f"Find a trending topic or current news item relevant to {profile.profile_md.split('##')[0].strip() if profile.profile_md else 'the user\'s industry'} and create a LinkedIn post about it. Focus on what's trending or in the news right now."
+            else:
+                # User provided a topic - find latest info about it
+                modified_user_message = f"Find the latest information, recent developments, or trending news about: {request.message}. Create a LinkedIn post using the most current and relevant information available."
+            print(f"Trending mode enabled - searching for trending/latest info: {modified_user_message[:100]}...")
         
-        # Also check if user explicitly requested trending topics
+        # If only "Web Search" is toggled (without Trending): use web search to learn about the subject
+        elif use_web_search_flag:
+            use_web_search = True
+            # Modify the message to emphasize learning about the subject first
+            modified_user_message = f"First, use web search to learn about and gather current information on: {request.message}. Then, based on what you learn, create a LinkedIn post about this topic."
+            print(f"Web search enabled - learning about subject before generating: {request.message[:50]}...")
+        
+        # Fallback: Check if message contains search-worthy keywords (legacy behavior)
+        else:
+            search_keywords = ['trending', 'current', 'latest', 'recent', 'statistics', 'data', 'research', 'news', 'update']
+            message_lower = request.message.lower()
+            if any(keyword in message_lower for keyword in search_keywords):
+                use_web_search = True
+                print(f"Enabling web search for keyword-based request: {request.message[:50]}...")
+        
+        # Also check if user explicitly requested trending topics via topic_mode (legacy support)
         topic_mode = request_options.get('topic_mode', 'auto')
-        if topic_mode == 'trending':
+        if topic_mode == 'trending' and not use_trending_topic and not use_web_search_flag:
             use_web_search = True
-            print("Enabling web search for trending topic request")
+            if modified_user_message == request.message:  # Only modify if not already modified
+                modified_user_message = f"Find a trending topic or current news item and create a LinkedIn post about it."
+            print("Enabling web search for legacy trending topic request")
         
         # Generate post
         try:
             # Pass conversation history to AI (current message hasn't been saved yet, so all history is previous)
             raw_response = await generate_completion(
                 system_prompt=system_prompt,
-                user_message=request.message,
+                user_message=modified_user_message,
                 temperature=0.8,
                 use_search=use_web_search,
                 conversation_history=conversation_history if conversation_history else None
@@ -457,20 +485,38 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             if isinstance(post_content, str):
                 # Check if post_content is actually a JSON string containing the full response
                 post_content_stripped = post_content.strip()
-                if post_content_stripped.startswith('{') and '"post_content"' in post_content_stripped and '"format_type"' in post_content_stripped:
+                # More robust check: if it starts with { and looks like JSON, try to parse it
+                if post_content_stripped.startswith('{') and ('"post_content"' in post_content_stripped or '"format_type"' in post_content_stripped or '"image_prompts"' in post_content_stripped):
                     try:
                         # Try to parse and extract the actual post_content
                         parsed_full = json.loads(post_content_stripped)
                         if isinstance(parsed_full, dict):
+                            # Try to extract post_content from the parsed JSON
                             actual_post_content = parsed_full.get("post_content")
                             if isinstance(actual_post_content, str) and len(actual_post_content.strip()) > 0:
                                 print("WARNING: Extracted post_content from JSON string that was stored in post_content field")
                                 post_content = actual_post_content
-                                # Also update metadata if available
+                                # Also update metadata, format_type, and image_prompts if available
                                 if "metadata" in parsed_full:
                                     metadata_dict = parsed_full.get("metadata", {})
-                    except (json.JSONDecodeError, TypeError, AttributeError):
+                                if "format_type" in parsed_full and not format_type:
+                                    format_type = parsed_full.get("format_type")
+                                if "image_prompts" in parsed_full and not image_prompts:
+                                    image_prompts = parsed_full.get("image_prompts")
+                            else:
+                                # If post_content is not found or empty, but we have a dict, 
+                                # check if the entire dict was meant to be the response
+                                # In this case, log an error and use a fallback
+                                print("ERROR: post_content field contains JSON but no valid post_content found")
+                                # Try to use the first meaningful string value as fallback
+                                for key, value in parsed_full.items():
+                                    if isinstance(value, str) and len(value.strip()) > 50 and key != "image_prompts":
+                                        post_content = value
+                                        print(f"Using {key} as fallback post_content")
+                                        break
+                    except (json.JSONDecodeError, TypeError, AttributeError) as e:
                         # If parsing fails, keep original post_content
+                        print(f"Failed to parse post_content as JSON: {e}")
                         pass
             
             # Clean post_content: Remove any slide prompts or image descriptions that might have leaked in
@@ -576,6 +622,26 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             # Only format if not already formatted (check for markers)
             if not post_content.startswith('**HEADER**') and not post_content.startswith('*SCRIPT*'):
                 post_content = format_video_script_string(post_content)
+        
+        # CRITICAL: Final check before saving - ensure post_content is never JSON
+        if isinstance(post_content, str):
+            post_content_clean = post_content.strip()
+            # If it looks like JSON (starts with { and contains JSON-like structure), try to extract content
+            if post_content_clean.startswith('{') and ('"post_content"' in post_content_clean or '"format_type"' in post_content_clean):
+                try:
+                    parsed_check = json.loads(post_content_clean)
+                    if isinstance(parsed_check, dict):
+                        extracted = parsed_check.get("post_content")
+                        if isinstance(extracted, str) and len(extracted.strip()) > 0:
+                            print("CRITICAL: Final extraction - post_content was JSON, extracted actual content")
+                            post_content = extracted
+                        else:
+                            # Last resort: if we can't extract, log error and use a placeholder
+                            print("CRITICAL ERROR: post_content is JSON but no valid content found. Using error message.")
+                            post_content = "Error: Invalid response format. Please try regenerating."
+                except:
+                    # If parsing fails, it's not valid JSON, so keep as-is
+                    pass
         
         # Convert format string to PostFormat enum
         format_enum_map = {
@@ -1029,8 +1095,31 @@ async def generate_carousel_image_prompts(post_content: str, context: dict) -> l
         else:
             expertise_str = str(expertise) if expertise else industry
         
+        # Detect if content is educational/tutorial/how-to
+        educational_keywords = ['how to', 'step', 'tutorial', 'guide', 'explain', 'learn', 'teach', 'solution', 'process', 'method', 'technique', 'way to', 'tips', 'best practices', 'example', 'demonstrate']
+        is_educational = any(keyword in post_content.lower() for keyword in educational_keywords)
+        
+        # Extract key educational points if educational
+        educational_instruction = ""
+        if is_educational:
+            educational_instruction = """
+
+CRITICAL FOR EDUCATIONAL CONTENT:
+- This post is educational/tutorial/how-to content
+- Each slide MUST include TEXT OVERLAYS with:
+  * Clear explanations of concepts being taught
+  * Step-by-step instructions if applicable
+  * Key takeaways or solutions
+  * Specific details that educate the viewer
+- Text should be readable, well-positioned, and complement the visuals
+- For "how to" content: Include numbered steps or sequential instructions in text
+- For explanatory content: Include key concepts, definitions, or solutions in text
+- Visuals should support the text, not replace it
+- Example: If explaining a process, the slide should show BOTH the visual representation AND text explaining what's happening
+- Text overlays are REQUIRED - slides cannot be images only"""
+        
         prompt = await generate_completion(
-            system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn carousel posts. Your prompts create a cohesive visual story with consistent theming.
+            system_prompt=f"""You are a creative expert at writing image generation prompts for LinkedIn carousel posts. Your prompts create a cohesive visual story with consistent theming.
 
 CRITICAL REQUIREMENTS:
 
@@ -1057,7 +1146,7 @@ CRITICAL REQUIREMENTS:
    - Slides 2-N: Each shows a specific point/concept, maintaining the theme
    - Final slide: Summarizes or provides takeaway, maintains theme
    - Slides build on each other visually like a story
-
+{educational_instruction}
 5. LINKEDIN OPTIMIZATION:
    - Professional, polished, engaging aesthetic
    - 1200×628px landscape format
@@ -1074,15 +1163,22 @@ EXPERTISE: {expertise_str}
 
 TASK:
 1. Analyze content: If specific tools/platforms mentioned → use real-world style. If general/abstract → use cartoon/illustration style with characters
-2. Break the post into {slide_count} logical sections/points (one per slide)
-3. Choose ONE consistent visual theme: same colors, same style (realistic OR cartoon), same composition for ALL slides
-4. Create {slide_count} prompts where:
+2. Determine if content is educational/tutorial/how-to: {"YES - This is educational content. Each slide MUST include text overlays with explanations, steps, or solutions." if is_educational else "NO - Standard content"}
+3. Break the post into {slide_count} logical sections/points (one per slide)
+4. Choose ONE consistent visual theme: same colors, same style (realistic OR cartoon), same composition for ALL slides
+5. Create {slide_count} prompts where:
    - Each slide represents ONE specific point from the post
    - All slides share the SAME color palette and visual style
    - If using characters: They do actions matching each slide's point
    - Slides build on each other visually (like a story)
+   {"- CRITICAL: Each slide MUST include text overlays with:" if is_educational else ""}
+   {"  * Clear explanations of what is being taught" if is_educational else ""}
+   {"  * Step-by-step instructions if applicable" if is_educational else ""}
+   {"  * Key solutions or takeaways" if is_educational else ""}
+   {"  * Specific educational content that helps viewers understand" if is_educational else ""}
+   {"- Text should be readable and well-integrated with visuals" if is_educational else ""}
 
-CRITICAL: All slides must be visually consistent - same colors, same style (realistic OR cartoon), same type of elements. They should feel like a cohesive series.
+CRITICAL: All slides must be visually consistent - same colors, same style (realistic OR cartoon), same type of elements. They should feel like a cohesive series.{" For educational content, text overlays are REQUIRED on every slide." if is_educational else ""}
 
 Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
             temperature=0.8

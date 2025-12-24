@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -19,10 +19,15 @@ import {
   FileImage,
   History,
   X,
-  Check
+  Check,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { CarouselSlider } from './CarouselSlider';
 import { CarouselPDFLoading } from './CarouselPDFLoading';
+import { FullscreenImageViewer } from './FullscreenImageViewer';
+import { FullscreenCarouselViewer } from './FullscreenCarouselViewer';
 
 interface UserProfile {
   name: string;
@@ -57,7 +62,8 @@ interface LinkedInPostPreviewProps {
   onCopyImagePrompt?: () => void;
   onCopySlidePrompts?: () => void; // For carousel posts
   onRegenerateImage?: () => void;
-  onRegeneratePDF?: () => void; // For carousel PDF regeneration
+  onRegeneratePDF?: (slideIndices?: number[]) => void; // For carousel PDF regeneration with optional slide indices
+  onRegenerateSlide?: (slideIndex: number) => void; // For regenerating a single slide
   onDownloadImage?: () => void;
   onDownloadPDF?: () => void; // For carousel PDF download
   onRegenerate?: () => void;
@@ -69,6 +75,9 @@ interface LinkedInPostPreviewProps {
   generatingImage?: boolean;
   generatingPDF?: boolean; // For carousel PDF generation
   generatingPDFProgress?: { current: number; total: number }; // Progress tracking
+  regeneratingSlideIndex?: number | null; // Index of slide being regenerated
+  currentSlideIndex?: number; // Current slide index to display
+  onSlideChange?: (slideIndex: number) => void; // Callback when slide changes
   imageHistory?: ImageHistoryItem[];
   pdfHistory?: PDFHistoryItem[]; // For carousel PDF history
   showImageHistory?: boolean;
@@ -82,6 +91,99 @@ interface LinkedInPostPreviewProps {
   className?: string;
 }
 
+// Mini PDF Carousel Component for History Modal
+function PDFHistoryCarousel({ 
+  slides, 
+  pdfId,
+  onSelectPDF,
+  isCurrent 
+}: { 
+  slides: string[]; 
+  pdfId: string;
+  onSelectPDF?: (pdfId: string) => void;
+  isCurrent: boolean;
+}) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const goToPrevious = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentSlide > 0) {
+      setCurrentSlide(currentSlide - 1);
+    }
+  };
+
+  const goToNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentSlide < slides.length - 1) {
+      setCurrentSlide(currentSlide + 1);
+    }
+  };
+
+  const isFirstSlide = currentSlide === 0;
+  const isLastSlide = currentSlide === slides.length - 1;
+
+  return (
+    <div className="relative aspect-square bg-black">
+      <img
+        src={`data:image/png;base64,${slides[currentSlide]}`}
+        alt={`Slide ${currentSlide + 1} of ${slides.length}`}
+        className="w-full h-full object-contain select-none"
+        draggable={false}
+      />
+      
+      {/* Navigation arrows - only show if multiple slides */}
+      {slides.length > 1 && (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={goToPrevious}
+            disabled={isFirstSlide}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-8 h-8 z-10 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={goToNext}
+            disabled={isLastSlide}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-8 h-8 z-10 disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </>
+      )}
+
+      {/* Slide counter */}
+      {slides.length > 1 && (
+        <div 
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full pointer-events-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {currentSlide + 1} / {slides.length}
+        </div>
+      )}
+
+      {/* Current indicator */}
+      {isCurrent && (
+        <div className="absolute top-2 right-2 bg-[#0A66C2] text-white rounded-full p-1.5 z-10 pointer-events-none">
+          <Check className="w-4 h-4" />
+        </div>
+      )}
+
+      {/* Select overlay */}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center pointer-events-none">
+        {!isCurrent && (
+          <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+            Select
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function LinkedInPostPreview({
   postContent,
   formatType,
@@ -93,6 +195,7 @@ export function LinkedInPostPreview({
   onCopySlidePrompts,
   onRegenerateImage,
   onRegeneratePDF,
+  onRegenerateSlide,
   onDownloadImage,
   onDownloadPDF,
   onRegenerate,
@@ -104,6 +207,9 @@ export function LinkedInPostPreview({
   generatingImage = false,
   generatingPDF = false,
   generatingPDFProgress,
+  regeneratingSlideIndex = null,
+  currentSlideIndex = 0,
+  onSlideChange,
   imageHistory = [],
   pdfHistory = [],
   showImageHistory = false,
@@ -116,6 +222,22 @@ export function LinkedInPostPreview({
   onSelectPDF,
   className = '',
 }: LinkedInPostPreviewProps) {
+  const [showFullscreenImage, setShowFullscreenImage] = useState(false);
+  const [showFullscreenCarousel, setShowFullscreenCarousel] = useState(false);
+  const [currentCarouselSlide, setCurrentCarouselSlide] = useState(currentSlideIndex);
+
+  // Update local state when prop changes (e.g., after regeneration)
+  useEffect(() => {
+    if (currentSlideIndex >= 0 && currentSlideIndex < (currentPDFSlides.length || 0)) {
+      setCurrentCarouselSlide(currentSlideIndex);
+    }
+  }, [currentSlideIndex, currentPDFSlides.length]);
+
+  // Notify parent when slide changes
+  const handleSlideChange = (slideIndex: number) => {
+    setCurrentCarouselSlide(slideIndex);
+    onSlideChange?.(slideIndex);
+  };
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -225,9 +347,9 @@ export function LinkedInPostPreview({
   };
 
   return (
-    <Card className={`w-full max-w-sm bg-white border border-[#E0DFDC] shadow-linkedin-sm overflow-hidden ${className}`}>
+    <Card className={`w-full max-w-lg bg-white border border-[#E0DFDC] shadow-linkedin-sm overflow-hidden ${className}`}>
       {/* Post Header */}
-      <div className="p-3 pb-2">
+      <div className="px-3 pt-2 pb-1.5">
         <div className="flex items-start gap-2.5">
           <Avatar className="w-9 h-9">
             <AvatarImage src={userProfile.avatar} alt={userProfile.name} />
@@ -294,7 +416,8 @@ export function LinkedInPostPreview({
               <img 
                 src={currentImage} 
                 alt="Generated LinkedIn post image"
-                className="w-full h-auto object-cover"
+                className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setShowFullscreenImage(true)}
               />
             </div>
           ) : (
@@ -326,7 +449,61 @@ export function LinkedInPostPreview({
             />
           ) : currentPDFSlides && currentPDFSlides.length > 0 ? (
             // Display carousel slider with slides
-            <CarouselSlider slides={currentPDFSlides} />
+            <div>
+              {/* Buttons above PDF preview */}
+              <div className="flex items-center justify-between px-3 py-2 bg-[#F9F9F9] border-b border-[#E0DFDC]">
+                {/* Regenerate Slide Button - Left side */}
+                {onRegenerateSlide && (
+                  <Button
+                    onClick={() => {
+                      onRegenerateSlide?.(currentCarouselSlide);
+                    }}
+                    disabled={regeneratingSlideIndex !== null && regeneratingSlideIndex !== undefined}
+                    className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full px-4 py-2 flex items-center gap-2 transition-all disabled:opacity-50 text-xs shadow-lg"
+                    style={{
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                    }}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${regeneratingSlideIndex !== null && regeneratingSlideIndex !== undefined ? 'animate-spin' : ''}`} />
+                    <span className="font-semibold">
+                      {regeneratingSlideIndex !== null && regeneratingSlideIndex !== undefined ? 'Regenerating...' : 'Regenerate slide'}
+                    </span>
+                  </Button>
+                )}
+                
+                {/* Fullscreen Button - Right side */}
+                <Button
+                  onClick={() => setShowFullscreenCarousel(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-[#666666] hover:text-[#0A66C2] hover:bg-[#F3F2F0] rounded-full px-3"
+                >
+                  <Maximize2 className="w-4 h-4 mr-2" />
+                  <span className="text-xs font-medium">Fullscreen</span>
+                </Button>
+              </div>
+              
+              <div 
+                className="cursor-pointer"
+                onClick={(e) => {
+                  // Don't open fullscreen if clicking on a disabled button
+                  const target = e.target as HTMLElement;
+                  const button = target.closest('button');
+                  if (button && button.disabled) {
+                    return;
+                  }
+                  setShowFullscreenCarousel(true);
+                }}
+              >
+                <CarouselSlider 
+                  slides={currentPDFSlides}
+                  onRegenerateSlide={onRegenerateSlide}
+                  regeneratingSlideIndex={regeneratingSlideIndex}
+                  onSlideChange={handleSlideChange}
+                  initialSlide={currentCarouselSlide}
+                />
+              </div>
+            </div>
           ) : (
             // Placeholder when no PDF yet
             <div className="bg-[#F3F2F0] aspect-square flex items-center justify-center">
@@ -386,7 +563,7 @@ export function LinkedInPostPreview({
       </div>
 
       {/* Action Buttons for User */}
-      <div className="px-3 py-2 bg-[#F9F9F9] border-t border-[#E0DFDC]">
+      <div className="px-3 pt-1.5 pb-2 bg-[#F9F9F9] border-t border-[#E0DFDC]">
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Copy Text Content */}
           {onCopyText && (
@@ -398,7 +575,7 @@ export function LinkedInPostPreview({
               title="Copy post text"
             >
               <Copy className="w-3 h-3" />
-              <span className="hidden sm:inline">Copy Text</span>
+              <span>Copy Text</span>
             </Button>
           )}
 
@@ -413,7 +590,7 @@ export function LinkedInPostPreview({
               title={imagePrompt ? `Copy image prompt: ${imagePrompt.substring(0, 50)}...` : "No image prompt available"}
             >
               <FileImage className="w-3 h-3" />
-              <span className="hidden sm:inline">Copy Prompt</span>
+              <span>Copy Prompt</span>
             </Button>
           )}
 
@@ -428,7 +605,7 @@ export function LinkedInPostPreview({
               title={imagePrompts && imagePrompts.length > 0 ? `Copy ${imagePrompts.length} slide prompts` : "No slide prompts available"}
             >
               <FileImage className="w-3 h-3" />
-              <span className="hidden sm:inline">Copy Prompts</span>
+              <span>Copy Prompts</span>
             </Button>
           )}
 
@@ -443,14 +620,14 @@ export function LinkedInPostPreview({
               title={imagePrompt ? "Regenerate image from prompt" : "No image prompt available"}
             >
               <RefreshCw className={`w-3 h-3 ${generatingImage ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{generatingImage ? 'Generating...' : 'Regenerate Image'}</span>
+              <span>{generatingImage ? 'Generating...' : 'Regenerate Image'}</span>
             </Button>
           )}
 
           {/* Regenerate PDF - Show for carousel posts */}
           {formatType === 'carousel' && onRegeneratePDF && (
             <Button
-              onClick={onRegeneratePDF}
+              onClick={() => onRegeneratePDF()}
               variant="outline"
               size="sm"
               disabled={!imagePrompts || imagePrompts.length === 0 || generatingPDF}
@@ -458,12 +635,12 @@ export function LinkedInPostPreview({
               title={imagePrompts && imagePrompts.length > 0 ? "Regenerate PDF from prompts" : "No prompts available"}
             >
               <RefreshCw className={`w-3 h-3 ${generatingPDF ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{generatingPDF ? 'Generating...' : 'Regenerate PDF'}</span>
+              <span>{generatingPDF ? 'Generating...' : 'Regenerate PDF'}</span>
             </Button>
           )}
 
-          {/* Image History - Show for image posts */}
-          {formatType === 'image' && onShowImageHistory && imageHistory.length > 0 && (
+          {/* Image History - Show for image posts (only when multiple versions exist) */}
+          {formatType === 'image' && onShowImageHistory && imageHistory.length > 1 && (
             <Button
               onClick={onShowImageHistory}
               variant="outline"
@@ -472,12 +649,12 @@ export function LinkedInPostPreview({
               title="View image history"
             >
               <History className="w-3 h-3" />
-              <span className="hidden sm:inline">History ({imageHistory.length})</span>
+              <span>History ({imageHistory.length})</span>
             </Button>
           )}
 
-          {/* PDF History - Show for carousel posts */}
-          {formatType === 'carousel' && onShowPdfHistory && pdfHistory.length > 0 && (
+          {/* PDF History - Show for carousel posts (only when multiple versions exist) */}
+          {formatType === 'carousel' && onShowPdfHistory && pdfHistory.length > 1 && (
             <Button
               onClick={onShowPdfHistory}
               variant="outline"
@@ -486,7 +663,7 @@ export function LinkedInPostPreview({
               title="View PDF history"
             >
               <History className="w-3 h-3" />
-              <span className="hidden sm:inline">History ({pdfHistory.length})</span>
+              <span>History ({pdfHistory.length})</span>
             </Button>
           )}
 
@@ -501,7 +678,7 @@ export function LinkedInPostPreview({
               title={currentImage ? "Download current image" : "No image generated yet"}
             >
               <Download className="w-3 h-3" />
-              <span className="hidden sm:inline">Download</span>
+              <span>Download</span>
             </Button>
           )}
 
@@ -516,7 +693,7 @@ export function LinkedInPostPreview({
               title={currentPDF ? "Download current PDF" : "No PDF generated yet"}
             >
               <Download className="w-3 h-3" />
-              <span className="hidden sm:inline">Download PDF</span>
+              <span>Download PDF</span>
             </Button>
           )}
 
@@ -530,7 +707,7 @@ export function LinkedInPostPreview({
               title="Regenerate this post"
             >
               <RefreshCw className="w-3 h-3" />
-              <span className="hidden sm:inline">Regenerate</span>
+              <span>Regenerate</span>
             </Button>
           )}
 
@@ -547,7 +724,7 @@ export function LinkedInPostPreview({
               title="Schedule for later"
             >
               <Calendar className="w-3 h-3" />
-              <span className="hidden sm:inline">Schedule</span>
+              <span>Schedule</span>
             </Button>
           )}
 
@@ -560,7 +737,7 @@ export function LinkedInPostPreview({
               title="Publish to LinkedIn now"
             >
               <ExternalLink className="w-3 h-3" />
-              <span className="hidden sm:inline">Publish</span>
+              <span>Publish</span>
             </Button>
           )}
         </div>
@@ -631,6 +808,90 @@ export function LinkedInPostPreview({
           </div>
         </div>
       )}
+
+      {/* PDF History Modal */}
+      {showPdfHistory && pdfHistory.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClosePdfHistory}>
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-[#E0DFDC]">
+              <h3 className="text-lg font-semibold text-black">PDF History</h3>
+              <button
+                onClick={onClosePdfHistory}
+                className="text-[#666666] hover:text-black hover:bg-[#F3F2F0] rounded-full p-1.5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* PDF Grid */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pdfHistory.map((pdf) => (
+                  <div
+                    key={pdf.id}
+                    className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                      pdf.is_current
+                        ? 'border-[#0A66C2] ring-2 ring-[#0A66C2]/20'
+                        : 'border-[#E0DFDC] hover:border-[#0A66C2]'
+                    }`}
+                    onClick={() => onSelectPDF?.(pdf.id)}
+                  >
+                    {/* PDF Preview with navigation */}
+                    {pdf.slide_images && pdf.slide_images.length > 0 && (
+                      <PDFHistoryCarousel
+                        slides={pdf.slide_images}
+                        pdfId={pdf.id}
+                        onSelectPDF={onSelectPDF}
+                        isCurrent={pdf.is_current}
+                      />
+                    )}
+                    <div className="p-3 bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-black">
+                          {pdf.slide_count} {pdf.slide_count === 1 ? 'slide' : 'slides'}
+                        </p>
+                        <p className="text-xs text-[#666666]">
+                          {new Date(pdf.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {pdf.prompts && pdf.prompts.length > 0 && (
+                        <p className="text-xs text-[#666666] line-clamp-2">
+                          {pdf.prompts[0]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-[#E0DFDC] bg-[#F9F9F9]">
+              <p className="text-xs text-[#666666] text-center">
+                Click on a PDF to set it as the current one for this post
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Image Viewer */}
+      <FullscreenImageViewer
+        imageSrc={currentImage || ''}
+        isOpen={showFullscreenImage}
+        onClose={() => setShowFullscreenImage(false)}
+      />
+
+      {/* Fullscreen Carousel Viewer */}
+      <FullscreenCarouselViewer
+        slides={currentPDFSlides}
+        isOpen={showFullscreenCarousel}
+        onClose={() => setShowFullscreenCarousel(false)}
+        onRegenerateSlide={onRegenerateSlide}
+        regeneratingSlideIndex={regeneratingSlideIndex}
+        initialSlide={currentCarouselSlide}
+      />
     </Card>
   );
 }
