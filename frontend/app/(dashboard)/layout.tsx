@@ -125,7 +125,7 @@ export default function DashboardLayout({
 
   const navItems = [
     { href: "/generate", label: "Copilot", icon: MessageSquare },
-    { href: "/history", label: "Posts Planning", icon: Calendar },
+    { href: "/post-planning", label: "Posts Planning", icon: Calendar },
     { href: "/comments", label: "Comments", icon: MessageSquare },
     { href: "/context", label: "Profile Context", icon: Sparkles },
   ];
