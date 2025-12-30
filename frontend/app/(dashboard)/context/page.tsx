@@ -27,6 +27,20 @@ export default function ContextPage() {
       const response = await api.user.getProfile();
       const profile = response.data;
       
+      // Helper function to convert content_mix object to array format if needed
+      const normalizeContentMix = (contentMix: any): any[] => {
+        if (!contentMix) return [];
+        if (Array.isArray(contentMix)) return contentMix;
+        if (typeof contentMix === 'object') {
+          // Convert object format {category: percentage} to array format [{category, percentage}]
+          return Object.entries(contentMix).map(([category, percentage]) => ({
+            category: category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            percentage: percentage
+          }));
+        }
+        return [];
+      };
+
       // Build context structure from profile data
       const profileContext = {
         personal_info: {
@@ -43,7 +57,7 @@ export default function ContextPage() {
           posting_frequency: profile.context_json?.posting_frequency || "2-3x per week",
           tone: profile.context_json?.tone || "professional",
         },
-        content_mix: profile.context_json?.content_mix || [],
+        content_mix: normalizeContentMix(profile.context_json?.content_mix),
         content_ideas_evergreen: profile.context_json?.content_ideas_evergreen || [],
         content_ideas_trending: profile.context_json?.content_ideas_trending || [],
         ai_generated_fields: profile.context_json?.ai_generated_fields || [],
@@ -377,12 +391,16 @@ export default function ContextPage() {
           icon={<Target className="h-5 w-5" />}
         >
           <div className="space-y-2">
-            {(context.content_mix || []).map((mix: any, index: number) => (
-              <div key={index} className="flex justify-between items-center bg-[#F3F2F0] p-3 rounded-md">
-                <span className="text-sm font-medium">{mix.category}</span>
-                <span className="text-sm text-[#0A66C2] font-semibold">{mix.percentage}%</span>
-              </div>
-            ))}
+            {Array.isArray(context.content_mix) && context.content_mix.length > 0 ? (
+              context.content_mix.map((mix: any, index: number) => (
+                <div key={index} className="flex justify-between items-center bg-[#F3F2F0] p-3 rounded-md">
+                  <span className="text-sm font-medium">{mix.category}</span>
+                  <span className="text-sm text-[#0A66C2] font-semibold">{mix.percentage}%</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-[#666666]">No content mix configured</p>
+            )}
           </div>
         </CollapsibleSection>
 

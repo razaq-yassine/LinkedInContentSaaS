@@ -21,6 +21,7 @@ class PostGenerationResponse(BaseModel):
     image_prompts: Optional[List[str]] = None  # For carousel posts
     metadata: Optional[PostMetadata] = None
     conversation_id: Optional[str] = None
+    title: Optional[str] = None  # Title for the conversation
     created_at: datetime
     
     class Config:

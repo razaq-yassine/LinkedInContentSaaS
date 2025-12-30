@@ -17,9 +17,29 @@ app = FastAPI(
 )
 
 # Configure CORS
+# Allow Cloudflare tunnel origins (trycloudflare.com domains)
+cors_origins = [
+    settings.frontend_url,
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+# Allow all trycloudflare.com domains (Cloudflare Quick Tunnels)
+# This is a wildcard approach - in production, use specific domains
+# For now, we'll allow any trycloudflare.com origin
+
+# Custom CORS function to allow trycloudflare.com domains
+def is_allowed_origin(origin: str) -> bool:
+    if origin in cors_origins:
+        return True
+    # Allow any trycloudflare.com domain
+    if "trycloudflare.com" in origin:
+        return True
+    return False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:3000", "http://localhost:3001"],
+    allow_origin_regex=r"https?://.*\.trycloudflare\.com",
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],

@@ -135,20 +135,13 @@ export function ConversationList({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <>
-                <div
-                  className={`text-sm font-medium truncate ${
-                    isActive ? 'text-[#0A66C2]' : 'text-black'
-                  }`}
-                >
-                  {conversation.title}
-                </div>
-                {conversation.last_message_preview && (
-                  <div className="text-xs text-[#666666] truncate mt-0.5">
-                    {conversation.last_message_preview}
-                  </div>
-                )}
-              </>
+              <div
+                className={`text-sm font-medium truncate ${
+                  isActive ? 'text-[#0A66C2]' : 'text-black'
+                }`}
+              >
+                {conversation.title}
+              </div>
             )}
           </div>
         </button>

@@ -82,6 +82,7 @@ The script should be engaging, valuable, and optimized for LinkedIn video format
 
 # JSON Format Templates
 CAROUSEL_JSON_FORMAT = """{
+    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
     "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post, NOT slide descriptions. Do NOT include slide prompts or mention slides here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
     "format_type": "carousel",
     "image_prompts": [
@@ -108,6 +109,7 @@ EDUCATIONAL CONTENT REQUIREMENT: If the post is educational (explains how to do 
 IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
 
 IMAGE_JSON_FORMAT = """{
+    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
     "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post. Use small statements with blank lines between them. Do NOT include image descriptions or prompts here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
     "format_type": "image",
     "image_prompt": "Detailed image generation prompt. If post mentions specific tools/platforms: use real-world visuals (dashboards, offices, devices). If post is general/abstract: use friendly cartoon/illustration style with diverse professional characters doing actions that match the post's message. For before/after comparisons: use split-screen with cartoon characters showing transformation. Include: visual style (realistic photography OR cartoon illustration), specific color palette, composition, concrete visual elements. LinkedIn-friendly, professional, engaging, 1200x628px. This is ONLY for AI image generation, NOT shown in the post.",
@@ -123,6 +125,7 @@ CRITICAL: post_content is the LinkedIn post text (what users see). image_prompt 
 IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
 
 VIDEO_SCRIPT_JSON_FORMAT = """{
+    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
     "post_content": "Complete video script formatted as readable text:\n\n[Hook - 3-5 seconds]\nYour attention-grabbing opening line here. Make it conversational and engaging.\n\n[Introduction - 10-15 seconds]\nSet up the context and why this topic matters. Establish credibility.\n\n[Main Content - 40-60 seconds]\nBreak down your main points:\n\nPoint 1: [Brief description]\n[Visual cue: what to show]\nYour script text here with natural pauses and conversational flow.\n\nPoint 2: [Brief description]\n[Visual cue: what to show]\nYour script text here.\n\nPoint 3: [Brief description]\n[Visual cue: what to show]\nYour script text here.\n\n[Summary - 10-15 seconds]\nReinforce the key takeaway. Tie back to the hook if possible.\n\n[CTA - 5-10 seconds]\nClear call-to-action that encourages engagement.\n\nTotal duration: 60-90 seconds. Write naturally as if speaking, not reading.",
     "format_type": "video_script",
     "metadata": {
@@ -135,6 +138,7 @@ VIDEO_SCRIPT_JSON_FORMAT = """{
 CRITICAL: post_content MUST be a single formatted string, NOT a dictionary or structured object. Format it as readable text with clear sections marked by brackets like [Hook], [Introduction], etc. Users will read this script when creating their video."""
 
 TEXT_JSON_FORMAT = """{
+    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
     "post_content": "your post content here with hashtags at the end like #tag1 #tag2 #tag3",
     "format_type": "text|carousel|image|video_script",
     "image_prompt": "detailed image prompt if format is image or carousel, otherwise null",
@@ -153,6 +157,7 @@ RESPONSE_FORMAT_REQUIREMENTS = """
 Respond with ONLY valid JSON (no markdown blocks).
 
 Rules:
+- title: REQUIRED - A concise, descriptive title for this post (3-8 words, captures the main topic). This will be used as the conversation title.
 - post_content: Normal LinkedIn post text (what users read)
 - image_prompt/image_prompts: SEPARATE from post_content (for generation only)
 - Write post_content as standalone post, independent of image prompts

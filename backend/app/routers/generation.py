@@ -377,7 +377,8 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             # Modify the message to emphasize trending/latest information
             if is_random_request or len(user_message_lower.split()) <= 3:
                 # User wants a random topic - find trending topics
-                modified_user_message = f"Find a trending topic or current news item relevant to {profile.profile_md.split('##')[0].strip() if profile.profile_md else 'the user\'s industry'} and create a LinkedIn post about it. Focus on what's trending or in the news right now."
+                industry_context = profile.profile_md.split('##')[0].strip() if profile.profile_md else "the user's industry"
+                modified_user_message = f"Find a trending topic or current news item relevant to {industry_context} and create a LinkedIn post about it. Focus on what's trending or in the news right now."
             else:
                 # User provided a topic - find latest info about it
                 modified_user_message = f"Find the latest information, recent developments, or trending news about: {request.message}. Create a LinkedIn post using the most current and relevant information available."
@@ -434,6 +435,11 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 cleaned_response = re.sub(r'\n?```$', '', cleaned_response)
             
             response_data = json.loads(cleaned_response)
+            
+            # Extract title from response if available (before processing post_content)
+            post_title = None
+            if isinstance(response_data, dict):
+                post_title = response_data.get("title")
             
             # Handle case where response_data might be the post_content directly
             if isinstance(response_data, dict):
@@ -598,6 +604,7 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         except json.JSONDecodeError:
             # Fallback to plain text response
             post_content = raw_response
+            post_title = None  # No title available in fallback case
             if post_type == 'image':
                 format_type = 'image'
                 # Generate image prompt even for fallback
@@ -663,11 +670,14 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         if metadata_dict:
             generation_options["metadata"] = metadata_dict
         
-        # Handle conversation
+        # Handle conversation (post_title was extracted earlier during JSON parsing)
         conversation_id = request.conversation_id
         if not conversation_id and request_options.get("create_conversation", True):
-            # Create new conversation
-            title = await generate_conversation_title(request.message)
+            # Create new conversation - use title from post if available, otherwise generate one
+            if post_title and post_title.strip():
+                title = post_title.strip()
+            else:
+                title = await generate_conversation_title(request.message)
             conversation = Conversation(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
@@ -677,13 +687,17 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             db.flush()
             conversation_id = conversation.id
         elif conversation_id:
-            # Update conversation timestamp
+            # Update conversation timestamp and title if post title is available
             conversation = db.query(Conversation).filter(
                 Conversation.id == conversation_id,
                 Conversation.user_id == user_id
             ).first()
             if conversation:
                 conversation.updated_at = datetime.utcnow()
+                # Update title if we have a new title from the post
+                if post_title and post_title.strip():
+                    conversation.title = post_title.strip()
+                    db.flush()
         
         # Save to database
         post_id = str(uuid.uuid4())
@@ -787,6 +801,13 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             estimated_engagement=metadata_dict.get("estimated_engagement", "medium")
         )
         
+        # Get the conversation title to return in response
+        conversation_title = None
+        if conversation_id:
+            conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+            if conversation:
+                conversation_title = conversation.title
+        
         return PostGenerationResponse(
             id=post.id,
             post_content=post_content,
@@ -795,6 +816,7 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             image_prompts=image_prompts if actual_format == 'carousel' else None,
             metadata=metadata,
             conversation_id=conversation_id,
+            title=conversation_title,
             created_at=post.created_at
         )
         

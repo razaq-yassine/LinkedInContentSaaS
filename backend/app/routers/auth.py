@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -549,22 +549,38 @@ async def change_password(
 # ============== GOOGLE OAUTH ==============
 
 @router.get("/google/login")
-async def google_login():
+async def google_login(request: Request):
     """Initiate Google OAuth flow for LOGIN"""
     if not settings.google_client_id:
         raise HTTPException(status_code=501, detail="Google OAuth is not configured")
+    
+    # Get the base URL from the request (supports both localhost and Cloudflare tunnel)
+    scheme = request.url.scheme
+    host = request.headers.get("host", request.url.hostname)
+    base_url = f"{scheme}://{host}"
+    redirect_uri = f"{base_url}/api/auth/google/callback"
+    
+    # Get frontend URL from referer (where the request came from)
+    referer = request.headers.get("referer", "")
+    frontend_url = None
+    if referer and "trycloudflare.com" in referer:
+        from urllib.parse import urlparse
+        parsed_referer = urlparse(referer)
+        frontend_url = f"{parsed_referer.scheme}://{parsed_referer.netloc}"
     
     state = secrets.token_urlsafe(32)
     google_oauth_states[state] = {
         "user_id": None,
         "redirect_context": "login",
+        "redirect_uri": redirect_uri,  # Store the redirect URI used
+        "frontend_tunnel_url": frontend_url,  # Store frontend tunnel URL for callback redirect
         "created_at": datetime.utcnow()
     }
     
     # Google OAuth URL
     params = {
         "client_id": settings.google_client_id,
-        "redirect_uri": settings.google_redirect_uri,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "state": state,
@@ -583,23 +599,31 @@ async def google_login():
 
 @router.get("/google/connect")
 async def google_connect(
+    request: Request,
     user_id: str = Depends(get_current_user_id)
 ):
     """Initiate Google OAuth flow for connecting account (requires auth)"""
     if not settings.google_client_id:
         raise HTTPException(status_code=501, detail="Google OAuth is not configured")
     
+    # Get the base URL from the request (supports both localhost and Cloudflare tunnel)
+    scheme = request.url.scheme
+    host = request.headers.get("host", request.url.hostname)
+    base_url = f"{scheme}://{host}"
+    redirect_uri = f"{base_url}/api/auth/google/callback"
+    
     state = secrets.token_urlsafe(32)
     google_oauth_states[state] = {
         "user_id": user_id,
         "redirect_context": "settings",
+        "redirect_uri": redirect_uri,  # Store the redirect URI used
         "created_at": datetime.utcnow()
     }
     
     # Google OAuth URL
     params = {
         "client_id": settings.google_client_id,
-        "redirect_uri": settings.google_redirect_uri,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "state": state,
@@ -618,6 +642,7 @@ async def google_connect(
 
 @router.get("/google/callback")
 async def google_callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: Session = Depends(get_db)
@@ -629,6 +654,7 @@ async def google_callback(
     state_data = google_oauth_states.pop(state)
     user_id = state_data.get("user_id")
     redirect_context = state_data.get("redirect_context", "login")
+    redirect_uri = state_data.get("redirect_uri", settings.google_redirect_uri)
     
     if datetime.utcnow() - state_data["created_at"] > timedelta(minutes=5):
         raise HTTPException(status_code=400, detail="State expired")
@@ -643,7 +669,7 @@ async def google_callback(
                     "client_secret": settings.google_client_secret,
                     "code": code,
                     "grant_type": "authorization_code",
-                    "redirect_uri": settings.google_redirect_uri
+                    "redirect_uri": redirect_uri
                 }
             )
             token_data = token_response.json()
@@ -759,7 +785,31 @@ async def google_callback(
                 "email_verified": True
             }
             user_data_encoded = urllib.parse.quote(json.dumps(user_data))
-            redirect_url = f"{settings.frontend_url}/login/callback?data={user_data_encoded}"
+            
+            # Determine frontend URL dynamically based on request origin
+            # If callback came from Cloudflare tunnel, redirect to frontend tunnel
+            scheme = request.url.scheme
+            host = request.headers.get("host", request.url.hostname)
+            referer = request.headers.get("referer", "")
+            
+            if "trycloudflare.com" in host:
+                # We're on a Cloudflare tunnel - try to get frontend URL from referer or state
+                frontend_tunnel_url = state_data.get("frontend_tunnel_url")
+                if frontend_tunnel_url:
+                    frontend_url = frontend_tunnel_url
+                elif referer and "trycloudflare.com" in referer:
+                    # Extract frontend URL from referer (where user came from)
+                    from urllib.parse import urlparse
+                    parsed_referer = urlparse(referer)
+                    frontend_url = f"{parsed_referer.scheme}://{parsed_referer.netloc}"
+                else:
+                    # Fallback: use configured frontend URL
+                    frontend_url = settings.frontend_url
+            else:
+                # Use configured frontend URL (localhost)
+                frontend_url = settings.frontend_url
+            
+            redirect_url = f"{frontend_url}/login/callback?data={user_data_encoded}"
             
             return RedirectResponse(url=redirect_url, status_code=302)
         else:
