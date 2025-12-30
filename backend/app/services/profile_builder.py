@@ -27,11 +27,33 @@ async def build_user_profile(
     
     print(f"🚀 Building user profile with TOON context for user {user_id}...")
     
+    # Initialize token usage tracking
+    token_usage_details = {}
+    total_input_tokens = 0
+    total_output_tokens = 0
+    # total_tokens will be calculated as input + output at the end
+    model_name = None
+    provider_name = None
+    
     # Step 1: Generate TOON-based profile context with intelligent defaults
     print(f"📝 Generating TOON profile context...")
     try:
         toon_context, metadata = await generate_profile_context_toon(cv_text)
         print(f"✅ Generated TOON context with {len(metadata.get('ai_generated_fields', []))} AI-generated fields")
+        
+        # Track TOON generation tokens
+        toon_token_usage = metadata.get('token_usage', {})
+        if toon_token_usage:
+            total_input_tokens += toon_token_usage.get("input_tokens", 0)
+            total_output_tokens += toon_token_usage.get("output_tokens", 0)
+            # Don't accumulate total_tokens - calculate it at the end as input + output
+            model_name = toon_token_usage.get("model")
+            provider_name = toon_token_usage.get("provider")
+            token_usage_details["toon_context"] = {
+                "input_tokens": toon_token_usage.get("input_tokens", 0),
+                "output_tokens": toon_token_usage.get("output_tokens", 0),
+                "total_tokens": toon_token_usage.get("total_tokens", 0)
+            }
     except Exception as e:
         print(f"❌ Error generating TOON context: {str(e)}")
         # Fallback to legacy approach
@@ -55,12 +77,21 @@ async def build_user_profile(
     # Step 4: Generate evergreen content ideas
     print(f"💡 Generating evergreen content ideas...")
     try:
-        evergreen_ideas = await generate_evergreen_content_ideas(
+        evergreen_ideas_result, evergreen_token_usage = await generate_evergreen_content_ideas(
             cv_text=cv_text,
             expertise_areas=expertise_areas,
             industry=industry
         )
+        evergreen_ideas = evergreen_ideas_result
         print(f"✅ Generated {len(evergreen_ideas)} evergreen content ideas")
+        total_input_tokens += evergreen_token_usage.get("input_tokens", 0)
+        total_output_tokens += evergreen_token_usage.get("output_tokens", 0)
+        # Don't accumulate total_tokens - calculate it at the end as input + output
+        token_usage_details["evergreen_ideas"] = {
+            "input_tokens": evergreen_token_usage.get("input_tokens", 0),
+            "output_tokens": evergreen_token_usage.get("output_tokens", 0),
+            "total_tokens": evergreen_token_usage.get("total_tokens", 0)
+        }
     except Exception as e:
         print(f"❌ Error generating evergreen ideas: {str(e)}")
         evergreen_ideas = []
@@ -97,7 +128,16 @@ async def build_user_profile(
     writing_style_md = None
     if style_choice == "my_style" and writing_samples:
         print(f"✍️  Analyzing writing style from {len(writing_samples)} samples...")
-        writing_style_md = await analyze_writing_style(writing_samples)
+        writing_style_result, writing_token_usage = await analyze_writing_style(writing_samples)
+        writing_style_md = writing_style_result
+        total_input_tokens += writing_token_usage.get("input_tokens", 0)
+        total_output_tokens += writing_token_usage.get("output_tokens", 0)
+        # Don't accumulate total_tokens - calculate it at the end as input + output
+        token_usage_details["writing_style"] = {
+            "input_tokens": writing_token_usage.get("input_tokens", 0),
+            "output_tokens": writing_token_usage.get("output_tokens", 0),
+            "total_tokens": writing_token_usage.get("total_tokens", 0)
+        }
     else:
         # Use top creator format as default
         writing_style_md = """# Writing Style Guide
@@ -128,7 +168,16 @@ Hook → Context → Insight → Takeaway
     
     # Step 9: Generate legacy profile.md for display
     print(f"📄 Generating profile markdown...")
-    profile_md = await generate_profile_from_cv(cv_text)
+    profile_md_result, profile_token_usage = await generate_profile_from_cv(cv_text)
+    profile_md = profile_md_result
+    total_input_tokens += profile_token_usage.get("input_tokens", 0)
+    total_output_tokens += profile_token_usage.get("output_tokens", 0)
+    # Don't accumulate total_tokens - calculate it at the end as input + output
+    token_usage_details["profile_md"] = {
+        "input_tokens": profile_token_usage.get("input_tokens", 0),
+        "output_tokens": profile_token_usage.get("output_tokens", 0),
+        "total_tokens": profile_token_usage.get("total_tokens", 0)
+    }
     
     # Step 10: Generate preferences based on style choice
     print(f"⚙️  Setting up preferences for style: {style_choice}...")
@@ -142,7 +191,15 @@ Hook → Context → Insight → Takeaway
         "context_toon": complete_toon,  # TOON format for LLM consumption
         "context_json": parsed_context,  # Parsed structure for UI/editing
         "preferences": preferences,
-        "ai_generated_fields": metadata.get('ai_generated_fields', [])
+        "ai_generated_fields": metadata.get('ai_generated_fields', []),
+        "token_usage": {
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+            "total_tokens": total_input_tokens + total_output_tokens,  # Calculate as sum to ensure math is correct
+            "model": model_name,
+            "provider": provider_name,
+            "details": token_usage_details
+        }
     }
 
 

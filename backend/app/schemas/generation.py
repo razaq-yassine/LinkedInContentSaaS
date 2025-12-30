@@ -8,6 +8,24 @@ class PostGenerationRequest(BaseModel):
     attachments: Optional[List[Dict[str, Any]]] = None
     conversation_id: Optional[str] = None
 
+class TokenUsage(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    details: Optional[Dict[str, Dict[str, int]]] = None  # Breakdown by call type
+    # Cost information (calculated, not from API)
+    cost: Optional[Dict[str, float]] = None  # {"input_cost": float, "output_cost": float, "total_cost": float}
+    # Image generation token usage (separate provider - OpenAI/Gemini for prompt generation)
+    image_prompt_tokens: Optional[Dict[str, int]] = None  # {"input_tokens": int, "output_tokens": int, "total_tokens": int}
+    image_prompt_cost: Optional[Dict[str, float]] = None  # {"input_cost": float, "output_cost": float, "total_cost": float}
+    image_prompt_provider: Optional[str] = None  # Provider used for image prompt generation
+    image_prompt_model: Optional[str] = None  # Model used for image prompt generation
+    # Cloudflare image generation cost (separate from prompt generation)
+    cloudflare_cost: Optional[Dict[str, float]] = None  # {"total_cost": float, "cost_per_image": float, "image_count": int}
+    cloudflare_model: Optional[str] = None  # Cloudflare model used (e.g., "@cf/leonardo/phoenix-1.0")
+
 class PostMetadata(BaseModel):
     hashtags: Optional[List[str]] = []
     tone: Optional[str] = "professional"
@@ -23,6 +41,7 @@ class PostGenerationResponse(BaseModel):
     conversation_id: Optional[str] = None
     title: Optional[str] = None  # Title for the conversation
     created_at: datetime
+    token_usage: Optional[TokenUsage] = None
     
     class Config:
         from_attributes = True

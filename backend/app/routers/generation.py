@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
@@ -12,7 +12,8 @@ from ..schemas.generation import (
     PostGenerationResponse,
     PostMetadata,
     GenerationHistoryResponse,
-    UpdateGenerationRequest
+    UpdateGenerationRequest,
+    TokenUsage
 )
 from ..services.ai_service import generate_completion, generate_conversation_title, research_topic_with_search
 from ..prompts.system_prompts import build_post_generation_prompt
@@ -27,6 +28,28 @@ import re
 import traceback
 
 router = APIRouter()
+
+def extract_compact_writing_style(writing_style_md: str) -> str:
+    """
+    Extract compact writing style summary from full markdown.
+    Returns only essential style information to reduce tokens.
+    """
+    if not writing_style_md:
+        return "Professional, engaging, value-driven"
+    
+    # Extract key style elements using regex
+    tone_match = re.search(r'tone[:\s]+([^\n]+)', writing_style_md, re.IGNORECASE)
+    sentence_match = re.search(r'sentence.*?(\d+[-\s]*\d*)', writing_style_md, re.IGNORECASE)
+    structure_match = re.search(r'structure[:\s]+([^\n]+)', writing_style_md, re.IGNORECASE)
+    
+    tone = tone_match.group(1).strip() if tone_match else "professional"
+    sentence_length = sentence_match.group(1) if sentence_match else "10-12"
+    structure = structure_match.group(1).strip() if structure_match else "Hook → Context → Insight → Takeaway"
+    
+    # Build compact summary
+    compact = f"Tone: {tone}. Sentence length: {sentence_length} words. Structure: {structure}. Format: Small statements with spacing."
+    
+    return compact
 
 @router.post("/post", response_model=PostGenerationResponse)
 async def generate_post(
@@ -237,6 +260,9 @@ IMPORTANT:
             hashtag_count = request_options.get('hashtag_count', 4)
             length_pref = request_options.get('length', 'medium')
             
+            # Extract compact writing style to reduce tokens
+            compact_style = extract_compact_writing_style(profile.writing_style_md or "")
+            
             system_prompt = f"""LinkedIn content expert. Generate posts matching user's style and expertise.
 
 ## RULES:
@@ -258,25 +284,67 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
 - Only skip hashtags if user explicitly requests "no hashtags" or "zero hashtags"
 - Include hashtags in the metadata field as an array
 
-USER CONTEXT:
+USER CONTEXT (TOON format):
 {toon_context}
 
 WRITING STYLE:
-{profile.writing_style_md or "Professional, engaging, value-driven"}
+{compact_style}
 
 Generate content matching their tone/expertise/audience. Use small statements with spacing. English only.
 
 User request: {request.message}
 """
         else:
-            # Fallback to legacy JSON-based prompt
-            base_prompt = build_post_generation_prompt(
-                profile_md=profile.profile_md or "",
-                writing_style_md=profile.writing_style_md or "",
-                context_json=profile.context_json or {},
-                user_message=request.message,
-                options=request_options
-            )
+            # Fallback to legacy prompt - try to use TOON if available, otherwise use markdown
+            # Check if we can generate TOON from context_json
+            fallback_toon = None
+            if profile.context_json:
+                try:
+                    from ..utils.toon_parser import dict_to_toon
+                    fallback_toon = dict_to_toon(profile.context_json)
+                except:
+                    pass
+            
+            if fallback_toon:
+                # Use TOON format even in fallback
+                compact_style = extract_compact_writing_style(profile.writing_style_md or "")
+                hashtag_count = request_options.get('hashtag_count', 4)
+                length_pref = request_options.get('length', 'medium')
+                
+                base_prompt = f"""LinkedIn content expert. Generate posts matching user's style and expertise.
+
+## RULES:
+- Language: English only
+- Format: Small statements, blank line between each
+
+## GENERATION OPTIONS:
+- Length: {length_pref}
+- Hashtag count: {hashtag_count} (ALWAYS include this many hashtags unless user explicitly requests zero)
+
+## CRITICAL: Hashtags
+- ALWAYS include exactly {hashtag_count} relevant hashtags at the end of the post
+- Hashtags should be relevant to the content and industry
+- Only skip hashtags if user explicitly requests "no hashtags" or "zero hashtags"
+- Include hashtags in the metadata field as an array
+
+USER CONTEXT (TOON format):
+{fallback_toon}
+
+WRITING STYLE:
+{compact_style}
+
+Generate content matching their tone/expertise/audience. Use small statements with spacing. English only.
+"""
+            else:
+                # True fallback - use markdown but with compact writing style
+                compact_style = extract_compact_writing_style(profile.writing_style_md or "")
+                base_prompt = build_post_generation_prompt(
+                    profile_md=profile.profile_md or "",
+                    writing_style_md=compact_style,  # Use compact version
+                    context_json=profile.context_json or {},
+                    user_message=request.message,
+                    options=request_options
+                )
             # Add critical instructions to legacy prompt as well
             additional_context = profile.context_json.get("additional_context", "") if profile.context_json else ""
             additional_context_section = ""
@@ -407,16 +475,42 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 modified_user_message = f"Find a trending topic or current news item and create a LinkedIn post about it."
             print("Enabling web search for legacy trending topic request")
         
+        # Initialize token usage tracking
+        token_usage_details = {}
+        total_input_tokens = 0
+        total_output_tokens = 0
+        # total_tokens will be calculated as input + output at the end
+        model_name = None
+        provider_name = None
+        
+        # Separate tracking for image prompt generation (uses different provider)
+        image_prompt_input_tokens = 0
+        image_prompt_output_tokens = 0
+        image_prompt_model = None
+        image_prompt_provider = None
+        
         # Generate post
         try:
             # Pass conversation history to AI (current message hasn't been saved yet, so all history is previous)
-            raw_response = await generate_completion(
+            raw_response, main_token_usage = await generate_completion(
                 system_prompt=system_prompt,
                 user_message=modified_user_message,
                 temperature=0.8,
                 use_search=use_web_search,
                 conversation_history=conversation_history if conversation_history else None
             )
+            
+            # Track main generation tokens
+            total_input_tokens += main_token_usage.get("input_tokens", 0)
+            total_output_tokens += main_token_usage.get("output_tokens", 0)
+            # Don't accumulate total_tokens - calculate it at the end as input + output
+            model_name = main_token_usage.get("model")
+            provider_name = main_token_usage.get("provider")
+            token_usage_details["post_generation"] = {
+                "input_tokens": main_token_usage.get("input_tokens", 0),
+                "output_tokens": main_token_usage.get("output_tokens", 0),
+                "total_tokens": main_token_usage.get("total_tokens", 0)
+            }
         except Exception as e:
             error_trace = traceback.format_exc()
             print(f"AI generation error: {str(e)}")
@@ -590,7 +684,18 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                         image_prompts = [single_prompt]
                     else:
                         # Generate prompts if missing
-                        image_prompts = await generate_carousel_image_prompts(post_content, profile.context_json or {})
+                        image_prompts_result, carousel_token_usage = await generate_carousel_image_prompts(post_content, profile.context_json or {})
+                        image_prompts = image_prompts_result
+                        # Track image prompt tokens separately (different provider)
+                        image_prompt_input_tokens += carousel_token_usage.get("input_tokens", 0)
+                        image_prompt_output_tokens += carousel_token_usage.get("output_tokens", 0)
+                        image_prompt_model = carousel_token_usage.get("model")
+                        image_prompt_provider = carousel_token_usage.get("provider")
+                        token_usage_details["carousel_prompts"] = {
+                            "input_tokens": carousel_token_usage.get("input_tokens", 0),
+                            "output_tokens": carousel_token_usage.get("output_tokens", 0),
+                            "total_tokens": carousel_token_usage.get("total_tokens", 0)
+                        }
                 # Use first prompt as primary for backward compatibility
                 image_prompt = image_prompts[0] if image_prompts and len(image_prompts) > 0 else None
             elif format_type == 'image':
@@ -598,7 +703,18 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 image_prompt = response_data.get("image_prompt")
                 if not image_prompt:
                     # Enforce: generate image prompt if missing
-                    image_prompt = await generate_image_prompt(post_content, profile.context_json or {})
+                    image_prompt_result, image_token_usage = await generate_image_prompt(post_content, profile.context_json or {})
+                    image_prompt = image_prompt_result
+                    # Track image prompt tokens separately (different provider)
+                    image_prompt_input_tokens += image_token_usage.get("input_tokens", 0)
+                    image_prompt_output_tokens += image_token_usage.get("output_tokens", 0)
+                    image_prompt_model = image_token_usage.get("model")
+                    image_prompt_provider = image_token_usage.get("provider")
+                    token_usage_details["image_prompt"] = {
+                        "input_tokens": image_token_usage.get("input_tokens", 0),
+                        "output_tokens": image_token_usage.get("output_tokens", 0),
+                        "total_tokens": image_token_usage.get("total_tokens", 0)
+                    }
             
             metadata_dict = response_data.get("metadata", {})
         except json.JSONDecodeError:
@@ -608,11 +724,33 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             if post_type == 'image':
                 format_type = 'image'
                 # Generate image prompt even for fallback
-                image_prompt = await generate_image_prompt(post_content, profile.context_json or {})
+                image_prompt_result, image_token_usage = await generate_image_prompt(post_content, profile.context_json or {})
+                image_prompt = image_prompt_result
+                # Track image prompt tokens separately (different provider)
+                image_prompt_input_tokens += image_token_usage.get("input_tokens", 0)
+                image_prompt_output_tokens += image_token_usage.get("output_tokens", 0)
+                image_prompt_model = image_token_usage.get("model")
+                image_prompt_provider = image_token_usage.get("provider")
+                token_usage_details["image_prompt"] = {
+                    "input_tokens": image_token_usage.get("input_tokens", 0),
+                    "output_tokens": image_token_usage.get("output_tokens", 0),
+                    "total_tokens": image_token_usage.get("total_tokens", 0)
+                }
             elif post_type == 'carousel':
                 format_type = 'carousel'
-                image_prompts = await generate_carousel_image_prompts(post_content, profile.context_json or {})
+                image_prompts_result, carousel_token_usage = await generate_carousel_image_prompts(post_content, profile.context_json or {})
+                image_prompts = image_prompts_result
                 image_prompt = image_prompts[0] if image_prompts and len(image_prompts) > 0 else None
+                # Track image prompt tokens separately (different provider)
+                image_prompt_input_tokens += carousel_token_usage.get("input_tokens", 0)
+                image_prompt_output_tokens += carousel_token_usage.get("output_tokens", 0)
+                image_prompt_model = carousel_token_usage.get("model")
+                image_prompt_provider = carousel_token_usage.get("provider")
+                token_usage_details["carousel_prompts"] = {
+                    "input_tokens": carousel_token_usage.get("input_tokens", 0),
+                    "output_tokens": carousel_token_usage.get("output_tokens", 0),
+                    "total_tokens": carousel_token_usage.get("total_tokens", 0)
+                }
             elif post_type == 'video_script':
                 format_type = 'video_script'
                 image_prompt = None
@@ -623,6 +761,43 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         
         # Convert "auto" to actual format for database
         actual_format = format_type if format_type != "auto" else "text"
+        
+        # Ensure image_prompts is initialized (may not be set in all code paths)
+        if 'image_prompts' not in locals():
+            image_prompts = None
+        
+        # Calculate Cloudflare image generation costs if image/carousel post
+        cloudflare_cost_for_storage = None
+        cloudflare_settings = None
+        try:
+            from ..utils.cost_calculator import calculate_cloudflare_image_cost
+            from ..config import get_settings
+            cloudflare_settings = get_settings()
+            
+            if actual_format == 'image':
+                # Single image post - estimate cost for 1 image (1200x1200, 25 steps)
+                cloudflare_cost_for_storage = calculate_cloudflare_image_cost(
+                    image_count=1,
+                    height=1200,
+                    width=1200,
+                    num_steps=25,
+                    model=cloudflare_settings.cloudflare_image_model if cloudflare_settings else None
+                )
+            elif actual_format == 'carousel':
+                # Carousel post - estimate cost for multiple images (typically 4-6 slides)
+                # Use number of image prompts if available, otherwise default to 4
+                carousel_image_count = len(image_prompts) if image_prompts and isinstance(image_prompts, list) else 4
+                cloudflare_cost_for_storage = calculate_cloudflare_image_cost(
+                    image_count=carousel_image_count,
+                    height=1200,
+                    width=1200,
+                    num_steps=25,
+                    model=cloudflare_settings.cloudflare_image_model if cloudflare_settings else None
+                )
+        except Exception as e:
+            # If Cloudflare cost calculation fails, log but don't break the request
+            print(f"Warning: Failed to calculate Cloudflare cost: {e}")
+            cloudflare_cost_for_storage = None
         
         # Format video scripts with special markers for better presentation (after format_type is determined)
         if actual_format == 'video_script' and post_content and isinstance(post_content, str):
@@ -670,6 +845,62 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         if metadata_dict:
             generation_options["metadata"] = metadata_dict
         
+        # Calculate costs BEFORE storing in generation_options
+        from ..utils.cost_calculator import calculate_cost
+        calculated_total_tokens = total_input_tokens + total_output_tokens
+        main_cost = calculate_cost(
+            provider=provider_name or "unknown",
+            model=model_name,
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens
+        )
+        
+        # Calculate image prompt costs if any
+        image_prompt_cost_for_storage = None
+        image_prompt_tokens_for_storage = None
+        if image_prompt_input_tokens > 0 or image_prompt_output_tokens > 0:
+            image_prompt_cost_for_storage = calculate_cost(
+                provider=image_prompt_provider or "unknown",
+                model=image_prompt_model,
+                input_tokens=image_prompt_input_tokens,
+                output_tokens=image_prompt_output_tokens
+            )
+            image_prompt_tokens_for_storage = {
+                "input_tokens": image_prompt_input_tokens,
+                "output_tokens": image_prompt_output_tokens,
+                "total_tokens": image_prompt_input_tokens + image_prompt_output_tokens
+            }
+        
+        # Store token usage in generation_options for later retrieval
+        if calculated_total_tokens > 0 or (total_input_tokens > 0 or total_output_tokens > 0):
+            # Include cost in stored token_usage
+            stored_token_usage = {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": calculated_total_tokens,
+                "model": model_name or "unknown",
+                "provider": provider_name or "unknown",
+                "details": token_usage_details if token_usage_details else None
+            }
+            # Add cost if calculated
+            if main_cost and (total_input_tokens > 0 or total_output_tokens > 0):
+                stored_token_usage["cost"] = main_cost
+            # Add image prompt tokens and cost if present
+            if image_prompt_tokens_for_storage:
+                stored_token_usage["image_prompt_tokens"] = image_prompt_tokens_for_storage
+            if image_prompt_cost_for_storage and (image_prompt_input_tokens > 0 or image_prompt_output_tokens > 0):
+                stored_token_usage["image_prompt_cost"] = image_prompt_cost_for_storage
+            if image_prompt_provider:
+                stored_token_usage["image_prompt_provider"] = image_prompt_provider
+            if image_prompt_model:
+                stored_token_usage["image_prompt_model"] = image_prompt_model
+            # Add Cloudflare cost if image/carousel post
+            if cloudflare_cost_for_storage and cloudflare_settings:
+                stored_token_usage["cloudflare_cost"] = cloudflare_cost_for_storage
+                stored_token_usage["cloudflare_model"] = cloudflare_settings.cloudflare_image_model
+            
+            generation_options["token_usage"] = stored_token_usage
+        
         # Handle conversation (post_title was extracted earlier during JSON parsing)
         conversation_id = request.conversation_id
         if not conversation_id and request_options.get("create_conversation", True):
@@ -677,7 +908,16 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             if post_title and post_title.strip():
                 title = post_title.strip()
             else:
-                title = await generate_conversation_title(request.message)
+                title_result, title_token_usage = await generate_conversation_title(request.message)
+                title = title_result
+                total_input_tokens += title_token_usage.get("input_tokens", 0)
+                total_output_tokens += title_token_usage.get("output_tokens", 0)
+                # Don't accumulate total_tokens - calculate it at the end as input + output
+                token_usage_details["conversation_title"] = {
+                    "input_tokens": title_token_usage.get("input_tokens", 0),
+                    "output_tokens": title_token_usage.get("output_tokens", 0),
+                    "total_tokens": title_token_usage.get("total_tokens", 0)
+                }
             conversation = Conversation(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
@@ -808,6 +1048,29 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             if conversation:
                 conversation_title = conversation.title
         
+        # Build token usage response (costs already calculated above)
+        # Use the same cost variables calculated earlier
+        image_prompt_cost = image_prompt_cost_for_storage
+        image_prompt_tokens = image_prompt_tokens_for_storage
+        
+        token_usage_response = None
+        if calculated_total_tokens > 0 or (total_input_tokens > 0 or total_output_tokens > 0) or image_prompt_tokens or cloudflare_cost_for_storage:
+            token_usage_response = TokenUsage(
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
+                total_tokens=calculated_total_tokens,
+                model=model_name or "unknown",
+                provider=provider_name or "unknown",
+                details=token_usage_details if token_usage_details else None,
+                cost=main_cost if (total_input_tokens > 0 or total_output_tokens > 0) else None,
+                image_prompt_tokens=image_prompt_tokens,
+                image_prompt_cost=image_prompt_cost if (image_prompt_input_tokens > 0 or image_prompt_output_tokens > 0) else None,
+                image_prompt_provider=image_prompt_provider,
+                image_prompt_model=image_prompt_model,
+                cloudflare_cost=cloudflare_cost_for_storage,
+                cloudflare_model=cloudflare_settings.cloudflare_image_model if (cloudflare_cost_for_storage and cloudflare_settings) else None
+            )
+        
         return PostGenerationResponse(
             id=post.id,
             post_content=post_content,
@@ -817,7 +1080,8 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             metadata=metadata,
             conversation_id=conversation_id,
             title=conversation_title,
-            created_at=post.created_at
+            created_at=post.created_at,
+            token_usage=token_usage_response
         )
         
     except HTTPException:
@@ -1034,7 +1298,7 @@ def format_video_script_string(script_text: str) -> str:
     
     return '\n'.join(formatted_lines)
 
-async def generate_image_prompt(post_content: str, context: dict) -> str:
+async def generate_image_prompt(post_content: str, context: dict) -> tuple[str, Dict[str, Any]]:
     """
     Generate AI image prompt for Canva/DALL-E that matches the post content and is LinkedIn-friendly
     """
@@ -1047,7 +1311,7 @@ async def generate_image_prompt(post_content: str, context: dict) -> str:
         else:
             expertise_str = str(expertise) if expertise else industry
         
-        prompt = await generate_completion(
+        prompt, token_usage = await generate_completion(
             system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn posts. Your prompts create vivid, concrete visuals that perfectly match the post's content.
 
 VISUAL STRATEGY:
@@ -1097,12 +1361,19 @@ Write the complete prompt as a single, detailed description ready for image gene
             prompt = re.sub(r'\n?```$', '', prompt)
         prompt = prompt.strip()
         
-        return prompt if prompt else "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
+        final_prompt = prompt if prompt else "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
+        return final_prompt, token_usage
     except Exception as e:
         print(f"Error generating image prompt: {str(e)}")
-        return "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
+        return "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px", {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "model": "unknown",
+            "provider": "unknown"
+        }
 
-async def generate_carousel_image_prompts(post_content: str, context: dict) -> list[str]:
+async def generate_carousel_image_prompts(post_content: str, context: dict) -> tuple[list[str], Dict[str, Any]]:
     """
     Generate multiple AI image prompts for carousel slides that match the post content and are LinkedIn-friendly
     """
@@ -1140,7 +1411,7 @@ CRITICAL FOR EDUCATIONAL CONTENT:
 - Example: If explaining a process, the slide should show BOTH the visual representation AND text explaining what's happening
 - Text overlays are REQUIRED - slides cannot be images only"""
         
-        prompt = await generate_completion(
+        prompt, token_usage = await generate_completion(
             system_prompt=f"""You are a creative expert at writing image generation prompts for LinkedIn carousel posts. Your prompts create a cohesive visual story with consistent theming.
 
 CRITICAL REQUIREMENTS:
@@ -1219,13 +1490,13 @@ Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
             if isinstance(prompts, list) and len(prompts) > 0:
                 # Ensure we have the right number of prompts
                 if len(prompts) >= slide_count:
-                    return prompts[:slide_count]
+                    return prompts[:slide_count], token_usage
                 elif len(prompts) < slide_count:
                     # Pad with variations of the last prompt
                     while len(prompts) < slide_count:
                         prompts.append(prompts[-1] if prompts else "Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, brand colors, 1200x628px")
-                    return prompts[:slide_count]
-                return prompts
+                    return prompts[:slide_count], token_usage
+                return prompts, token_usage
         except json.JSONDecodeError as e:
             print(f"Failed to parse carousel prompts as JSON: {str(e)}")
             print(f"Raw response: {prompt[:200]}")
@@ -1233,11 +1504,17 @@ Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
         # Fallback: split by lines or create default prompts
         lines = [line.strip() for line in prompt.split('\n') if line.strip() and not line.strip().startswith('-') and not line.strip().startswith('Slide')]
         if len(lines) >= slide_count:
-            return lines[:slide_count]
+            return lines[:slide_count], token_usage
         
         # Ultimate fallback: create generic but LinkedIn-friendly prompts
-        return [f"Professional LinkedIn carousel slide {i+1}, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for i in range(slide_count)]
+        return [f"Professional LinkedIn carousel slide {i+1}, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for i in range(slide_count)], token_usage
     except Exception as e:
         print(f"Error generating carousel image prompts: {str(e)}")
         # Fallback: return default LinkedIn-friendly prompts
-        return ["Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for _ in range(4)]
+        return ["Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for _ in range(4)], {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "model": "unknown",
+            "provider": "unknown"
+        }

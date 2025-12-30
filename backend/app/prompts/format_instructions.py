@@ -80,17 +80,12 @@ Generate a comprehensive video script for LinkedIn:
 
 The script should be engaging, valuable, and optimized for LinkedIn video format."""
 
-# JSON Format Templates
+# JSON Format Templates (Optimized for token efficiency)
 CAROUSEL_JSON_FORMAT = """{
-    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
-    "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post, NOT slide descriptions. Do NOT include slide prompts or mention slides here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
+    "title": "Concise title (3-8 words)",
+    "post_content": "LinkedIn post text with hashtags at end",
     "format_type": "carousel",
-    "image_prompts": [
-        "Slide 1: Detailed prompt with consistent theme - represents first point/concept from post. Include exact colors/style that will be used for ALL slides. If educational: Include text overlay with explanation/solution/step.",
-        "Slide 2: Detailed prompt with SAME theme/colors/style - represents second point/concept, builds on slide 1 visually. If educational: Include text overlay with explanation/solution/step.",
-        "Slide 3: Detailed prompt with SAME theme/colors/style - represents third point/concept, continues visual story. If educational: Include text overlay with explanation/solution/step.",
-        "Continue for 4-8 slides total. CRITICAL: All slides must use SAME color palette, SAME style, SAME visual elements. Each slide represents ONE specific point from post. Slides should build a visual narrative, not be random images. If post is educational/tutorial/how-to: Each slide MUST include text overlays with explanations, steps, or solutions - slides cannot be images only."
-    ],
+    "image_prompts": ["Slide 1: prompt with consistent theme", "Slide 2: same theme", "4-8 slides total, same colors/style"],
     "metadata": {
         "hashtags": ["#tag1", "#tag2", "#tag3"],
         "tone": "professional|casual|thought-leader|educator",
@@ -98,21 +93,13 @@ CAROUSEL_JSON_FORMAT = """{
     }
 }
 
-CRITICAL: post_content is the LinkedIn post text (what users see). image_prompts must create a cohesive visual story with consistent theming across ALL slides.
-
-EDUCATIONAL CONTENT REQUIREMENT: If the post is educational (explains how to do something, teaches concepts, provides solutions), each image_prompt MUST explicitly request text overlays with:
-- Clear explanations of what is being taught
-- Step-by-step instructions if applicable  
-- Key solutions or takeaways
-- Specific educational content that helps viewers understand
-
-IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
+Rules: All slides use SAME colors/style. Educational posts need text overlays. Include hashtags in post_content AND metadata."""
 
 IMAGE_JSON_FORMAT = """{
-    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
-    "post_content": "The actual LinkedIn post text that users will read. This is a normal LinkedIn post. Use small statements with blank lines between them. Do NOT include image descriptions or prompts here. MUST include hashtags at the end like #tag1 #tag2 #tag3",
+    "title": "Concise title (3-8 words)",
+    "post_content": "LinkedIn post text with hashtags at end",
     "format_type": "image",
-    "image_prompt": "Detailed image generation prompt. If post mentions specific tools/platforms: use real-world visuals (dashboards, offices, devices). If post is general/abstract: use friendly cartoon/illustration style with diverse professional characters doing actions that match the post's message. For before/after comparisons: use split-screen with cartoon characters showing transformation. Include: visual style (realistic photography OR cartoon illustration), specific color palette, composition, concrete visual elements. LinkedIn-friendly, professional, engaging, 1200x628px. This is ONLY for AI image generation, NOT shown in the post.",
+    "image_prompt": "Visual prompt: real-world if specific tools/platforms, cartoon if abstract. 1200x628px, professional.",
     "metadata": {
         "hashtags": ["#tag1", "#tag2", "#tag3"],
         "tone": "professional|casual|thought-leader|educator",
@@ -120,9 +107,7 @@ IMAGE_JSON_FORMAT = """{
     }
 }
 
-CRITICAL: post_content is the LinkedIn post text (what users see). image_prompt must create a concrete visual - use cartoon/illustration characters when content is general/abstract, use real-world visuals when content is specific.
-
-IMPORTANT: post_content MUST include hashtags at the end (e.g., "#tag1 #tag2 #tag3"). Hashtags should appear BOTH in post_content text AND in metadata.hashtags array."""
+Rules: Include hashtags in post_content AND metadata."""
 
 VIDEO_SCRIPT_JSON_FORMAT = """{
     "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
@@ -138,10 +123,10 @@ VIDEO_SCRIPT_JSON_FORMAT = """{
 CRITICAL: post_content MUST be a single formatted string, NOT a dictionary or structured object. Format it as readable text with clear sections marked by brackets like [Hook], [Introduction], etc. Users will read this script when creating their video."""
 
 TEXT_JSON_FORMAT = """{
-    "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
-    "post_content": "your post content here with hashtags at the end like #tag1 #tag2 #tag3",
-    "format_type": "text|carousel|image|video_script",
-    "image_prompt": "detailed image prompt if format is image or carousel, otherwise null",
+    "title": "Concise title (3-8 words)",
+    "post_content": "Post content with hashtags at end",
+    "format_type": "text",
+    "image_prompt": null,
     "metadata": {
         "hashtags": ["#tag1", "#tag2", "#tag3"],
         "tone": "professional|casual|thought-leader|educator",
@@ -149,7 +134,7 @@ TEXT_JSON_FORMAT = """{
     }
 }
 
-CRITICAL: post_content MUST include the hashtags at the end of the text. Hashtags should appear BOTH in post_content (as text) AND in metadata.hashtags (as array)."""
+Rules: Include hashtags in post_content AND metadata."""
 
 # Response Format Requirements
 RESPONSE_FORMAT_REQUIREMENTS = """

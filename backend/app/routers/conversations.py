@@ -116,11 +116,14 @@ async def get_conversation(
                     if post.format.value == 'carousel':
                         message_data["image_prompts"] = gen_options.get("image_prompts")
                     message_data["metadata"] = gen_options.get("metadata")
+                    # Include token_usage if available
+                    message_data["token_usage"] = gen_options.get("token_usage")
                 else:
                     message_data["image_prompt"] = None
                     if post.format.value == 'carousel':
                         message_data["image_prompts"] = None
                     message_data["metadata"] = None
+                    message_data["token_usage"] = None
         
         messages.append(MessageResponse(**message_data))
     

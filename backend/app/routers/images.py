@@ -35,6 +35,7 @@ class ImageGenerationResponse(BaseModel):
     metadata: dict
     post_id: Optional[str] = None
     is_current: bool = False
+    cloudflare_cost: Optional[dict] = None  # Updated Cloudflare cost after regeneration
 
 class ImageHistoryItem(BaseModel):
     id: str
@@ -162,6 +163,61 @@ async def generate_image_for_post(
             post_format=post.format.value if post.format else "text"
         )
         
+        # Calculate Cloudflare cost for this image generation
+        from ..utils.cost_calculator import calculate_cloudflare_image_cost
+        from ..config import get_settings
+        cloudflare_settings = get_settings()
+        
+        # Extract image dimensions and steps from metadata or use defaults
+        image_metadata = result.get("metadata", {})
+        height = image_metadata.get("height", 1200)
+        width = image_metadata.get("width", 1200)
+        num_steps = image_metadata.get("num_steps", 25)
+        model = image_metadata.get("model", cloudflare_settings.cloudflare_image_model if cloudflare_settings else None)
+        
+        cloudflare_cost = calculate_cloudflare_image_cost(
+            image_count=1,
+            height=height,
+            width=width,
+            num_steps=num_steps,
+            model=model
+        )
+        
+        # Update post's token_usage to append Cloudflare costs
+        if post.generation_options:
+            gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
+            token_usage = gen_options.get("token_usage", {})
+            
+            # Initialize or update cloudflare_cost
+            if "cloudflare_cost" in token_usage:
+                # Append to existing costs
+                existing_cost = token_usage["cloudflare_cost"]
+                existing_image_count = existing_cost.get("image_count", 0)
+                existing_total_cost = existing_cost.get("total_cost", 0.0)
+                
+                print(f"DEBUG: Updating cloudflare_cost - existing: count={existing_image_count}, cost={existing_total_cost}, new cost={cloudflare_cost['total_cost']}")
+                
+                token_usage["cloudflare_cost"] = {
+                    "total_cost": round(existing_total_cost + cloudflare_cost["total_cost"], 8),
+                    "cost_per_image": cloudflare_cost["cost_per_image"],
+                    "image_count": existing_image_count + 1,
+                    "tiles_per_image": cloudflare_cost.get("tiles_per_image"),
+                    "steps_per_image": cloudflare_cost.get("steps_per_image")
+                }
+                print(f"DEBUG: Updated cloudflare_cost - new: count={token_usage['cloudflare_cost']['image_count']}, cost={token_usage['cloudflare_cost']['total_cost']}")
+            else:
+                # First image generation
+                print(f"DEBUG: First cloudflare_cost - count={cloudflare_cost.get('image_count', 1)}, cost={cloudflare_cost['total_cost']}")
+                token_usage["cloudflare_cost"] = cloudflare_cost
+            
+            gen_options["token_usage"] = token_usage
+            post.generation_options = gen_options
+            # Mark the JSON field as modified so SQLAlchemy detects the change
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(post, "generation_options")
+            db.commit()
+            db.refresh(post)  # Refresh to get the latest data
+        
         # Mark all other images for this post as not current
         db.query(GeneratedImage).filter(
             GeneratedImage.post_id == post_id
@@ -182,6 +238,25 @@ async def generate_image_for_post(
         db.add(generated_image)
         db.commit()
         
+        # Get updated cloudflare_cost from post after commit
+        # Re-query the post to ensure we have the latest data
+        db.refresh(post)
+        updated_cloudflare_cost = None
+        if post.generation_options:
+            gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
+            token_usage = gen_options.get("token_usage", {})
+            updated_cloudflare_cost = token_usage.get("cloudflare_cost")
+            print(f"DEBUG: Retrieved cloudflare_cost from post: {updated_cloudflare_cost}")
+        else:
+            print(f"DEBUG: post.generation_options is None or empty")
+        
+        # If we updated it above but didn't get it, use the one we just set
+        if not updated_cloudflare_cost and 'token_usage' in locals():
+            updated_cloudflare_cost = token_usage.get("cloudflare_cost") if 'token_usage' in locals() else None
+            print(f"DEBUG: Using local token_usage cloudflare_cost: {updated_cloudflare_cost}")
+        
+        print(f"DEBUG: Returning ImageGenerationResponse with cloudflare_cost: {updated_cloudflare_cost}")
+        
         return ImageGenerationResponse(
             image_id=image_id,
             image=result["image"],
@@ -190,7 +265,8 @@ async def generate_image_for_post(
             model=result["metadata"]["model"],
             metadata=result["metadata"],
             post_id=post_id,
-            is_current=True
+            is_current=True,
+            cloudflare_cost=updated_cloudflare_cost
         )
     
     except HTTPException:

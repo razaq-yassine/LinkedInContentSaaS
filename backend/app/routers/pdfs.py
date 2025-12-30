@@ -32,6 +32,7 @@ class PDFGenerationResponse(BaseModel):
     model: str
     post_id: str
     is_current: bool = False
+    cloudflare_cost: Optional[dict] = None  # Updated Cloudflare cost after regeneration
 
 class PDFHistoryItem(BaseModel):
     id: str
@@ -155,6 +156,13 @@ async def generate_carousel_pdf(
         # Generate images for prompts (either all or selected slides)
         new_slide_images = []
         model_used = None
+        total_cloudflare_cost = 0.0
+        images_generated = 0
+        
+        # Import cost calculator
+        from ..utils.cost_calculator import calculate_cloudflare_image_cost
+        from ..config import get_settings
+        cloudflare_settings = get_settings()
         
         prompts_to_process = request.prompts
         if is_partial_regeneration:
@@ -185,6 +193,23 @@ async def generate_carousel_pdf(
                 new_slide_images.append(image_data)
                 if not model_used:
                     model_used = result.get("metadata", {}).get("model", "cloudflare")
+                
+                # Calculate cost for this image
+                image_metadata = result.get("metadata", {})
+                height = image_metadata.get("height", 1200)
+                width = image_metadata.get("width", 1200)
+                num_steps = image_metadata.get("num_steps", 25)
+                model = image_metadata.get("model", cloudflare_settings.cloudflare_image_model if cloudflare_settings else None)
+                
+                image_cost = calculate_cloudflare_image_cost(
+                    image_count=1,
+                    height=height,
+                    width=width,
+                    num_steps=num_steps,
+                    model=model
+                )
+                total_cloudflare_cost += image_cost["total_cost"]
+                images_generated += 1
             except HTTPException:
                 raise
             except Exception as e:
@@ -205,6 +230,46 @@ async def generate_carousel_pdf(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="No images were generated successfully"
             )
+        
+        # Update post's token_usage to append Cloudflare costs
+        if post.generation_options and images_generated > 0:
+            gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
+            token_usage = gen_options.get("token_usage", {})
+            
+            # Calculate cost per image
+            cost_per_image = total_cloudflare_cost / images_generated if images_generated > 0 else 0.0
+            
+            # Initialize or update cloudflare_cost
+            if "cloudflare_cost" in token_usage:
+                # Append to existing costs
+                existing_cost = token_usage["cloudflare_cost"]
+                existing_image_count = existing_cost.get("image_count", 0)
+                existing_total_cost = existing_cost.get("total_cost", 0.0)
+                
+                token_usage["cloudflare_cost"] = {
+                    "total_cost": round(existing_total_cost + total_cloudflare_cost, 8),
+                    "cost_per_image": round(cost_per_image, 8),
+                    "image_count": existing_image_count + images_generated,
+                    "tiles_per_image": existing_cost.get("tiles_per_image", 9),
+                    "steps_per_image": existing_cost.get("steps_per_image", 25)
+                }
+            else:
+                # First image generation
+                token_usage["cloudflare_cost"] = {
+                    "total_cost": round(total_cloudflare_cost, 8),
+                    "cost_per_image": round(cost_per_image, 8),
+                    "image_count": images_generated,
+                    "tiles_per_image": 9,  # 1200x1200 = 9 tiles
+                    "steps_per_image": 25
+                }
+            
+            gen_options["token_usage"] = token_usage
+            post.generation_options = gen_options
+            # Mark the JSON field as modified so SQLAlchemy detects the change
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(post, "generation_options")
+            db.commit()
+            db.refresh(post)  # Refresh to get the latest data
         
         # Merge slides if partial regeneration
         if is_partial_regeneration:
@@ -273,6 +338,13 @@ async def generate_carousel_pdf(
         # Clean up progress after 5 minutes
         asyncio.create_task(cleanup_progress(request.post_id))
         
+        # Get updated cloudflare_cost from post
+        updated_cloudflare_cost = None
+        if post.generation_options:
+            gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
+            token_usage = gen_options.get("token_usage", {})
+            updated_cloudflare_cost = token_usage.get("cloudflare_cost")
+        
         return PDFGenerationResponse(
             pdf_id=pdf_id,
             pdf=pdf_result["pdf"],
@@ -282,7 +354,8 @@ async def generate_carousel_pdf(
             prompts=final_prompts,
             model=model_used or "cloudflare",
             post_id=request.post_id,
-            is_current=True
+            is_current=True,
+            cloudflare_cost=updated_cloudflare_cost
         )
     
     except HTTPException:

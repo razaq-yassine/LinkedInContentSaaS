@@ -250,7 +250,8 @@ async def process_onboarding(
                     "ai_generated_fields": profile_data.get("ai_generated_fields", [])
                 },
                 "context_json": context_json,  # Legacy field
-                "preferences": profile_data["preferences"]
+                "preferences": profile_data["preferences"],
+                "token_usage": profile_data.get("token_usage")
             }
         }
     except Exception as e:

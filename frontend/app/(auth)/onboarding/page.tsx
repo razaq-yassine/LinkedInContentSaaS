@@ -23,6 +23,7 @@ function OnboardingContent() {
   const [posts, setPosts] = useState<string[]>([]);
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
+  const [tokenUsage, setTokenUsage] = useState<any>(null);
 
   useEffect(() => {
     // Restore profile data from localStorage if on step 5
@@ -138,6 +139,12 @@ function OnboardingContent() {
         console.log("Process response:", processResponse);
         const profileDataFromResponse = processResponse.data.profile;
         setProfileData(profileDataFromResponse);
+        
+        // Capture token usage
+        if (profileDataFromResponse.token_usage) {
+          setTokenUsage(profileDataFromResponse.token_usage);
+        }
+        
         // Save to localStorage for persistence
         localStorage.setItem("onboarding_profile_data", JSON.stringify(profileDataFromResponse));
         setStep(5);
@@ -268,6 +275,7 @@ function OnboardingContent() {
         {step === 5 && profileData && (
           <Step5Preview
             profileData={profileData}
+            tokenUsage={tokenUsage}
             onComplete={handleStep5}
             onBack={handleBackFromStep5}
           />

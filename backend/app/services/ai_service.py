@@ -19,7 +19,7 @@ async def generate_completion(
     temperature: float = 0.7,
     use_search: bool = False,
     conversation_history: Optional[List[Dict[str, str]]] = None
-) -> str:
+) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using either OpenAI or Gemini based on AI_PROVIDER setting
     
@@ -30,6 +30,14 @@ async def generate_completion(
         temperature: Generation temperature
         use_search: Enable web search (only supported by Gemini)
         conversation_history: Optional list of previous messages in format [{"role": "user|assistant", "content": "..."}]
+    
+    Returns:
+        Tuple of (response_text, token_usage_dict) where token_usage_dict contains:
+        - input_tokens: int
+        - output_tokens: int
+        - total_tokens: int
+        - model: str
+        - provider: str
     """
     provider = settings.ai_provider.lower()
     
@@ -51,7 +59,7 @@ async def _generate_with_openai(
     model: str = "gpt-4o",
     temperature: float = 0.7,
     conversation_history: Optional[List[Dict[str, str]]] = None
-) -> str:
+) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using OpenAI API
     
@@ -61,6 +69,9 @@ async def _generate_with_openai(
         model: Model name
         temperature: Generation temperature
         conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
+    
+    Returns:
+        Tuple of (response_text, token_usage_dict)
     """
     if not openai_client:
         raise Exception("OpenAI API key not configured")
@@ -90,7 +101,17 @@ async def _generate_with_openai(
             temperature=temperature
         )
         
-        return response.choices[0].message.content
+        # Extract token usage
+        usage = response.usage
+        token_usage = {
+            "input_tokens": usage.prompt_tokens if usage else 0,
+            "output_tokens": usage.completion_tokens if usage else 0,
+            "total_tokens": usage.total_tokens if usage else 0,
+            "model": model,
+            "provider": "openai"
+        }
+        
+        return response.choices[0].message.content, token_usage
     except Exception as e:
         raise Exception(f"OpenAI API error: {str(e)}")
 
@@ -100,7 +121,7 @@ async def _generate_with_gemini(
     temperature: float = 0.7,
     use_search: bool = False,
     conversation_history: Optional[List[Dict[str, str]]] = None
-) -> str:
+) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using Google Gemini API (new google-genai SDK)
     
@@ -110,6 +131,9 @@ async def _generate_with_gemini(
         temperature: Generation temperature
         use_search: Enable Google Search grounding for web searches
         conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
+    
+    Returns:
+        Tuple of (response_text, token_usage_dict)
     """
     if not gemini_client:
         raise Exception("Gemini API key not configured")
@@ -150,11 +174,31 @@ async def _generate_with_gemini(
             config=config,
         )
         
-        return response.text
+        # Extract token usage from usage_metadata
+        usage_metadata = getattr(response, 'usage_metadata', None)
+        if usage_metadata:
+            token_usage = {
+                "input_tokens": getattr(usage_metadata, 'prompt_token_count', 0) or 0,
+                "output_tokens": getattr(usage_metadata, 'candidates_token_count', 0) or 0,
+                "total_tokens": getattr(usage_metadata, 'total_token_count', 0) or 0,
+                "model": settings.gemini_model,
+                "provider": "gemini"
+            }
+        else:
+            # Fallback if usage_metadata is not available
+            token_usage = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "model": settings.gemini_model,
+                "provider": "gemini"
+            }
+        
+        return response.text, token_usage
     except Exception as e:
         raise Exception(f"Gemini API error: {str(e)}")
 
-async def generate_profile_from_cv(cv_text: str) -> str:
+async def generate_profile_from_cv(cv_text: str) -> tuple[str, Dict[str, Any]]:
     """
     Generate profile.md from CV text
     """
@@ -195,9 +239,10 @@ Create a profile following this structure:
 
 Extract actual information from the CV. Be specific and use real data points."""
 
-    return await generate_completion(system_prompt, cv_text)
+    result, _ = await generate_completion(system_prompt, cv_text)
+    return result
 
-async def analyze_writing_style(posts: List[str]) -> str:
+async def analyze_writing_style(posts: List[str]) -> tuple[str, Dict[str, Any]]:
     """
     Analyze writing style from sample posts
     """
@@ -235,7 +280,8 @@ Create a guide following this structure:
 Be specific and use examples from the posts provided."""
 
     posts_text = "\n\n---POST---\n\n".join(posts)
-    return await generate_completion(system_prompt, f"Analyze these posts:\n\n{posts_text}")
+    result, _ = await generate_completion(system_prompt, f"Analyze these posts:\n\n{posts_text}")
+    return result
 
 async def generate_context_json(cv_text: str, profile_md: str) -> Dict:
     """
@@ -263,7 +309,7 @@ Return a JSON object with this structure:
   }
 }"""
 
-    result = await generate_completion(
+    result, _ = await generate_completion(
         system_prompt,
         f"CV:\n{cv_text}\n\nProfile:\n{profile_md}",
         temperature=0.3
@@ -373,7 +419,7 @@ CRITICAL RULES:
 
 Output only TOON format, no explanations."""
 
-    result = await generate_completion(
+    result, token_usage = await generate_completion(
         system_prompt=system_prompt,
         user_message=f"CV Content:\n\n{cv_text}\n\n{f'Industry Hint: {industry_hint}' if industry_hint else ''}",
         temperature=0.5
@@ -390,14 +436,15 @@ Output only TOON format, no explanations."""
         metadata = {
             'ai_generated_fields': ai_generated_fields,
             'toon_format': result,
-            'parsed_data': parsed
+            'parsed_data': parsed,
+            'token_usage': token_usage
         }
         
         return result, metadata
     except Exception as e:
         print(f"Error parsing TOON result: {str(e)}")
         # Return result anyway, let caller handle parsing
-        return result, {'ai_generated_fields': [], 'toon_format': result}
+        return result, {'ai_generated_fields': [], 'toon_format': result, 'token_usage': token_usage}
 
 
 async def generate_evergreen_content_ideas(
@@ -405,7 +452,7 @@ async def generate_evergreen_content_ideas(
     expertise_areas: List[str],
     industry: str,
     achievements: List[str] = None
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Generate 10-15 evergreen content ideas based on CV achievements and expertise.
     
@@ -463,7 +510,7 @@ Industry: {industry}{achievements_text}
 Create 10-15 unique, specific ideas based on their actual experience."""
 
     try:
-        result = await generate_completion(
+        result, token_usage = await generate_completion(
             system_prompt=system_prompt,
             user_message=user_message,
             temperature=0.7
@@ -484,7 +531,8 @@ Create 10-15 unique, specific ideas based on their actual experience."""
             if 'ai_generated' not in idea:
                 idea['ai_generated'] = False
                 
-        return ideas[:15]  # Max 15 ideas
+        ideas_result = ideas[:15]  # Max 15 ideas
+        return ideas_result, token_usage
         
     except Exception as e:
         print(f"Error generating evergreen ideas: {str(e)}")
@@ -504,7 +552,13 @@ Create 10-15 unique, specific ideas based on their actual experience."""
                 "why_relevant": "Aligned with your expertise areas",
                 "ai_generated": True
             }
-        ]
+        ], {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "model": "unknown",
+            "provider": "unknown"
+        }
 
 
 async def generate_default_preferences(style_choice: str) -> Dict:
@@ -574,7 +628,7 @@ Examples:
 Output ONLY the title, nothing else."""
 
     try:
-        title = await generate_completion(
+        title, token_usage = await generate_completion(
             system_prompt=system_prompt,
             user_message=first_message,
             temperature=0.5
@@ -643,7 +697,7 @@ Industry: {industry}
 Search for current trends, hot topics, and emerging discussions in their field that would make great LinkedIn content."""
 
     try:
-        result = await generate_completion(
+        result, token_usage = await generate_completion(
             system_prompt=system_prompt,
             user_message=user_message,
             temperature=0.7,
@@ -716,7 +770,7 @@ Keep it focused and actionable for LinkedIn content creation."""
         user_message += f"\n\nContext: {context}"
 
     try:
-        result = await generate_completion(
+        result, token_usage = await generate_completion(
             system_prompt=system_prompt,
             user_message=user_message,
             temperature=0.7,

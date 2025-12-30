@@ -42,6 +42,7 @@ import { ContextConfigModal } from "@/components/ContextConfigModal";
 import { GenerationOptionsMenu } from "@/components/GenerationOptionsMenu";
 import { PostTypeMenu } from "@/components/PostTypeMenu";
 import { SlideSelectionModal } from "@/components/SlideSelectionModal";
+import TokenUsage from "@/components/TokenUsage";
 
 interface Message {
   id: string;
@@ -56,6 +57,43 @@ interface Message {
     hashtags?: string[];
     tone?: string;
     estimated_engagement?: string;
+  };
+  token_usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    model?: string;
+    provider?: string;
+    details?: {
+      [key: string]: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+      };
+    };
+    cost?: {
+      input_cost: number;
+      output_cost: number;
+      total_cost: number;
+    };
+    image_prompt_tokens?: {
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+    };
+    image_prompt_cost?: {
+      input_cost: number;
+      output_cost: number;
+      total_cost: number;
+    };
+    image_prompt_provider?: string;
+    image_prompt_model?: string;
+    cloudflare_cost?: {
+      total_cost: number;
+      cost_per_image?: number;
+      image_count?: number;
+    };
+    cloudflare_model?: string;
   };
 }
 
@@ -406,6 +444,7 @@ export default function GeneratePage() {
   const [useTrendingTopic, setUseTrendingTopic] = useState(savedOptions.useTrendingTopic);
   const [internetSearch, setInternetSearch] = useState(savedOptions.internetSearch);
   const [contextTone, setContextTone] = useState<string | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<any>(null);
 
   // Save options to localStorage whenever they change
   useEffect(() => {
@@ -524,6 +563,7 @@ export default function GeneratePage() {
         let imagePrompt = msg.image_prompt;
         let imagePrompts = msg.image_prompts;
         let metadata = msg.metadata;
+        let tokenUsage = msg.token_usage; // Include token_usage from backend
         
         // Use the parseJsonContent utility function
         if (typeof content === 'string' && content.trim().length > 0) {
@@ -565,6 +605,7 @@ export default function GeneratePage() {
           image_prompts: imagePrompts, // For carousel posts
         post_id: msg.post_id, // Post ID from backend
           metadata: metadata,
+          token_usage: tokenUsage, // Include token_usage from backend
         };
       });
       setMessages(uiMessages);
@@ -975,6 +1016,11 @@ export default function GeneratePage() {
       );
       const data = response.data;
 
+      // Capture token usage
+      if (data.token_usage) {
+        setTokenUsage(data.token_usage);
+      }
+
       // Safeguard: Extract actual post_content if it's a JSON string
       let postContent = data.post_content || data.content;
       if (typeof postContent === 'string' && postContent.trim().startsWith('{') && postContent.includes('"post_content"')) {
@@ -1000,6 +1046,7 @@ export default function GeneratePage() {
         image_prompts: data.image_prompts, // For carousel posts
         post_id: data.id, // Post ID is the same as the response ID
         metadata: data.metadata,
+        token_usage: data.token_usage,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -1094,6 +1141,7 @@ export default function GeneratePage() {
         format_type: data.format_type || data.format,
         image_prompt: data.image_prompt,
         metadata: data.metadata,
+        token_usage: data.token_usage,
       };
 
       setMessages((prev) => {
@@ -1121,7 +1169,9 @@ export default function GeneratePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F3F2F0]">
+    <>
+      <TokenUsage tokenUsage={tokenUsage} />
+      <div className="min-h-screen bg-[#F3F2F0]">
       {/* Top Banner - Only show when no conversation */}
       {messages.length === 0 && (
         <div className="bg-white border-b border-[#E0DFDC] py-2 sm:py-3 px-3 sm:px-4">
@@ -1353,6 +1403,35 @@ export default function GeneratePage() {
                               [postId]: `data:image/png;base64,${imageData}`
                             }));
 
+                            // Update token usage with Cloudflare cost if provided
+                            console.log("DEBUG: Image regeneration response:", {
+                              has_cloudflare_cost: !!response.data.cloudflare_cost,
+                              cloudflare_cost: response.data.cloudflare_cost,
+                              current_msg_token_usage: msg.token_usage
+                            });
+                            
+                            if (response.data.cloudflare_cost) {
+                              setMessages(prev => prev.map(m => {
+                                if (m.id === msg.id) {
+                                  const updated = {
+                                    ...m,
+                                    token_usage: {
+                                      ...(m.token_usage || {}),
+                                      cloudflare_cost: response.data.cloudflare_cost
+                                    }
+                                  };
+                                  console.log("DEBUG: Updated message:", {
+                                    id: updated.id,
+                                    cloudflare_cost: updated.token_usage?.cloudflare_cost
+                                  });
+                                  return updated;
+                                }
+                                return m;
+                              }));
+                            } else {
+                              console.warn("DEBUG: No cloudflare_cost in response");
+                            }
+
                             // Reload image history
                             await loadImageHistory(postId);
                           } catch (error: any) {
@@ -1421,6 +1500,22 @@ export default function GeneratePage() {
                               ...prev,
                               [postId]: slideImages
                             }));
+
+                            // Update token usage with Cloudflare cost if provided
+                            if (response.data.cloudflare_cost) {
+                              setMessages(prev => prev.map(m => {
+                                if (m.id === msg.id) {
+                                  return {
+                                    ...m,
+                                    token_usage: {
+                                      ...(m.token_usage || {}),
+                                      cloudflare_cost: response.data.cloudflare_cost
+                                    }
+                                  };
+                                }
+                                return m;
+                              }));
+                            }
 
                             // Load PDF history
                             await loadPdfHistory(postId);
@@ -1625,23 +1720,115 @@ export default function GeneratePage() {
                       </div>
                     )}
 
-                    {/* Metadata Tags */}
-                    {displayMetadata && (
-                      <div className="flex items-center gap-2 text-xs">
-                        {displayMetadata.tone && (
-                        <span className="px-2.5 py-1 bg-[#F3F2F0] text-[#666666] rounded-full font-medium">
-                            {displayMetadata.tone}
-                        </span>
+                    {/* Token Usage Display */}
+                    {msg.token_usage && (
+                      <div className="space-y-2">
+                        {/* Main Generation Tokens */}
+                        <div className="flex items-center gap-3 text-xs bg-[#F9F9F9] px-3 py-2 rounded-lg border border-[#E0DFDC]">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[#666666] font-medium">Tokens:</span>
+                            <span className="font-mono font-semibold text-[#0A66C2]">
+                              {msg.token_usage.total_tokens.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[#666666]">Input:</span>
+                            <span className="font-mono text-green-600 font-medium">
+                              {msg.token_usage.input_tokens.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[#666666]">Output:</span>
+                            <span className="font-mono text-orange-600 font-medium">
+                              {msg.token_usage.output_tokens.toLocaleString()}
+                            </span>
+                          </div>
+                          {msg.token_usage.cost && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#666666]">Cost:</span>
+                              <span className="font-mono text-purple-600 font-medium">
+                                ${msg.token_usage.cost.total_cost.toFixed(6)}
+                              </span>
+                            </div>
+                          )}
+                          {msg.token_usage.provider && (
+                            <div className="flex items-center gap-1 ml-auto">
+                              <span className="text-[#666666] text-[10px]">
+                                {msg.token_usage.provider.charAt(0).toUpperCase() + msg.token_usage.provider.slice(1)}
+                                {msg.token_usage.model && ` (${msg.token_usage.model})`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Image Prompt Generation Tokens (Separate Provider) */}
+                        {msg.token_usage.image_prompt_tokens && (
+                          <div className="flex items-center gap-3 text-xs bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#666666] font-medium">Image Prompts:</span>
+                              <span className="font-mono font-semibold text-blue-600">
+                                {msg.token_usage.image_prompt_tokens.total_tokens.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#666666]">Input:</span>
+                              <span className="font-mono text-green-600 font-medium">
+                                {msg.token_usage.image_prompt_tokens.input_tokens.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#666666]">Output:</span>
+                              <span className="font-mono text-orange-600 font-medium">
+                                {msg.token_usage.image_prompt_tokens.output_tokens.toLocaleString()}
+                              </span>
+                            </div>
+                            {msg.token_usage.image_prompt_cost && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#666666]">Cost:</span>
+                                <span className="font-mono text-purple-600 font-medium">
+                                  ${msg.token_usage.image_prompt_cost.total_cost.toFixed(6)}
+                                </span>
+                              </div>
+                            )}
+                            {msg.token_usage.image_prompt_provider && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                <span className="text-[#666666] text-[10px]">
+                                  {msg.token_usage.image_prompt_provider.charAt(0).toUpperCase() + msg.token_usage.image_prompt_provider.slice(1)}
+                                  {msg.token_usage.image_prompt_model && ` (${msg.token_usage.image_prompt_model})`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         )}
-                        {displayMetadata.estimated_engagement && (
-                        <span className="px-2.5 py-1 bg-[#F3F2F0] text-[#666666] rounded-full font-medium">
-                            {displayMetadata.estimated_engagement} engagement
-                        </span>
-                        )}
-                        {displayMetadata.hashtags && displayMetadata.hashtags.length > 0 && (
-                          <span className="px-2.5 py-1 bg-[#E7F3FF] text-[#0A66C2] rounded-full font-medium">
-                            {displayMetadata.hashtags.length} hashtags
-                          </span>
+                        
+                        {/* Cloudflare Image Generation Cost (Separate Provider) */}
+                        {msg.token_usage.cloudflare_cost && (
+                          <div className="flex items-center gap-3 text-xs bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#666666] font-medium">Image Generation:</span>
+                              <span className="font-mono font-semibold text-purple-600">
+                                {msg.token_usage.cloudflare_cost.image_count || 1} image{(msg.token_usage.cloudflare_cost.image_count || 1) > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#666666]">Cost:</span>
+                              <span className="font-mono text-purple-600 font-medium">
+                                ${msg.token_usage.cloudflare_cost.total_cost.toFixed(6)}
+                              </span>
+                            </div>
+                            {msg.token_usage.cloudflare_cost.cost_per_image && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#666666] text-[10px]">(${msg.token_usage.cloudflare_cost.cost_per_image.toFixed(6)}/image)</span>
+                              </div>
+                            )}
+                            {msg.token_usage.cloudflare_model && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                <span className="text-[#666666] text-[10px]">
+                                  Cloudflare ({msg.token_usage.cloudflare_model.replace('@cf/leonardo/', '').replace('@cf/', '')})
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -1910,5 +2097,6 @@ export default function GeneratePage() {
           );
         })}
     </div>
+    </>
   );
 }

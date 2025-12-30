@@ -96,16 +96,24 @@ def build_post_generation_prompt(
             trending_topics_section += f"- **{topic.get('title', '')}**: {topic.get('description', '')}\n"
         trending_topics_section += "\nConsider these trending topics if relevant to the user's request.\n"
     
+    # Extract key info from context_json to reduce tokens
+    tone = context_json.get('tone', 'professional')
+    industry = context_json.get('industry', 'General')
+    expertise_tags = context_json.get('expertise_tags', [])[:5]  # Limit to top 5
+    
+    # Build compact profile summary instead of full markdown
+    profile_summary = f"Industry: {industry}"
+    if expertise_tags:
+        profile_summary += f". Expertise: {', '.join(expertise_tags)}"
+    
     system_prompt = f"""{CONTENT_GENERATION_SYSTEM_PROMPT}
 
-## User Profile Context
-{profile_md}
-
-## Writing Style to Match
-{writing_style_md}
+## User Profile Context (Summary)
+{profile_summary}
+Tone: {tone}
 {trending_topics_section}
 ## User Preferences
-- Tone: {context_json.get('tone', 'professional')}
+- Tone: {tone}
 - Hashtag count: {options.get('hashtag_count', 4)} (ALWAYS include this many hashtags unless user explicitly requests zero)
 - Post format: {options.get('format', 'text')}
 
@@ -119,6 +127,9 @@ def build_post_generation_prompt(
 - Hashtags should be relevant to the content and industry
 - Only skip hashtags if user explicitly requests "no hashtags" or "zero hashtags"
 - Include hashtags in the metadata field as an array
+
+## Writing Style to Match
+{writing_style_md}
 
 Generate a post that sounds EXACTLY like this person wrote it, following their style perfectly."""
 
@@ -134,7 +145,7 @@ def build_comment_generation_prompt(
     Build prompt for comment generation
     """
     
-    system_prompt = f"""{COMMENT_GENERATION_SYSTEM_PROMPT}
+    additional_prompt = f"""
 
 ## User Profile
 {profile_md}
@@ -155,7 +166,8 @@ Generate a comment that:
 2. Matches their authentic voice
 3. Is concise and professional
 4. Advances the conversation meaningfully"""
-
+    
+    system_prompt = COMMENT_GENERATION_SYSTEM_PROMPT + additional_prompt
     return system_prompt
 
 

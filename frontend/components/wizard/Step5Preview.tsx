@@ -10,11 +10,25 @@ import { Badge } from "@/components/ui/badge";
 
 interface Step5Props {
   profileData: any;
+  tokenUsage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    model?: string;
+    provider?: string;
+    details?: {
+      [key: string]: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+      };
+    };
+  } | null;
   onComplete: (preferences: any) => void;
   onBack: () => void;
 }
 
-export default function Step5Preview({ profileData, onComplete, onBack }: Step5Props) {
+export default function Step5Preview({ profileData, tokenUsage, onComplete, onBack }: Step5Props) {
   const [context, setContext] = useState(profileData.profile_context || {});
   const [preferences, setPreferences] = useState(
     profileData.preferences || {
@@ -396,6 +410,38 @@ export default function Step5Preview({ profileData, onComplete, onBack }: Step5P
           </div>
         </CollapsibleSection>
       </div>
+
+      {/* Token Usage Display */}
+      {tokenUsage && (
+        <div className="mb-6 flex items-center gap-3 text-xs bg-[#F9F9F9] px-4 py-3 rounded-lg border border-[#E0DFDC]">
+          <div className="flex items-center gap-1">
+            <span className="text-[#666666] font-medium">Tokens Used:</span>
+            <span className="font-mono font-semibold text-[#0A66C2]">
+              {tokenUsage.total_tokens.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[#666666]">Input:</span>
+            <span className="font-mono text-green-600 font-medium">
+              {tokenUsage.input_tokens.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[#666666]">Output:</span>
+            <span className="font-mono text-orange-600 font-medium">
+              {tokenUsage.output_tokens.toLocaleString()}
+            </span>
+          </div>
+          {tokenUsage.provider && (
+            <div className="flex items-center gap-1 ml-auto">
+              <span className="text-[#666666] text-[10px]">
+                {tokenUsage.provider.charAt(0).toUpperCase() + tokenUsage.provider.slice(1)}
+                {tokenUsage.model && ` (${tokenUsage.model})`}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>

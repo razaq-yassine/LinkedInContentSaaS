@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from .generation import TokenUsage
 
 class ConversationResponse(BaseModel):
     id: str
@@ -23,6 +24,7 @@ class MessageResponse(BaseModel):
     image_prompt: Optional[str] = None
     image_prompts: Optional[List[str]] = None  # For carousel posts
     metadata: Optional[Dict[str, Any]] = None
+    token_usage: Optional[Dict[str, Any]] = None  # Token usage data from generation_options
     
     class Config:
         from_attributes = True
