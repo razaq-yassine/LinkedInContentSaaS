@@ -11,6 +11,7 @@ import Step2StyleChoice from "@/components/wizard/Step2StyleChoice";
 import Step3ImportPosts from "@/components/wizard/Step3ImportPosts";
 import Step4UploadCV from "@/components/wizard/Step4UploadCV";
 import Step5Preview from "@/components/wizard/Step5Preview";
+import FeatureSlider from "@/components/onboarding/FeatureSlider";
 
 function OnboardingContent() {
   const router = useRouter();
@@ -149,18 +150,9 @@ function OnboardingContent() {
         localStorage.setItem("onboarding_profile_data", JSON.stringify(profileDataFromResponse));
         setStep(5);
       } catch (processError: any) {
-        console.warn("Profile processing failed, skipping to generate:", processError);
-        // Complete onboarding and redirect to generate page
-        try {
-          await api.onboarding.complete();
-          const userData = JSON.parse(localStorage.getItem("user") || "{}");
-          userData.onboarding_completed = true;
-          localStorage.setItem("user", JSON.stringify(userData));
-          router.push("/generate");
-        } catch (completeError) {
-          console.error("Failed to complete onboarding:", completeError);
-          router.push("/generate");
-        }
+        console.warn("Profile processing failed:", processError);
+        const errorDetail = processError?.response?.data?.detail || processError?.detail || processError?.message || "Unknown error";
+        alert(`Profile processing failed: ${errorDetail}\n\nPlease try again or contact support if the issue persists.`);
       }
     } catch (error: any) {
       console.error("Processing error:", error);
@@ -202,21 +194,24 @@ function OnboardingContent() {
 
   const progress = (step / 5) * 100;
 
-  if (initializing || loading) {
+  if (initializing) {
     return (
       <div className="min-h-screen bg-[#F3F2F0] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-[#0A66C2] mx-auto mb-6"></div>
-          <p className="text-xl font-semibold text-black mb-2">
-            {initializing ? "Loading your progress..." : "Processing your information..."}
-          </p>
-          <p className="text-sm text-[#666666]">
-            {initializing 
-              ? "Checking your onboarding status..." 
-              : "This may take a minute. We're analyzing your CV and generating your profile."}
-          </p>
+          <p className="text-xl font-semibold text-black mb-2">Loading your progress...</p>
+          <p className="text-sm text-[#666666]">Checking your onboarding status...</p>
         </div>
       </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <FeatureSlider
+        message="Processing your information..."
+        subMessage="This may take a minute. We're analyzing your CV and generating your profile."
+      />
     );
   }
 

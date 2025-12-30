@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 from ..database import get_db
@@ -28,6 +28,49 @@ import re
 import traceback
 
 router = APIRouter()
+
+def get_recent_post_titles(db: Session, user_id: str, hours: int = 24) -> List[str]:
+    """
+    Retrieve titles/topics of posts generated in the last N hours for a user.
+    Only extracts titles to avoid passing full content to AI.
+    
+    Args:
+        db: Database session
+        user_id: User ID to filter posts
+        hours: Number of hours to look back (default 24)
+    
+    Returns:
+        List of post titles/topics from recent posts
+    """
+    cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+    
+    recent_posts = db.query(GeneratedPost).filter(
+        GeneratedPost.user_id == user_id,
+        GeneratedPost.created_at >= cutoff_time
+    ).order_by(GeneratedPost.created_at.desc()).all()
+    
+    titles = []
+    for post in recent_posts:
+        # Extract title from generation_options metadata if available
+        if post.generation_options and isinstance(post.generation_options, dict):
+            metadata = post.generation_options.get('metadata', {})
+            if isinstance(metadata, dict):
+                title = metadata.get('title')
+                if title and isinstance(title, str) and title.strip():
+                    titles.append(title.strip())
+                    continue
+        
+        # Fallback: use topic field (truncated user message)
+        if post.topic and post.topic.strip():
+            titles.append(post.topic.strip())
+        # Last resort: extract first line from content as title
+        elif post.content:
+            first_line = post.content.split('\n')[0].strip()
+            # Only use if it's reasonably short (likely a title)
+            if first_line and len(first_line) < 150:
+                titles.append(first_line[:100])  # Truncate to 100 chars
+    
+    return titles
 
 def extract_compact_writing_style(writing_style_md: str) -> str:
     """
@@ -157,6 +200,25 @@ async def generate_post(
         request_options = request.options.copy() if request.options else {}
         request_options = parse_prompt_preferences(request.message, request_options)
         
+        # Extract attachments from options if not provided at top level
+        # This allows frontend to pass attachments through options
+        image_attachments = request.attachments
+        if not image_attachments and request_options.get('attachments'):
+            image_attachments = request_options.pop('attachments')
+        
+        # If we have image attachments, add context about them to the message
+        attachment_context = ""
+        if image_attachments and len(image_attachments) > 0:
+            image_count = len(image_attachments)
+            attachment_context = f"""
+
+[IMPORTANT: The user has attached {image_count} image(s) to this message. You MUST:
+1. Carefully analyze each image to understand its content, context, and visual elements
+2. Use the image content as PRIMARY input for generating the LinkedIn post
+3. Reference specific details, themes, or elements from the image(s) in your post
+4. If the images show products, events, achievements, or visuals - incorporate them into your content
+5. The post should be directly inspired by and relevant to what's shown in the images]"""
+        
         # Detect if user wants a random/new topic
         user_message_lower = request.message.lower().strip()
         is_random_request = any(keyword in user_message_lower for keyword in [
@@ -218,6 +280,21 @@ async def generate_post(
                 # Override random request detection - refinement takes priority
                 is_random_request = False
         
+        # Get recent post titles to avoid duplicate topics (only for new posts, not refinements)
+        recent_titles_section = ""
+        if not is_refinement_request:
+            recent_titles = get_recent_post_titles(db, user_id, hours=24)
+            if recent_titles:
+                recent_titles_section = f"""
+
+## RECENT POST TOPICS (AVOID DUPLICATES):
+You have recently written posts on the following topics in the last 24 hours:
+{chr(10).join(f"- {title}" for title in recent_titles)}
+
+IMPORTANT: Generate a NEW and DIFFERENT topic. Do NOT create content about any of these recent topics.
+Choose a fresh angle, different subject matter, or completely new theme.
+"""
+        
         # Build system prompt with user context
         # If TOON context is available, use it for token efficiency
         if toon_context:
@@ -272,7 +349,7 @@ IMPORTANT:
 
 ## CONTEXT USAGE:
 Profile context is for ALIGNMENT ONLY (tone, style, expertise level, audience) - NOT for topic selection.
-DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}{refinement_context}
+DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}{refinement_context}{recent_titles_section}
 
 ## GENERATION OPTIONS:
 - Length: {length_pref}
@@ -390,7 +467,7 @@ IMPORTANT:
 
 ## CONTEXT USAGE:
 Profile context is for ALIGNMENT ONLY (tone, style, expertise level, audience) - NOT for topic selection.
-DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}{refinement_context}
+DO NOT pull topics from CV projects/experiences unless user explicitly references them.{topic_instruction}{refinement_context}{recent_titles_section}
 """
         
         # Add format-specific instructions
@@ -436,7 +513,7 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         
         # Modify user message based on flags
         # Note: Trending takes priority if both flags are set
-        modified_user_message = request.message
+        modified_user_message = request.message + attachment_context
         
         # If "Trending" is clicked: use web search to find trending topics or latest info
         # This takes priority over the web search toggle
@@ -492,12 +569,14 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         # Generate post
         try:
             # Pass conversation history to AI (current message hasn't been saved yet, so all history is previous)
+            # Include image attachments for vision analysis if present
             raw_response, main_token_usage = await generate_completion(
                 system_prompt=system_prompt,
                 user_message=modified_user_message,
                 temperature=0.8,
                 use_search=use_web_search,
-                conversation_history=conversation_history if conversation_history else None
+                conversation_history=conversation_history if conversation_history else None,
+                image_attachments=image_attachments if image_attachments else None
             )
             
             # Track main generation tokens
@@ -949,7 +1028,7 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             content=post_content,
             format=format_enum,
             generation_options=generation_options,  # Now includes image_prompt and metadata
-            attachments=request.attachments
+            attachments=image_attachments
         )
         
         db.add(post)
@@ -958,12 +1037,13 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         
         # Save conversation messages (user prompt + AI response)
         if conversation_id:
-            # Save user message
+            # Save user message with attachments if present
             user_message = ConversationMessage(
                 id=str(uuid.uuid4()),
                 conversation_id=conversation_id,
                 role=MessageRole.USER,
-                content=request.message
+                content=request.message,
+                attachments=image_attachments if image_attachments else None
             )
             db.add(user_message)
             

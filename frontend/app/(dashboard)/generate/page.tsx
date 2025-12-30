@@ -20,7 +20,9 @@ import {
   Layers,
   Check,
   Video,
-  Globe
+  Globe,
+  ImagePlus,
+  Trash2
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -44,6 +46,13 @@ import { PostTypeMenu } from "@/components/PostTypeMenu";
 import { SlideSelectionModal } from "@/components/SlideSelectionModal";
 import TokenUsage from "@/components/TokenUsage";
 
+interface MessageAttachment {
+  type: string;
+  data: string;  // base64 encoded
+  name: string;
+  preview?: string;  // data URL for display
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -53,6 +62,7 @@ interface Message {
   image_prompt?: string;
   image_prompts?: string[]; // For carousel posts
   post_id?: string; // Post ID for assistant messages
+  attachments?: MessageAttachment[];  // Image attachments for user messages
   metadata?: {
     hashtags?: string[];
     tone?: string;
@@ -383,6 +393,16 @@ export default function GeneratePage() {
   const [showSlideSelectionModal, setShowSlideSelectionModal] = useState<Record<string, boolean>>({}); // post_id -> boolean
   const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({}); // post_id -> current slide index
 
+  // Uploaded images state
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  
+  // Image upload constants
+  const MAX_IMAGES = 4;
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB per image
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+
   // Generation options
   // Default values
   const DEFAULT_POST_TYPE = "auto";
@@ -551,6 +571,97 @@ export default function GeneratePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Image upload handlers
+  const validateImageFile = (file: File): { valid: boolean; error?: string } => {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return { valid: false, error: `Invalid file type: ${file.type}. Allowed: JPG, PNG, WebP, GIF` };
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      return { valid: false, error: `File "${file.name}" exceeds 5MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB)` };
+    }
+    return { valid: true };
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    const errors: string[] = [];
+
+    // Check total count
+    const totalCount = uploadedImages.length + files.length;
+    if (totalCount > MAX_IMAGES) {
+      alert(`Maximum ${MAX_IMAGES} images allowed. You have ${uploadedImages.length}, trying to add ${files.length}.`);
+      return;
+    }
+
+    Array.from(files).forEach((file) => {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        errors.push(validation.error!);
+        return;
+      }
+
+      newFiles.push(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (errors.length > 0) {
+      alert(`Some files were rejected:\n${errors.join('\n')}`);
+    }
+
+    if (newFiles.length > 0) {
+      setUploadedImages(prev => [...prev, ...newFiles]);
+    }
+
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllImages = () => {
+    setUploadedImages([]);
+    setImagePreviews([]);
+  };
+
+  const convertImagesToBase64 = async (): Promise<Array<{ type: string; data: string; name: string }>> => {
+    const attachments: Array<{ type: string; data: string; name: string }> = [];
+    
+    for (const file of uploadedImages) {
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Extract base64 data without the data URL prefix
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.readAsDataURL(file);
+      });
+      
+      attachments.push({
+        type: file.type,
+        data: base64,
+        name: file.name
+      });
+    }
+    
+    return attachments;
+  };
+
   const loadConversation = async (id: string) => {
     try {
       const response = await api.conversations.get(id);
@@ -595,17 +706,29 @@ export default function GeneratePage() {
           }
         }
         
+        // Convert stored attachments to display format (base64 to data URL for preview)
+        let attachments: MessageAttachment[] | undefined = undefined;
+        if (msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+          attachments = msg.attachments.map((att: any) => ({
+            type: att.type,
+            data: att.data,
+            name: att.name,
+            preview: `data:${att.type};base64,${att.data}`
+          }));
+        }
+        
         return {
-        id: msg.id,
-        role: msg.role, // "user" or "assistant"
+          id: msg.id,
+          role: msg.role, // "user" or "assistant"
           content: content,
           post_content: msg.role === "assistant" ? content : undefined,
           format_type: formatType,
           image_prompt: imagePrompt,
           image_prompts: imagePrompts, // For carousel posts
-        post_id: msg.post_id, // Post ID from backend
+          post_id: msg.post_id, // Post ID from backend
           metadata: metadata,
           token_usage: tokenUsage, // Include token_usage from backend
+          attachments: attachments, // Image attachments for user messages
         };
       });
       setMessages(uiMessages);
@@ -971,10 +1094,19 @@ export default function GeneratePage() {
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
+    // Prepare attachments with previews for display before clearing
+    const messageAttachments: MessageAttachment[] = uploadedImages.map((file, index) => ({
+      type: file.type,
+      data: '', // Will be filled with base64 data
+      name: file.name,
+      preview: imagePreviews[index] // Keep preview for display
+    }));
+
     const userMessageObj: Message = {
       id: Date.now().toString(),
       role: "user",
       content: userMessage,
+      attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
     };
 
     setInput("");
@@ -999,7 +1131,15 @@ export default function GeneratePage() {
       // Parse user prompt for preferences (overrides current settings)
       const promptPreferences = parsePromptPreferences(userMessage);
 
-      const options = {
+      // Convert uploaded images to base64 attachments for API
+      const imageAttachments = uploadedImages.length > 0 ? await convertImagesToBase64() : undefined;
+      
+      // Clear uploaded images after preparing attachments
+      if (uploadedImages.length > 0) {
+        clearAllImages();
+      }
+
+      const options: Record<string, any> = {
         post_type: postType,
         tone,
         length: promptPreferences.length, // Use parsed length (prompt has priority)
@@ -1007,6 +1147,11 @@ export default function GeneratePage() {
         use_trending_topic: useTrendingTopic,
         use_web_search: internetSearch,
       };
+
+      // Include image attachments in options if present
+      if (imageAttachments && imageAttachments.length > 0) {
+        options.attachments = imageAttachments;
+      }
 
       const response = await api.generate.post(
         userMessage,
@@ -1351,10 +1496,26 @@ export default function GeneratePage() {
             <div key={msg.id}>
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                    <div className="max-w-[85%] sm:max-w-[600px] bg-[#0A66C2] text-white rounded-xl sm:rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-linkedin-sm">
+                  <div className="max-w-[85%] sm:max-w-[600px] flex flex-col items-end gap-2">
+                    {/* Display attached images above the message */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 justify-end">
+                        {msg.attachments.map((attachment, idx) => (
+                          <div key={idx} className="relative">
+                            <img
+                              src={attachment.preview || `data:${attachment.type};base64,${attachment.data}`}
+                              alt={attachment.name}
+                              className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-[#0A66C2]/30"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="bg-[#0A66C2] text-white rounded-xl sm:rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-linkedin-sm">
                       <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                      {msg.content}
-                    </p>
+                        {msg.content}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1439,6 +1600,83 @@ export default function GeneratePage() {
                             alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
                           } finally {
                             setGeneratingImages(prev => ({ ...prev, [postId]: false }));
+                          }
+                        }}
+                        onGenerateImageWithPrompt={async (customPrompt: string) => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          if (!customPrompt.trim()) return;
+
+                          setGeneratingImages(prev => ({ ...prev, [postId]: true }));
+
+                          try {
+                            const response = await api.images.generateWithPrompt(postId, customPrompt);
+                            const imageData = response.data.image;
+
+                            // Store the current image
+                            setCurrentImages(prev => ({
+                              ...prev,
+                              [postId]: `data:image/png;base64,${imageData}`
+                            }));
+
+                            // Update message's image_prompt with the custom prompt
+                            setMessages(prev => prev.map(m => {
+                              if (m.id === msg.id) {
+                                const updated = {
+                                  ...m,
+                                  image_prompt: customPrompt,
+                                  token_usage: response.data.cloudflare_cost ? {
+                                    ...(m.token_usage || {}),
+                                    cloudflare_cost: response.data.cloudflare_cost
+                                  } : m.token_usage
+                                };
+                                return updated;
+                              }
+                              return m;
+                            }));
+
+                            // Reload image history
+                            await loadImageHistory(postId);
+                          } catch (error: any) {
+                            console.error("Image generation with custom prompt failed:", error);
+                            alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
+                          } finally {
+                            setGeneratingImages(prev => ({ ...prev, [postId]: false }));
+                          }
+                        }}
+                        onRegenerateImagePrompt={async () => {
+                          const postId = postIdMap[msg.id] || msg.id;
+
+                          try {
+                            const response = await api.images.regeneratePrompt(postId);
+                            const newPrompt = response.data.image_prompt;
+                            const tokenUsage = response.data.token_usage;
+
+                            // Update message's image_prompt and token_usage
+                            setMessages(prev => prev.map(m => {
+                              if (m.id === msg.id) {
+                                return {
+                                  ...m,
+                                  image_prompt: newPrompt,
+                                  token_usage: tokenUsage ? {
+                                    ...m.token_usage,
+                                    input_tokens: m.token_usage?.input_tokens || 0,
+                                    output_tokens: m.token_usage?.output_tokens || 0,
+                                    total_tokens: m.token_usage?.total_tokens || 0,
+                                    image_prompt_tokens: tokenUsage.image_prompt_tokens,
+                                    image_prompt_cost: tokenUsage.image_prompt_cost,
+                                    image_prompt_provider: tokenUsage.image_prompt_provider,
+                                    image_prompt_model: tokenUsage.image_prompt_model,
+                                  } : m.token_usage
+                                };
+                              }
+                              return m;
+                            }));
+
+                            return newPrompt;
+                          } catch (error: any) {
+                            console.error("Image prompt regeneration failed:", error);
+                            alert(`Prompt regeneration failed: ${error.response?.data?.detail || error.message}`);
+                            return undefined;
                           }
                         }}
                         onRegeneratePDF={async (slideIndices?: number[]) => {
@@ -1859,27 +2097,109 @@ export default function GeneratePage() {
 
         {/* Input Area - Fixed at Bottom */}
         <div className="flex-shrink-0 pt-4 sm:pt-6 pb-4 sm:pb-6 z-10 bg-[#F3F2F0]">
-          <div className="bg-white rounded-xl sm:rounded-2xl shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden">
-            <Textarea
-              placeholder="Describe what you want to post about..."
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                if (e.target.value.trim()) {
-                  setShowMobileButtons(true);
-                }
-              }}
-              onFocus={() => setShowMobileButtons(true)}
-              onClick={() => setShowMobileButtons(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              rows={3}
-              className="border-0 resize-none focus-visible:ring-0 text-sm sm:text-base px-4 py-3 sm:px-5 sm:py-4"
-            />
+          {/* Image Preview Area */}
+          {imagePreviews.length > 0 && (
+            <div className="bg-white rounded-t-xl sm:rounded-t-2xl border border-b-0 border-[#E0DFDC] p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs sm:text-sm text-[#666666] font-medium">
+                  Attached Images ({imagePreviews.length}/{MAX_IMAGES})
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllImages}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs px-2 h-7"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Clear All
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={preview}
+                      alt={`Upload ${index + 1}`}
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-[#E0DFDC]"
+                    />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] px-1 rounded">
+                      {(uploadedImages[index]?.size / 1024 / 1024).toFixed(1)}MB
+                    </span>
+                  </div>
+                ))}
+                {imagePreviews.length < MAX_IMAGES && (
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="w-16 h-16 sm:w-20 sm:h-20 border-2 border-dashed border-[#E0DFDC] rounded-lg flex flex-col items-center justify-center text-[#666666] hover:border-[#0A66C2] hover:text-[#0A66C2] transition-colors"
+                  >
+                    <ImagePlus className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-[10px] mt-0.5">Add</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Hidden file input for images */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+            multiple
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+          
+          <div className={`bg-white ${imagePreviews.length > 0 ? 'rounded-b-xl sm:rounded-b-2xl' : 'rounded-xl sm:rounded-2xl'} shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden`}>
+            <div className="relative flex items-start">
+              {/* Image upload icon button on the left */}
+              <button
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploadedImages.length >= MAX_IMAGES}
+                className={`absolute left-2 top-3 sm:left-3 sm:top-4 p-1.5 rounded-lg transition-colors z-10 ${
+                  uploadedImages.length >= MAX_IMAGES
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : uploadedImages.length > 0
+                    ? 'text-blue-600 hover:bg-blue-50'
+                    : 'text-[#666666] hover:bg-gray-100'
+                }`}
+                title={uploadedImages.length >= MAX_IMAGES ? `Maximum ${MAX_IMAGES} images` : "Attach images"}
+              >
+                <ImagePlus className="w-5 h-5 sm:w-5 sm:h-5" />
+                {uploadedImages.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                    {uploadedImages.length}
+                  </span>
+                )}
+              </button>
+              
+              <Textarea
+                placeholder="Describe what you want to post about..."
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  if (e.target.value.trim()) {
+                    setShowMobileButtons(true);
+                  }
+                }}
+                onFocus={() => setShowMobileButtons(true)}
+                onClick={() => setShowMobileButtons(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                rows={3}
+                className="border-0 resize-none focus-visible:ring-0 text-sm sm:text-base pl-12 sm:pl-14 pr-4 py-3 sm:pr-5 sm:py-4 w-full"
+              />
+            </div>
             <div className={`px-3 py-2 sm:px-4 sm:py-3 bg-[#F9F9F9] border-t border-[#E0DFDC] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 ${showMobileButtons ? 'flex' : 'hidden sm:flex'}`}>
               <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
                 <Button

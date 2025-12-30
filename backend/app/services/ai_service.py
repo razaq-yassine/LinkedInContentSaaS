@@ -18,7 +18,8 @@ async def generate_completion(
     model: Optional[str] = None,
     temperature: float = 0.7,
     use_search: bool = False,
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    image_attachments: Optional[List[Dict[str, Any]]] = None
 ) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using either OpenAI or Gemini based on AI_PROVIDER setting
@@ -30,6 +31,7 @@ async def generate_completion(
         temperature: Generation temperature
         use_search: Enable web search (only supported by Gemini)
         conversation_history: Optional list of previous messages in format [{"role": "user|assistant", "content": "..."}]
+        image_attachments: Optional list of image attachments for vision analysis [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
     
     Returns:
         Tuple of (response_text, token_usage_dict) where token_usage_dict contains:
@@ -42,14 +44,14 @@ async def generate_completion(
     provider = settings.ai_provider.lower()
     
     if provider == "gemini":
-        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search, conversation_history)
+        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search, conversation_history, image_attachments)
     elif provider == "openai":
         if use_search:
             # OpenAI doesn't have built-in search, fall back to standard completion
             print("Warning: Web search not supported by OpenAI, using standard completion")
         # Use model from settings if not explicitly provided
         openai_model = model or settings.openai_model
-        return await _generate_with_openai(system_prompt, user_message, openai_model, temperature, conversation_history)
+        return await _generate_with_openai(system_prompt, user_message, openai_model, temperature, conversation_history, image_attachments)
     else:
         raise Exception(f"Unknown AI provider: {provider}")
 
@@ -58,10 +60,11 @@ async def _generate_with_openai(
     user_message: str,
     model: str = "gpt-4o",
     temperature: float = 0.7,
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    image_attachments: Optional[List[Dict[str, Any]]] = None
 ) -> tuple[str, Dict[str, Any]]:
     """
-    Generate a completion using OpenAI API
+    Generate a completion using OpenAI API with optional vision support
     
     Args:
         system_prompt: System instructions
@@ -69,6 +72,7 @@ async def _generate_with_openai(
         model: Model name
         temperature: Generation temperature
         conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
+        image_attachments: Optional list of image attachments for vision [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
     
     Returns:
         Tuple of (response_text, token_usage_dict)
@@ -92,8 +96,23 @@ async def _generate_with_openai(
                     "content": msg.get("content", "")
                 })
         
-        # Add current user message
-        messages.append({"role": "user", "content": user_message})
+        # Build user message content (with optional images for vision)
+        if image_attachments and len(image_attachments) > 0:
+            # Use multimodal content format for vision
+            user_content = [{"type": "text", "text": user_message}]
+            for img in image_attachments:
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{img['type']};base64,{img['data']}",
+                        "detail": "high"
+                    }
+                })
+            messages.append({"role": "user", "content": user_content})
+            print(f"OpenAI: Processing {len(image_attachments)} image(s) for vision analysis")
+        else:
+            # Standard text-only message
+            messages.append({"role": "user", "content": user_message})
         
         response = openai_client.chat.completions.create(
             model=model,
@@ -120,10 +139,11 @@ async def _generate_with_gemini(
     user_message: str,
     temperature: float = 0.7,
     use_search: bool = False,
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    image_attachments: Optional[List[Dict[str, Any]]] = None
 ) -> tuple[str, Dict[str, Any]]:
     """
-    Generate a completion using Google Gemini API (new google-genai SDK)
+    Generate a completion using Google Gemini API (new google-genai SDK) with optional vision support
     
     Args:
         system_prompt: System instructions
@@ -131,6 +151,7 @@ async def _generate_with_gemini(
         temperature: Generation temperature
         use_search: Enable Google Search grounding for web searches
         conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
+        image_attachments: Optional list of image attachments for vision [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
     
     Returns:
         Tuple of (response_text, token_usage_dict)
@@ -139,6 +160,8 @@ async def _generate_with_gemini(
         raise Exception("Gemini API key not configured")
     
     try:
+        import base64
+        
         # Build conversation history string if provided
         history_text = ""
         if conversation_history:
@@ -167,10 +190,22 @@ async def _generate_with_gemini(
         
         config = types.GenerateContentConfig(**config_params)
         
+        # Build contents with optional images for vision
+        if image_attachments and len(image_attachments) > 0:
+            # Use multimodal content format for vision
+            contents = [combined_prompt]
+            for img in image_attachments:
+                # Decode base64 and create Part with inline_data
+                image_bytes = base64.b64decode(img['data'])
+                contents.append(types.Part.from_bytes(data=image_bytes, mime_type=img['type']))
+            print(f"Gemini: Processing {len(image_attachments)} image(s) for vision analysis")
+        else:
+            contents = combined_prompt
+        
         # Generate content using new SDK
         response = gemini_client.models.generate_content(
             model=settings.gemini_model,
-            contents=combined_prompt,
+            contents=contents,
             config=config,
         )
         
@@ -239,8 +274,8 @@ Create a profile following this structure:
 
 Extract actual information from the CV. Be specific and use real data points."""
 
-    result, _ = await generate_completion(system_prompt, cv_text)
-    return result
+    result, token_usage = await generate_completion(system_prompt, cv_text)
+    return result, token_usage
 
 async def analyze_writing_style(posts: List[str]) -> tuple[str, Dict[str, Any]]:
     """
@@ -280,8 +315,8 @@ Create a guide following this structure:
 Be specific and use examples from the posts provided."""
 
     posts_text = "\n\n---POST---\n\n".join(posts)
-    result, _ = await generate_completion(system_prompt, f"Analyze these posts:\n\n{posts_text}")
-    return result
+    result, token_usage = await generate_completion(system_prompt, f"Analyze these posts:\n\n{posts_text}")
+    return result, token_usage
 
 async def generate_context_json(cv_text: str, profile_md: str) -> Dict:
     """

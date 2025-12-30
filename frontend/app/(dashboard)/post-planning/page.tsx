@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { LinkedInPostPreview } from "@/components/LinkedInPostPreview";
-import { Calendar, Clock, Edit2, Trash2, MoreHorizontal } from "lucide-react";
+import { PostHistoryItem } from "@/components/PostHistoryItem";
+import { Calendar, Plus } from "lucide-react";
 import { api } from "@/lib/api-client";
 
 export default function HistoryPage() {
+  const router = useRouter();
   const [posts, setPosts] = useState<any[]>([]);
-  const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState("all");
   const [user, setUser] = useState<any>(null);
@@ -26,12 +25,8 @@ export default function HistoryPage() {
 
   const loadHistory = async () => {
     try {
-      const [postsRes, commentsRes] = await Promise.all([
-        api.generate.getHistory("post", 50),
-        api.generate.getHistory("comment", 50),
-      ]);
+      const postsRes = await api.generate.getHistory("post", 50);
       setPosts(postsRes.data);
-      setComments(commentsRes.data);
     } catch (error) {
       console.error("Failed to load history:", error);
     } finally {
@@ -41,7 +36,16 @@ export default function HistoryPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // Could add toast notification
+  };
+
+  const handlePublish = (postId: string) => {
+    // TODO: Implement LinkedIn publishing
+    alert("LinkedIn publishing coming soon!");
+  };
+
+  const handleSchedule = (postId: string) => {
+    // TODO: Implement scheduling modal
+    alert("Scheduling feature coming soon!");
   };
 
   if (loading) {
@@ -55,13 +59,25 @@ export default function HistoryPage() {
     );
   }
 
+  // Count posts by status
+  const publishedCount = posts.filter((p) => p.published_to_linkedin).length;
+  const scheduledCount = posts.filter((p) => p.scheduled_at && !p.published_to_linkedin).length;
+  const draftCount = posts.filter((p) => !p.published_to_linkedin && !p.scheduled_at).length;
+
   const filteredPosts = posts.filter((post) => {
     if (filterTab === "all") return true;
-    if (filterTab === "scheduled") return false; // TODO: Add scheduled field
+    if (filterTab === "scheduled") return post.scheduled_at && !post.published_to_linkedin;
     if (filterTab === "published") return post.published_to_linkedin;
-    if (filterTab === "drafts") return !post.published_to_linkedin;
+    if (filterTab === "drafts") return !post.published_to_linkedin && !post.scheduled_at;
     return true;
   });
+
+  // User profile for post previews
+  const userProfile = {
+    name: user?.name || "Your Name",
+    headline: "Professional | Content Creator",
+    avatar: user?.linkedin_profile_picture,
+  };
 
   return (
     <div className="min-h-screen bg-[#F3F2F0] py-8">
@@ -73,185 +89,86 @@ export default function HistoryPage() {
               Manage your content calendar and track your posts
             </p>
           </div>
-          <Button className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full">
-            <Calendar className="w-4 h-4 mr-2" />
-            Schedule Post
+          <Button 
+            onClick={() => router.push("/generate")}
+            className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create New Post
           </Button>
         </div>
 
-        <Tabs defaultValue="posts" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-linkedin-md border border-[#E0DFDC] p-1">
-            <TabsList className="grid w-full grid-cols-2 bg-transparent gap-1">
-              <TabsTrigger 
-                value="posts"
-                className="data-[state=active]:bg-[#E7F3FF] data-[state=active]:text-[#0A66C2] rounded-lg"
-              >
-                Posts ({posts.length})
-              </TabsTrigger>
-              <TabsTrigger 
-                value="comments"
-                className="data-[state=active]:bg-[#E7F3FF] data-[state=active]:text-[#0A66C2] rounded-lg"
-              >
-                Comments ({comments.length})
-              </TabsTrigger>
-        </TabsList>
-          </div>
-
-          <TabsContent value="posts" className="space-y-6">
-            {/* Filter Tabs */}
-            <div className="bg-white rounded-lg shadow-linkedin-sm border border-[#E0DFDC] p-2 flex gap-2">
-              {["all", "scheduled", "published", "drafts"].map((tab) => (
+        <div className="space-y-6">
+            {/* Filter Tabs with counts */}
+            <div className="bg-white rounded-lg shadow-linkedin-sm border border-[#E0DFDC] p-2 flex gap-2 flex-wrap">
+              {[
+                { key: "all", label: "All", count: posts.length },
+                { key: "drafts", label: "Drafts", count: draftCount },
+                { key: "scheduled", label: "Scheduled", count: scheduledCount },
+                { key: "published", label: "Published", count: publishedCount },
+              ].map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setFilterTab(tab)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filterTab === tab
+                  key={tab.key}
+                  onClick={() => setFilterTab(tab.key)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                    filterTab === tab.key
                       ? "bg-[#0A66C2] text-white"
                       : "text-[#666666] hover:bg-[#F3F2F0]"
                   }`}
                 >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab.label}
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      filterTab === tab.key
+                        ? "bg-white/20 text-white"
+                        : "bg-[#E0DFDC] text-[#666666]"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
                 </button>
               ))}
             </div>
 
             {/* Posts List */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {filteredPosts.length === 0 ? (
                 <Card className="p-12 text-center bg-white border border-[#E0DFDC] shadow-linkedin-sm">
                   <Calendar className="w-16 h-16 text-[#666666] mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-black mb-2">No posts yet</h3>
-                  <p className="text-[#666666]">
+                  <p className="text-[#666666] mb-4">
                     Start creating content in the Copilot to see your posts here
                   </p>
-              </Card>
-            ) : (
-                filteredPosts.map((post) => (
-                  <div key={post.id} className="bg-white rounded-xl shadow-linkedin-md border border-[#E0DFDC] overflow-hidden">
-                    {/* Post Header */}
-                    <div className="px-6 py-4 border-b border-[#E0DFDC] flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge 
-                          variant="outline" 
-                          className="border-[#0A66C2] text-[#0A66C2] bg-[#E7F3FF]"
-                        >
-                          {post.format}
-                        </Badge>
-                        <div className="flex items-center gap-2 text-sm text-[#666666]">
-                          <Clock className="w-4 h-4" />
-                          <span>
-                            {new Date(post.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-[#666666] hover:text-[#0A66C2]"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-[#666666] hover:text-[#CC1016]"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-[#666666]"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Post Preview */}
-                    <div className="p-6">
-                      <LinkedInPostPreview
-                        postContent={post.content}
-                        formatType={post.format}
-                        imagePrompt={post.generation_options?.image_prompt}
-                        imagePrompts={post.generation_options?.image_prompts}
-                        userProfile={{
-                          name: user?.name || "Your Name",
-                          headline: "Professional | Content Creator",
-                          avatar: user?.linkedin_profile_picture,
-                        }}
-                        onCopyText={() => copyToClipboard(post.content)}
-                        onCopyImagePrompt={() => {
-                          const imagePrompt = post.generation_options?.image_prompt;
-                          if (imagePrompt) {
-                            copyToClipboard(imagePrompt);
-                          }
-                        }}
-                        onCopySlidePrompts={() => {
-                          const imagePrompts = post.generation_options?.image_prompts;
-                          if (imagePrompts && Array.isArray(imagePrompts) && imagePrompts.length > 0) {
-                            // Format slide prompts nicely: one per line with slide numbers
-                            const formattedPrompts = imagePrompts
-                              .map((prompt: string, index: number) => `Slide ${index + 1}:\n${prompt}`)
-                              .join('\n\n');
-                            copyToClipboard(formattedPrompts);
-                          }
-                        }}
-                        onRegenerateImage={() => {
-                          alert("Image generation coming soon! The prompt will be sent to an AI image generator.");
-                        }}
-                        onDownloadImage={() => alert("Image download coming soon!")}
-                        onRegenerate={() => alert("Regenerate from history coming soon!")}
-                        onSchedule={() => alert("Schedule feature coming soon!")}
-                        onPost={() => alert("LinkedIn posting coming soon!")}
-                        className="max-w-full"
-                      />
-                  </div>
-                  </div>
-              ))
-            )}
-          </div>
-        </TabsContent>
-
-          <TabsContent value="comments" className="space-y-4">
-            {comments.length === 0 ? (
-              <Card className="p-12 text-center bg-white border border-[#E0DFDC] shadow-linkedin-sm">
-                <p className="text-[#666666]">No comments generated yet.</p>
-              </Card>
-            ) : (
-              comments.map((comment) => (
-                <Card key={comment.id} className="p-6 bg-white border border-[#E0DFDC] shadow-linkedin-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <Badge className="bg-[#E7F3FF] text-[#0A66C2] border border-[#0A66C2]">
-                      Score: {comment.worthiness_score}/24
-                    </Badge>
-                    <span className="text-xs text-[#666666]">
-                      {new Date(comment.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="bg-[#F3F2F0] p-4 rounded-lg mb-4">
-                    <p className="whitespace-pre-wrap text-sm text-black">
-                      {comment.content}
-                    </p>
-                  </div>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(comment.content)}
-                    className="border-[#E0DFDC] hover:border-[#0A66C2]"
+                    onClick={() => router.push("/generate")}
+                    className="bg-[#0A66C2] hover:bg-[#004182] text-white"
                   >
-                    📋 Copy
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Post
                   </Button>
                 </Card>
-              ))
-            )}
-        </TabsContent>
-      </Tabs>
+              ) : (
+                filteredPosts.map((post) => (
+                  <PostHistoryItem
+                    key={post.id}
+                    post={{
+                      id: post.id,
+                      content: post.content,
+                      format: post.format,
+                      created_at: post.created_at,
+                      conversation_id: post.conversation_id,
+                      published_to_linkedin: post.published_to_linkedin,
+                      scheduled_at: post.scheduled_at,
+                      generation_options: post.generation_options,
+                    }}
+                    userProfile={userProfile}
+                    onPublish={handlePublish}
+                    onSchedule={handleSchedule}
+                  />
+                ))
+              )}
+            </div>
+        </div>
       </div>
     </div>
   );

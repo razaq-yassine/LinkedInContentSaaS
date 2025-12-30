@@ -111,6 +111,7 @@ class ConversationMessage(Base):
     role = Column(SQLEnum(MessageRole), nullable=False)
     content = Column(Text, nullable=False)
     post_id = Column(String(36), ForeignKey("generated_posts.id", ondelete="SET NULL"))
+    attachments = Column(JSON)  # Image attachments for user messages
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     
     # Relationships

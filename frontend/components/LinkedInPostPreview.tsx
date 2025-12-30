@@ -23,7 +23,10 @@ import {
   Maximize2,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Wand2,
 } from 'lucide-react';
+import { Textarea } from './ui/textarea';
 import { CarouselSlider } from './CarouselSlider';
 import { CarouselPDFLoading } from './CarouselPDFLoading';
 import { FullscreenImageViewer } from './FullscreenImageViewer';
@@ -62,6 +65,8 @@ interface LinkedInPostPreviewProps {
   onCopyImagePrompt?: () => void;
   onCopySlidePrompts?: () => void; // For carousel posts
   onRegenerateImage?: () => void;
+  onGenerateImageWithPrompt?: (customPrompt: string) => void; // Generate image with custom prompt
+  onRegenerateImagePrompt?: () => Promise<string | undefined>; // Regenerate image prompt, returns new prompt
   onRegeneratePDF?: (slideIndices?: number[]) => void; // For carousel PDF regeneration with optional slide indices
   onRegenerateSlide?: (slideIndex: number) => void; // For regenerating a single slide
   onDownloadImage?: () => void;
@@ -194,6 +199,8 @@ export function LinkedInPostPreview({
   onCopyImagePrompt,
   onCopySlidePrompts,
   onRegenerateImage,
+  onGenerateImageWithPrompt,
+  onRegenerateImagePrompt,
   onRegeneratePDF,
   onRegenerateSlide,
   onDownloadImage,
@@ -225,6 +232,9 @@ export function LinkedInPostPreview({
   const [showFullscreenImage, setShowFullscreenImage] = useState(false);
   const [showFullscreenCarousel, setShowFullscreenCarousel] = useState(false);
   const [currentCarouselSlide, setCurrentCarouselSlide] = useState(currentSlideIndex);
+  const [showRegenerateImageModal, setShowRegenerateImageModal] = useState(false);
+  const [editableImagePrompt, setEditableImagePrompt] = useState(imagePrompt || '');
+  const [isRegeneratingPrompt, setIsRegeneratingPrompt] = useState(false);
 
   // Update local state when prop changes (e.g., after regeneration)
   useEffect(() => {
@@ -610,9 +620,12 @@ export function LinkedInPostPreview({
           )}
 
           {/* Regenerate Image - Show for image posts */}
-          {formatType === 'image' && onRegenerateImage && (
+          {formatType === 'image' && (onRegenerateImage || onGenerateImageWithPrompt) && (
             <Button
-              onClick={onRegenerateImage}
+              onClick={() => {
+                setEditableImagePrompt(imagePrompt || '');
+                setShowRegenerateImageModal(true);
+              }}
               variant="outline"
               size="sm"
               disabled={!imagePrompt || generatingImage}
@@ -892,6 +905,99 @@ export function LinkedInPostPreview({
         regeneratingSlideIndex={regeneratingSlideIndex}
         initialSlide={currentCarouselSlide}
       />
+
+      {/* Regenerate Image Modal */}
+      {showRegenerateImageModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowRegenerateImageModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-[#E0DFDC]">
+              <h3 className="text-lg font-semibold text-black flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-[#0A66C2]" />
+                Regenerate Image
+              </h3>
+              <button
+                onClick={() => setShowRegenerateImageModal(false)}
+                className="text-[#666666] hover:text-black hover:bg-[#F3F2F0] rounded-full p-1.5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#333333] mb-2">
+                  Image Prompt
+                </label>
+                <Textarea
+                  value={editableImagePrompt}
+                  onChange={(e) => setEditableImagePrompt(e.target.value)}
+                  placeholder="Enter a description for the image..."
+                  className="min-h-[120px] text-sm resize-none"
+                  disabled={generatingImage || isRegeneratingPrompt}
+                />
+                <p className="text-xs text-[#666666] mt-1">
+                  Edit the prompt above to customize the generated image
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-[#E0DFDC] bg-[#F9F9F9] flex flex-col gap-2">
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                {/* Regenerate Prompt Button */}
+                {onRegenerateImagePrompt && (
+                  <Button
+                    onClick={async () => {
+                      setIsRegeneratingPrompt(true);
+                      try {
+                        const newPrompt = await onRegenerateImagePrompt();
+                        if (newPrompt) {
+                          setEditableImagePrompt(newPrompt);
+                        }
+                      } finally {
+                        setIsRegeneratingPrompt(false);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    disabled={generatingImage || isRegeneratingPrompt}
+                    className="flex items-center gap-2 flex-1"
+                  >
+                    <Wand2 className={`w-4 h-4 ${isRegeneratingPrompt ? 'animate-pulse' : ''}`} />
+                    <span>{isRegeneratingPrompt ? 'Regenerating...' : 'Regenerate Prompt'}</span>
+                  </Button>
+                )}
+
+                {/* Generate Image Button */}
+                <Button
+                  onClick={() => {
+                    if (onGenerateImageWithPrompt) {
+                      onGenerateImageWithPrompt(editableImagePrompt);
+                      setShowRegenerateImageModal(false);
+                    } else if (onRegenerateImage) {
+                      onRegenerateImage();
+                      setShowRegenerateImageModal(false);
+                    }
+                  }}
+                  size="sm"
+                  disabled={!editableImagePrompt.trim() || generatingImage || isRegeneratingPrompt}
+                  className="flex items-center gap-2 flex-1 bg-[#0A66C2] hover:bg-[#004182] text-white"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Generate Image</span>
+                </Button>
+              </div>
+
+              <p className="text-xs text-[#666666] text-center">
+                Use &quot;Regenerate Prompt&quot; to get a new AI-generated prompt, or edit manually and click &quot;Generate Image&quot;
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
