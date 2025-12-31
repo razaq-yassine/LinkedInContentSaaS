@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from .config import get_settings
 from .database import engine, Base
 from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription
+from .services.scheduler_service import start_scheduler, stop_scheduler
 
 settings = get_settings()
 
@@ -91,6 +92,25 @@ async def startup_event():
         except Exception as e:
             print(f"⚠️  Database connection warning: {e}")
             print("💡 Make sure migrations are up to date: alembic upgrade head")
+    
+    # Start the scheduler for publishing scheduled posts
+    try:
+        start_scheduler()
+        print("✅ Scheduler started - checking for scheduled posts every 5 minutes")
+    except Exception as e:
+        print(f"⚠️  Failed to start scheduler: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Cleanup on shutdown.
+    """
+    # Stop the scheduler gracefully
+    try:
+        stop_scheduler()
+        print("✅ Scheduler stopped")
+    except Exception as e:
+        print(f"⚠️  Error stopping scheduler: {e}")
 
 @app.get("/")
 async def root():

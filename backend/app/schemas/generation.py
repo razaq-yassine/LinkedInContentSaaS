@@ -87,4 +87,25 @@ class GenerationHistoryResponse(BaseModel):
 class UpdateGenerationRequest(BaseModel):
     content: str
 
+class SchedulePostRequest(BaseModel):
+    scheduled_at: datetime  # UTC datetime
+    timezone: Optional[str] = None  # User's timezone for display purposes
+
+class ScheduledPostResponse(BaseModel):
+    id: str
+    content: str
+    format: Optional[str]
+    scheduled_at: datetime
+    conversation_id: Optional[str] = None
+    generation_options: Optional[Dict[str, Any]] = None
+    
+    class Config:
+        from_attributes = True
+
+class ScheduledPostsListResponse(BaseModel):
+    posts: List[ScheduledPostResponse]
+    
+    class Config:
+        from_attributes = True
+
 

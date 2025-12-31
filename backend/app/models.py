@@ -137,6 +137,7 @@ class GeneratedPost(Base):
     user_edited_content = Column(Text)
     user_rating = Column(Integer)  # 1-5 stars
     published_to_linkedin = Column(Boolean, default=False)
+    scheduled_at = Column(DateTime, nullable=True, index=True)
     
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     

@@ -95,6 +95,7 @@ interface LinkedInPostPreviewProps {
   onSelectImage?: (imageId: string) => void;
   onSelectPDF?: (pdfId: string) => void;
   published?: boolean; // Whether the post has been published
+  onTogglePublished?: (published: boolean) => void; // Toggle published status
   className?: string;
 }
 
@@ -230,6 +231,7 @@ export function LinkedInPostPreview({
   onSelectImage,
   onSelectPDF,
   published = false,
+  onTogglePublished,
   className = '',
 }: LinkedInPostPreviewProps) {
   const [showFullscreenImage, setShowFullscreenImage] = useState(false);
@@ -730,22 +732,23 @@ export function LinkedInPostPreview({
           {/* Divider */}
           <div className="h-5 w-px bg-[#E0DFDC] mx-0.5" />
 
-          {/* Schedule */}
-          {onSchedule && (
+          {/* Schedule - Hide for video scripts and published posts */}
+          {onSchedule && formatType !== "video_script" && (
             <Button
               onClick={onSchedule}
               variant="outline"
               size="sm"
+              disabled={published}
               className="flex items-center gap-1 h-7 text-xs px-2"
-              title="Schedule for later"
+              title={published ? "Cannot schedule published posts" : "Schedule for later"}
             >
               <Calendar className="w-3 h-3" />
               <span>Schedule</span>
             </Button>
           )}
 
-          {/* Post to LinkedIn */}
-          {onPost && (
+          {/* Post to LinkedIn - Hide for video scripts */}
+          {onPost && formatType !== "video_script" && (
             <div className="flex items-center gap-2">
               <Button
                 onClick={onPost}
@@ -782,6 +785,33 @@ export function LinkedInPostPreview({
                   </>
                 )}
               </Button>
+              
+              {/* Toggle Published Status - Show next to Publish button */}
+              {onTogglePublished && (
+                <Button
+                  onClick={() => onTogglePublished(!published)}
+                  variant="outline"
+                  size="sm"
+                  className={`flex items-center gap-1 h-7 text-xs px-2 ${
+                    published
+                      ? "border-red-500 text-red-600 hover:bg-red-50"
+                      : "border-green-500 text-green-600 hover:bg-green-50"
+                  }`}
+                  title={published ? "Mark as not published" : "Mark as published"}
+                >
+                  {published ? (
+                    <>
+                      <X className="w-3 h-3" />
+                      <span>Mark Unpublished</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Mark Published</span>
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           )}
         </div>

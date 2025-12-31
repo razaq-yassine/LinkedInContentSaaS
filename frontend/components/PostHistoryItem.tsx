@@ -19,8 +19,10 @@ import {
   ExternalLink,
   CheckCircle2,
   FileText,
+  XCircle,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/toaster";
 
 type PostStatus = "draft" | "scheduled" | "published";
 
@@ -46,6 +48,7 @@ interface PostHistoryItemProps {
   defaultOpen?: boolean;
   onPublish?: (postId: string) => void;
   onSchedule?: (postId: string) => void;
+  onTogglePublished?: (postId: string, published: boolean) => void;
 }
 
 export function PostHistoryItem({
@@ -54,8 +57,11 @@ export function PostHistoryItem({
   defaultOpen,
   onPublish,
   onSchedule,
+  onTogglePublished,
 }: PostHistoryItemProps) {
   const router = useRouter();
+  const { addToast } = useToast();
+  const [toggling, setToggling] = useState(false);
   const [isOpen, setIsOpen] = useState(defaultOpen ?? true);
   
   // Image/PDF state for post preview
@@ -160,7 +166,25 @@ export function PostHistoryItem({
     navigator.clipboard.writeText(text);
   };
 
-  const canPublishOrSchedule = status === "draft";
+  // Video scripts cannot be published or scheduled
+  const canPublishOrSchedule = status === "draft" && post.format !== "video_script";
+  
+  const handleTogglePublished = async () => {
+    if (!onTogglePublished) return;
+    
+    setToggling(true);
+    try {
+      await onTogglePublished(post.id, !post.published_to_linkedin);
+    } catch (error) {
+      addToast({
+        title: "Error",
+        description: "Failed to update published status",
+        variant: "error",
+      });
+    } finally {
+      setToggling(false);
+    }
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -197,15 +221,25 @@ export function PostHistoryItem({
                 {getPostTitle()}
               </span>
 
-              {/* Date */}
+              {/* Date and Time */}
               <div className="flex items-center gap-1.5 text-xs text-[#666666] flex-shrink-0">
                 <Clock className="w-3.5 h-3.5" />
                 <span>
-                  {new Date(post.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {post.scheduled_at
+                    ? new Date(post.scheduled_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : new Date(post.created_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
                 </span>
               </div>
             </div>
@@ -228,14 +262,15 @@ export function PostHistoryItem({
                 </Button>
               )}
 
-              {/* Schedule Button */}
-              {canPublishOrSchedule && onSchedule && (
+              {/* Schedule Button - Disabled for published posts */}
+              {onSchedule && !post.published_to_linkedin && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onSchedule(post.id)}
-                  className="text-[#666666] hover:text-amber-600 hover:bg-amber-50"
-                  title="Schedule post"
+                  disabled={post.published_to_linkedin}
+                  className="text-[#666666] hover:text-amber-600 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={post.published_to_linkedin ? "Cannot schedule published posts" : "Schedule post"}
                 >
                   <Calendar className="w-4 h-4" />
                 </Button>
@@ -320,8 +355,8 @@ export function PostHistoryItem({
                 </Button>
               )}
 
-              {/* Schedule Button */}
-              {canPublishOrSchedule && onSchedule && (
+              {/* Schedule Button - Disabled for published posts */}
+              {onSchedule && !post.published_to_linkedin && (
                 <Button
                   onClick={() => onSchedule(post.id)}
                   variant="outline"
@@ -332,8 +367,34 @@ export function PostHistoryItem({
                 </Button>
               )}
 
+              {/* Toggle Published Status Button */}
+              {onTogglePublished && (
+                <Button
+                  onClick={handleTogglePublished}
+                  variant="outline"
+                  disabled={toggling}
+                  className={
+                    post.published_to_linkedin
+                      ? "border-red-300 text-red-600 hover:bg-red-50"
+                      : "border-green-300 text-green-600 hover:bg-green-50"
+                  }
+                >
+                  {post.published_to_linkedin ? (
+                    <>
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Mark as Not Published
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Mark as Published
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Status indicator for published/scheduled */}
-              {status === "published" && (
+              {status === "published" && !onTogglePublished && (
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="font-medium">Published to LinkedIn</span>

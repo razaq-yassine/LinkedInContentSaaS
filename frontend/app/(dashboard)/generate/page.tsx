@@ -55,6 +55,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PublishingModal } from "@/components/PublishingModal";
+import { ScheduleModal } from "@/components/ScheduleModal";
 
 interface MessageAttachment {
   type: string;
@@ -140,7 +141,7 @@ function parseJsonContent(content: string): {
     length: cleaned.length,
     has_backticks: cleaned.includes('```')
   });
-  
+
   // Remove markdown code blocks if present
   // Handle ```json ... ``` or ``` ... ```
   // Also handle cases where there might be quotes around it: "```json\n{..."
@@ -157,7 +158,7 @@ function parseJsonContent(content: string): {
       length: cleaned.length
     });
   }
-  
+
   if (cleaned.includes('```')) {
     // Remove opening code block marker (handle both ```json and ```)
     // Use more aggressive regex to handle various formats
@@ -176,19 +177,19 @@ function parseJsonContent(content: string): {
       still_has_backticks: cleaned.includes('```')
     });
   }
-  
+
   // Check if it looks like JSON - find the first { and last }
   // This is more robust than regex matching
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
-  
+
   console.log('🔍 Step 4 - Brace positions:', {
     firstBrace,
     lastBrace,
     preview_before: cleaned.substring(0, 100),
     preview_after: cleaned.substring(Math.max(0, cleaned.length - 100))
   });
-  
+
   if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
     console.log('⚠️ No valid JSON braces found:', {
       firstBrace,
@@ -197,10 +198,10 @@ function parseJsonContent(content: string): {
     });
     return null;
   }
-  
+
   // Extract just the JSON part (from first { to last })
   cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-  
+
   console.log('🔍 Step 5 - Extracted JSON:', {
     length: cleaned.length,
     first_100: cleaned.substring(0, 100),
@@ -208,7 +209,7 @@ function parseJsonContent(content: string): {
     has_post_content: cleaned.includes('"post_content"'),
     has_format_type: cleaned.includes('"format_type"')
   });
-  
+
   // Check if it contains JSON-like structure
   if (!cleaned.includes('"post_content"') && !cleaned.includes('"format_type"')) {
     console.log('⚠️ No post_content or format_type found');
@@ -223,7 +224,7 @@ function parseJsonContent(content: string): {
       format_type: parsed.format_type,
       keys: Object.keys(parsed)
     });
-    
+
     if (typeof parsed !== 'object' || parsed === null) {
       console.log('⚠️ Parsed result is not an object:', typeof parsed);
       return null;
@@ -286,7 +287,7 @@ function parseJsonContent(content: string): {
     // Not valid JSON - this is expected for non-JSON content, so use warn instead of error
     // Only log detailed info if it actually looked like JSON
     const lookedLikeJson = cleaned.includes('"post_content"') || cleaned.includes('"format_type"');
-    
+
     if (lookedLikeJson) {
       console.warn('⚠️ JSON parsing failed in parseJsonContent (will attempt fix):', {
         error: e?.message || String(e) || 'Unknown error',
@@ -295,39 +296,39 @@ function parseJsonContent(content: string): {
         cleaned_length: cleaned.length
       });
     }
-    
+
     // Try to find and fix common JSON issues
     // The most common issue is unescaped newlines in string values
     try {
       console.log('🔧 Attempting to fix JSON by escaping newlines in strings...');
-      
+
       // Smart fix: escape newlines only inside string values (between quotes)
       let fixed = '';
       let inString = false;
       let escapeNext = false;
-      
+
       for (let i = 0; i < cleaned.length; i++) {
         const char = cleaned[i];
         const prevChar = i > 0 ? cleaned[i - 1] : '';
-        
+
         if (escapeNext) {
           fixed += char;
           escapeNext = false;
           continue;
         }
-        
+
         if (char === '\\') {
           escapeNext = true;
           fixed += char;
           continue;
         }
-        
+
         if (char === '"' && prevChar !== '\\') {
           inString = !inString;
           fixed += char;
           continue;
         }
-        
+
         if (inString) {
           // Inside a string - escape newlines
           if (char === '\n') {
@@ -342,10 +343,10 @@ function parseJsonContent(content: string): {
           fixed += char;
         }
       }
-      
+
       console.log('🔧 Fixed JSON preview:', fixed.substring(0, 300));
       const parsedFixed = JSON.parse(fixed);
-      
+
       if (parsedFixed && parsedFixed.post_content) {
         console.log('✅ Successfully fixed and parsed JSON!');
         return {
@@ -362,7 +363,7 @@ function parseJsonContent(content: string): {
         error_name: fixError?.name
       });
     }
-    
+
     return null;
   }
 }
@@ -384,6 +385,8 @@ export default function GeneratePage() {
   const [publishingModalOpen, setPublishingModalOpen] = useState(false);
   const [publishingStatus, setPublishingStatus] = useState<"publishing" | "success" | "error">("publishing");
   const [publishingError, setPublishingError] = useState<string>("");
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [postToSchedule, setPostToSchedule] = useState<{ id: string; content: string; formatType?: string; published?: boolean } | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showContextModal, setShowContextModal] = useState(false);
   const [hasContext, setHasContext] = useState(false);
@@ -415,7 +418,7 @@ export default function GeneratePage() {
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Image upload constants
   const MAX_IMAGES = 4;
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB per image
@@ -657,7 +660,7 @@ export default function GeneratePage() {
 
   const convertImagesToBase64 = async (): Promise<Array<{ type: string; data: string; name: string }>> => {
     const attachments: Array<{ type: string; data: string; name: string }> = [];
-    
+
     for (const file of uploadedImages) {
       const base64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -669,14 +672,14 @@ export default function GeneratePage() {
         };
         reader.readAsDataURL(file);
       });
-      
+
       attachments.push({
         type: file.type,
         data: base64,
         name: file.name
       });
     }
-    
+
     return attachments;
   };
 
@@ -693,7 +696,7 @@ export default function GeneratePage() {
         let imagePrompts = msg.image_prompts;
         let metadata = msg.metadata;
         let tokenUsage = msg.token_usage; // Include token_usage from backend
-        
+
         // Use the parseJsonContent utility function
         if (typeof content === 'string' && content.trim().length > 0) {
           const trimmed = content.trim();
@@ -723,7 +726,7 @@ export default function GeneratePage() {
             }
           }
         }
-        
+
         // Convert stored attachments to display format (base64 to data URL for preview)
         let attachments: MessageAttachment[] | undefined = undefined;
         if (msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0) {
@@ -734,7 +737,7 @@ export default function GeneratePage() {
             preview: `data:${att.type};base64,${att.data}`
           }));
         }
-        
+
         return {
           id: msg.id,
           role: msg.role, // "user" or "assistant"
@@ -758,7 +761,7 @@ export default function GeneratePage() {
       for (const msg of uiMessages) {
         if (msg.role === "assistant" && msg.post_id) {
           newPostIdMap[msg.id] = msg.post_id;
-          
+
           // Track published posts from backend
           if (msg.published_to_linkedin) {
             publishedPostsSet.add(msg.post_id);
@@ -1159,7 +1162,7 @@ export default function GeneratePage() {
 
       // Convert uploaded images to base64 attachments for API
       const imageAttachments = uploadedImages.length > 0 ? await convertImagesToBase64() : undefined;
-      
+
       // Clear uploaded images after preparing attachments
       if (uploadedImages.length > 0) {
         clearAllImages();
@@ -1351,7 +1354,7 @@ export default function GeneratePage() {
     if (!postToPublish) return "";
     const msg = messages.find(m => postIdMap[m.id] === postToPublish);
     const isPublished = msg?.published_to_linkedin || publishedPosts.has(postToPublish);
-    return isPublished 
+    return isPublished
       ? "This post has already been published to LinkedIn. Are you sure you want to publish it again?"
       : "This post will be published to your LinkedIn profile and will be visible to your network. Are you sure you want to continue?";
   };
@@ -1369,7 +1372,7 @@ export default function GeneratePage() {
       if (response.data.success) {
         // Update published status in state
         setPublishedPosts(prev => new Set(prev).add(postId));
-        
+
         // Update published status in messages
         setMessages(prev => prev.map(m => {
           if (m.post_id === postId) {
@@ -1377,7 +1380,7 @@ export default function GeneratePage() {
           }
           return m;
         }));
-        
+
         addToast({
           title: "Published successfully!",
           description: "Your post has been published to LinkedIn.",
@@ -1397,6 +1400,43 @@ export default function GeneratePage() {
     }
   }
 
+  const handleTogglePublished = async (postId: string, published: boolean) => {
+    try {
+      await api.generate.togglePublishedStatus(postId, published);
+
+      // Update published status in state
+      if (published) {
+        setPublishedPosts(prev => new Set(prev).add(postId));
+      } else {
+        setPublishedPosts(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
+      }
+
+      // Update published status in messages
+      setMessages(prev => prev.map(m => {
+        if (m.post_id === postId || postIdMap[m.id] === postId) {
+          return { ...m, published_to_linkedin: published };
+        }
+        return m;
+      }));
+
+      addToast({
+        title: "Success",
+        description: `Post marked as ${published ? "published" : "not published"}`,
+        variant: "success",
+      });
+    } catch (error: any) {
+      addToast({
+        title: "Error",
+        description: error.response?.data?.detail || "Failed to update published status",
+        variant: "error",
+      });
+    }
+  };
+
   async function publishPostWithModal(postId: string) {
     // Show publishing modal
     setPublishingModalOpen(true);
@@ -1408,7 +1448,7 @@ export default function GeneratePage() {
       if (response.data.success) {
         // Update published status in state
         setPublishedPosts(prev => new Set(prev).add(postId));
-        
+
         // Update published status in messages
         setMessages(prev => prev.map(m => {
           if (m.post_id === postId) {
@@ -1416,7 +1456,7 @@ export default function GeneratePage() {
           }
           return m;
         }));
-        
+
         // Show success state
         setPublishingStatus("success");
       }
@@ -1431,997 +1471,1022 @@ export default function GeneratePage() {
     <>
       <TokenUsage tokenUsage={tokenUsage} />
       <div className="min-h-screen bg-[#F3F2F0]">
-      {/* Top Banner - Only show when no conversation */}
-      {messages.length === 0 && (
-        <div className="bg-white border-b border-[#E0DFDC] py-2 sm:py-3 px-3 sm:px-4">
-          <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#0A66C2] flex-shrink-0" />
-            <span className="text-xs sm:text-base font-medium text-[#666666]">
-            Trained on posts of top LinkedIn creators
-          </span>
-          <div className="flex -space-x-2">
-            {topCreators.map((creator, idx) => (
-                <Avatar key={idx} className="w-7 h-7 sm:w-9 sm:h-9 border-2 border-white">
-                <AvatarImage src={creator.image} alt={creator.name} />
-                  <AvatarFallback className="bg-[#0A66C2] text-white text-[10px] sm:text-xs font-semibold">
-                  {creator.initials}
-                </AvatarFallback>
-              </Avatar>
-            ))}
+        {/* Top Banner - Only show when no conversation */}
+        {messages.length === 0 && (
+          <div className="bg-white border-b border-[#E0DFDC] py-2 sm:py-3 px-3 sm:px-4">
+            <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#0A66C2] flex-shrink-0" />
+              <span className="text-xs sm:text-base font-medium text-[#666666]">
+                Trained on posts of top LinkedIn creators
+              </span>
+              <div className="flex -space-x-2">
+                {topCreators.map((creator, idx) => (
+                  <Avatar key={idx} className="w-7 h-7 sm:w-9 sm:h-9 border-2 border-white">
+                    <AvatarImage src={creator.image} alt={creator.name} />
+                    <AvatarFallback className="bg-[#0A66C2] text-white text-[10px] sm:text-xs font-semibold">
+                      {creator.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      )}
+        )}
 
-      {/* Main Content */}
-      <div className={`max-w-4xl mx-auto px-3 sm:px-4 ${messages.length === 0 ? 'h-[calc(100vh-60px)] sm:h-[calc(100vh-80px)]' : 'h-[calc(100vh-40px)] sm:h-[calc(100vh-60px)]'} flex flex-col`}>
-        {/* Messages - Scrollable Area */}
-        <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 py-4 sm:py-8 pb-4 pr-1 sm:pr-2">
-          {messages.length === 0 && (
-            <div className="text-center py-10 sm:py-20 px-2">
-              <div className="max-w-2xl mx-auto">
-                {/* Icon */}
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg">
-                  <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-purple-600" />
-                </div>
+        {/* Main Content */}
+        <div className={`max-w-4xl mx-auto px-3 sm:px-4 ${messages.length === 0 ? 'h-[calc(100vh-60px)] sm:h-[calc(100vh-80px)]' : 'h-[calc(100vh-40px)] sm:h-[calc(100vh-60px)]'} flex flex-col`}>
+          {/* Messages - Scrollable Area */}
+          <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 py-4 sm:py-8 pb-4 pr-1 sm:pr-2">
+            {messages.length === 0 && (
+              <div className="text-center py-10 sm:py-20 px-2">
+                <div className="max-w-2xl mx-auto">
+                  {/* Icon */}
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg">
+                    <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-purple-600" />
+                  </div>
 
-                {/* Heading */}
-                <h2 className="text-2xl sm:text-3xl font-bold text-black mb-2 sm:mb-3">
-                  Need inspiration?
-                </h2>
+                  {/* Heading */}
+                  <h2 className="text-2xl sm:text-3xl font-bold text-black mb-2 sm:mb-3">
+                    Need inspiration?
+                  </h2>
 
-                {/* Description */}
-                <p className="text-base sm:text-lg text-[#666666] mb-6 sm:mb-8 max-w-lg mx-auto leading-relaxed px-2">
-                  Let AI generate a unique LinkedIn post tailored to your expertise and style.
-                  Click below to get started instantly.
-                </p>
+                  {/* Description */}
+                  <p className="text-base sm:text-lg text-[#666666] mb-6 sm:mb-8 max-w-lg mx-auto leading-relaxed px-2">
+                    Let AI generate a unique LinkedIn post tailored to your expertise and style.
+                    Click below to get started instantly.
+                  </p>
 
-                {/* Post Type Selection Cards */}
-                <div className="mb-4 sm:mb-6 px-2">
-                  <p className="text-xs sm:text-sm text-[#666666] mb-3 sm:mb-4 text-center">Content type:</p>
-                  <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
-                    {[
-                      { value: "auto", label: "Choose for me", icon: Zap },
-                      { value: "image", label: "Text + Image", icon: Image },
-                      { value: "text", label: "Text Only", icon: FileText },
-                      { value: "carousel", label: "Carousel", icon: Layers },
-                      { value: "video_script", label: "Video script", icon: Video },
-                    ].map((type) => {
-                      const IconComponent = type.icon;
-                      const isSelected = postType === type.value;
-                      return (
-                        <button
-                          key={type.value}
-                          onClick={() => setPostType(type.value)}
-                          className={`
+                  {/* Post Type Selection Cards */}
+                  <div className="mb-4 sm:mb-6 px-2">
+                    <p className="text-xs sm:text-sm text-[#666666] mb-3 sm:mb-4 text-center">Content type:</p>
+                    <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+                      {[
+                        { value: "auto", label: "Choose for me", icon: Zap },
+                        { value: "image", label: "Text + Image", icon: Image },
+                        { value: "text", label: "Text Only", icon: FileText },
+                        { value: "carousel", label: "Carousel", icon: Layers },
+                        { value: "video_script", label: "Video script", icon: Video },
+                      ].map((type) => {
+                        const IconComponent = type.icon;
+                        const isSelected = postType === type.value;
+                        return (
+                          <button
+                            key={type.value}
+                            onClick={() => setPostType(type.value)}
+                            className={`
                             relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 transition-all duration-200
                             flex flex-col items-center justify-center gap-1 sm:gap-2
                             ${isSelected
-                              ? "bg-gradient-to-br from-purple-50 to-blue-50 border-purple-500 shadow-lg scale-105"
-                              : "bg-white border-[#E0DFDC] hover:border-purple-300 hover:shadow-md"
-                            }
+                                ? "bg-gradient-to-br from-purple-50 to-blue-50 border-purple-500 shadow-lg scale-105"
+                                : "bg-white border-[#E0DFDC] hover:border-purple-300 hover:shadow-md"
+                              }
                           `}
-                        >
-                          <IconComponent
-                            className={`w-4 h-4 sm:w-6 sm:h-6 ${isSelected ? "text-purple-600" : "text-[#666666]"
-                              }`}
-                          />
-                          <span
-                            className={`text-[10px] sm:text-xs font-medium text-center px-1 leading-tight ${isSelected ? "text-purple-600" : "text-[#666666]"
-                              }`}
                           >
-                            {type.label}
-                          </span>
-                          {isSelected && (
-                            <div className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5">
-                              <div className="w-4 h-4 sm:w-5 sm:h-5 bg-purple-600 rounded-full flex items-center justify-center">
-                                <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
-                              </div>
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Inspiration Button */}
-                <div className="mb-4 sm:mb-6 px-2">
-                  <Button
-                    onClick={handleInspiration}
-                    disabled={loading}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full px-6 py-5 sm:px-10 sm:py-7 text-base sm:text-lg font-semibold shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none w-full sm:w-auto"
-                    size="lg"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                        Generate random post for me
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Helper text */}
-                <p className="text-xs sm:text-sm text-[#999999] px-2">
-                  Or type your own topic in the input below
-                </p>
-              </div>
-            </div>
-          )}
-
-          {messages.map((msg, idx) => {
-            // Check if content is JSON and extract data if needed
-            let displayContent = msg.post_content || msg.content;
-            let displayFormatType = msg.format_type;
-            let displayImagePrompt = msg.image_prompt;
-            let displayImagePrompts = msg.image_prompts;
-            let displayMetadata = msg.metadata;
-
-            // ALWAYS check if content or post_content is JSON and try to parse it
-            // This handles cases where JSON was stored in the database
-            const contentToCheck = msg.post_content || msg.content;
-            if (typeof contentToCheck === 'string' && contentToCheck.trim().length > 0) {
-              const trimmed = contentToCheck.trim();
-              
-              // More aggressive check: if it contains JSON-like structure, try to parse
-              const looksLikeJson = trimmed.startsWith('{') || 
-                                   trimmed.startsWith('```') ||
-                                   trimmed.startsWith('"```') ||
-                                   (trimmed.includes('"post_content"') && (trimmed.includes('"format_type"') || trimmed.includes('format_type')));
-              
-              if (looksLikeJson) {
-                console.log('🔍 Attempting to parse JSON content:', {
-                  starts_with: trimmed.substring(0, 50),
-                  length: trimmed.length
-                });
-                
-                const parsed = parseJsonContent(contentToCheck);
-                if (parsed && parsed.post_content && parsed.post_content.trim().length > 0) {
-                  console.log('✅ Successfully parsed JSON content:', {
-                    original_length: contentToCheck.length,
-                    extracted_content_length: parsed.post_content.length,
-                    format_type: parsed.format_type,
-                    has_image_prompts: !!parsed.image_prompts?.length,
-                    has_metadata: !!parsed.metadata
-                  });
-                  displayContent = parsed.post_content;
-                  displayFormatType = parsed.format_type || displayFormatType;
-                  displayImagePrompt = parsed.image_prompt || displayImagePrompt;
-                  displayImagePrompts = parsed.image_prompts || displayImagePrompts;
-                  displayMetadata = parsed.metadata || displayMetadata;
-                } else {
-                  console.warn('⚠️ Failed to parse JSON content:', {
-                    starts_with: trimmed.substring(0, 100),
-                    length: trimmed.length,
-                    has_post_content_key: trimmed.includes('"post_content"'),
-                    parsed_result: parsed
-                  });
-                }
-              }
-            }
-
-            return (
-            <div key={msg.id}>
-              {msg.role === "user" ? (
-                <div className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-[600px] flex flex-col items-end gap-2">
-                    {/* Display attached images above the message */}
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 justify-end">
-                        {msg.attachments.map((attachment, idx) => (
-                          <div key={idx} className="relative">
-                            <img
-                              src={attachment.preview || `data:${attachment.type};base64,${attachment.data}`}
-                              alt={attachment.name}
-                              className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-[#0A66C2]/30"
+                            <IconComponent
+                              className={`w-4 h-4 sm:w-6 sm:h-6 ${isSelected ? "text-purple-600" : "text-[#666666]"
+                                }`}
                             />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="bg-[#0A66C2] text-white rounded-xl sm:rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-linkedin-sm">
-                      <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                        {msg.content}
-                      </p>
+                            <span
+                              className={`text-[10px] sm:text-xs font-medium text-center px-1 leading-tight ${isSelected ? "text-purple-600" : "text-[#666666]"
+                                }`}
+                            >
+                              {type.label}
+                            </span>
+                            {isSelected && (
+                              <div className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5">
+                                <div className="w-4 h-4 sm:w-5 sm:h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                                  <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex justify-start">
-                    <div className="max-w-[95%] sm:max-w-[700px] w-full space-y-3 sm:space-y-4">
-                    {/* LinkedIn Post Preview */}
-                      {displayContent ? (
-                      <LinkedInPostPreview
-                          postContent={displayContent}
-                          formatType={displayFormatType || "text"}
-                          imagePrompt={displayImagePrompt}
-                          imagePrompts={displayImagePrompts}
-                        userProfile={{
-                          name: user?.name || "Your Name",
-                          headline: "Professional | Content Creator",
-                          avatar: user?.linkedin_profile_picture,
-                        }}
-                        onCopyText={() => copyToClipboard(displayContent)}
-                        onCopyImagePrompt={() => {
-                          if (msg.image_prompt) {
-                            copyToClipboard(msg.image_prompt);
-                          }
-                        }}
-                        onCopySlidePrompts={() => {
-                          if (msg.image_prompts && msg.image_prompts.length > 0) {
-                            // Format slide prompts nicely: one per line with slide numbers
-                            const formattedPrompts = msg.image_prompts
-                              .map((prompt: string, index: number) => `Slide ${index + 1}:\n${prompt}`)
-                              .join('\n\n');
-                            copyToClipboard(formattedPrompts);
-                          }
-                        }}
-                        onRegenerateImage={async () => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          if (!msg.image_prompt) return;
 
-                          setGeneratingImages(prev => ({ ...prev, [postId]: true }));
-
-                          try {
-                            const response = await api.images.generateFromPost(postId);
-                            const imageData = response.data.image;
-
-                            // Store the current image
-                            setCurrentImages(prev => ({
-                              ...prev,
-                              [postId]: `data:image/png;base64,${imageData}`
-                            }));
-
-                            // Update token usage with Cloudflare cost if provided
-                            console.log("DEBUG: Image regeneration response:", {
-                              has_cloudflare_cost: !!response.data.cloudflare_cost,
-                              cloudflare_cost: response.data.cloudflare_cost,
-                              current_msg_token_usage: msg.token_usage
-                            });
-                            
-                            if (response.data.cloudflare_cost) {
-                              setMessages(prev => prev.map(m => {
-                                if (m.id === msg.id) {
-                                  const updated = {
-                                    ...m,
-                                    token_usage: {
-                                      ...(m.token_usage || {}),
-                                      cloudflare_cost: response.data.cloudflare_cost
-                                    }
-                                  };
-                                  console.log("DEBUG: Updated message:", {
-                                    id: updated.id,
-                                    cloudflare_cost: updated.token_usage?.cloudflare_cost
-                                  });
-                                  return updated;
-                                }
-                                return m;
-                              }));
-                            } else {
-                              console.warn("DEBUG: No cloudflare_cost in response");
-                            }
-
-                            // Reload image history
-                            await loadImageHistory(postId);
-                          } catch (error: any) {
-                            console.error("Image regeneration failed:", error);
-                            alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
-                          } finally {
-                            setGeneratingImages(prev => ({ ...prev, [postId]: false }));
-                          }
-                        }}
-                        onGenerateImageWithPrompt={async (customPrompt: string) => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          if (!customPrompt.trim()) return;
-
-                          setGeneratingImages(prev => ({ ...prev, [postId]: true }));
-
-                          try {
-                            const response = await api.images.generateWithPrompt(postId, customPrompt);
-                            const imageData = response.data.image;
-
-                            // Store the current image
-                            setCurrentImages(prev => ({
-                              ...prev,
-                              [postId]: `data:image/png;base64,${imageData}`
-                            }));
-
-                            // Update message's image_prompt with the custom prompt
-                            setMessages(prev => prev.map(m => {
-                              if (m.id === msg.id) {
-                                const updated = {
-                                  ...m,
-                                  image_prompt: customPrompt,
-                                  token_usage: response.data.cloudflare_cost ? {
-                                    ...(m.token_usage || {}),
-                                    cloudflare_cost: response.data.cloudflare_cost
-                                  } : m.token_usage
-                                };
-                                return updated;
-                              }
-                              return m;
-                            }));
-
-                            // Reload image history
-                            await loadImageHistory(postId);
-                          } catch (error: any) {
-                            console.error("Image generation with custom prompt failed:", error);
-                            alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
-                          } finally {
-                            setGeneratingImages(prev => ({ ...prev, [postId]: false }));
-                          }
-                        }}
-                        onRegenerateImagePrompt={async () => {
-                          const postId = postIdMap[msg.id] || msg.id;
-
-                          try {
-                            const response = await api.images.regeneratePrompt(postId);
-                            const newPrompt = response.data.image_prompt;
-                            const tokenUsage = response.data.token_usage;
-
-                            // Update message's image_prompt and token_usage
-                            setMessages(prev => prev.map(m => {
-                              if (m.id === msg.id) {
-                                return {
-                                  ...m,
-                                  image_prompt: newPrompt,
-                                  token_usage: tokenUsage ? {
-                                    ...m.token_usage,
-                                    input_tokens: m.token_usage?.input_tokens || 0,
-                                    output_tokens: m.token_usage?.output_tokens || 0,
-                                    total_tokens: m.token_usage?.total_tokens || 0,
-                                    image_prompt_tokens: tokenUsage.image_prompt_tokens,
-                                    image_prompt_cost: tokenUsage.image_prompt_cost,
-                                    image_prompt_provider: tokenUsage.image_prompt_provider,
-                                    image_prompt_model: tokenUsage.image_prompt_model,
-                                  } : m.token_usage
-                                };
-                              }
-                              return m;
-                            }));
-
-                            return newPrompt;
-                          } catch (error: any) {
-                            console.error("Image prompt regeneration failed:", error);
-                            alert(`Prompt regeneration failed: ${error.response?.data?.detail || error.message}`);
-                            return undefined;
-                          }
-                        }}
-                        onRegeneratePDF={async (slideIndices?: number[]) => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          if (!msg.image_prompts || msg.image_prompts.length === 0) return;
-
-                          // If no slide indices provided or empty array, show selection modal
-                          // Also handle case where event object might be passed instead of undefined
-                          if (slideIndices === undefined || slideIndices === null || !Array.isArray(slideIndices) || slideIndices.length === 0) {
-                            setShowSlideSelectionModal(prev => ({ ...prev, [postId]: true }));
-                            return;
-                          }
-
-                          // Determine prompts to use based on slide indices
-                          const promptsToRegenerate = slideIndices.length === msg.image_prompts.length
-                            ? msg.image_prompts // Regenerate all
-                            : slideIndices.map(idx => msg.image_prompts![idx]);
-
-                          setGeneratingPDFs(prev => ({ ...prev, [postId]: true }));
-                          setPdfProgress(prev => ({ ...prev, [postId]: { current: 0, total: promptsToRegenerate.length } }));
-
-                          // Start polling for progress
-                          const progressInterval = setInterval(async () => {
-                            try {
-                              const progressResponse = await api.pdfs.getProgress(postId);
-                              const progress = progressResponse.data;
-                              setPdfProgress(prev => ({
-                                ...prev,
-                                [postId]: { current: progress.current || 0, total: progress.total || promptsToRegenerate.length }
-                              }));
-
-                              if (progress.completed || progress.status === 'completed') {
-                                clearInterval(progressInterval);
-                              }
-                            } catch (error) {
-                              // Ignore progress polling errors
-                            }
-                          }, 1000); // Poll every second
-
-                          try {
-                            const response = await api.pdfs.generateCarousel(
-                              postId,
-                              promptsToRegenerate,
-                              slideIndices.length === msg.image_prompts.length ? undefined : slideIndices
-                            );
-                            const pdfData = response.data.pdf;
-                            const slideImages = response.data.slide_images || [];
-
-                            clearInterval(progressInterval);
-
-                            // Store the current PDF
-                            setCurrentPDFs(prev => ({
-                              ...prev,
-                              [postId]: `data:application/pdf;base64,${pdfData}`
-                            }));
-
-                            // Store slide images for preview
-                            setCurrentPDFSlides(prev => ({
-                              ...prev,
-                              [postId]: slideImages
-                            }));
-
-                            // Update token usage with Cloudflare cost if provided
-                            if (response.data.cloudflare_cost) {
-                              setMessages(prev => prev.map(m => {
-                                if (m.id === msg.id) {
-                                  return {
-                                    ...m,
-                                    token_usage: {
-                                      ...(m.token_usage || {}),
-                                      cloudflare_cost: response.data.cloudflare_cost
-                                    }
-                                  };
-                                }
-                                return m;
-                              }));
-                            }
-
-                            // Load PDF history
-                            await loadPdfHistory(postId);
-                          } catch (error: any) {
-                            clearInterval(progressInterval);
-                            console.error("PDF regeneration failed:", error);
-                            alert(`PDF regeneration failed: ${error.response?.data?.detail || error.message}`);
-                          } finally {
-                            setGeneratingPDFs(prev => ({ ...prev, [postId]: false }));
-                            setPdfProgress(prev => ({ ...prev, [postId]: { current: promptsToRegenerate.length, total: promptsToRegenerate.length } }));
-                          }
-                        }}
-                        onRegenerateSlide={async (slideIndex: number) => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          if (!msg.image_prompts || msg.image_prompts.length === 0) return;
-                          if (slideIndex < 0 || slideIndex >= msg.image_prompts.length) return;
-
-                          // Store the current slide index before regeneration
-                          const slideIndexToMaintain = slideIndex;
-
-                          // Set regenerating state for this specific slide
-                          setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: slideIndex }));
-
-                          try {
-                            const promptForSlide = msg.image_prompts[slideIndex];
-                            const response = await api.pdfs.generateCarousel(
-                              postId,
-                              [promptForSlide],
-                              [slideIndex]
-                            );
-                            const slideImages = response.data.slide_images || [];
-
-                            // Replace ALL slides with the new PDF slides (backend returns all slides)
-                            if (slideImages.length > 0) {
-                              // Update slide index FIRST to ensure CarouselSlider receives correct initialSlide
-                              setCurrentSlideIndex(prev => ({
-                                ...prev,
-                                [postId]: slideIndexToMaintain
-                              }));
-
-                              // Then update slides - this will trigger CarouselSlider to use the updated initialSlide
-                              setCurrentPDFSlides(prev => ({
-                                ...prev,
-                                [postId]: slideImages
-                              }));
-                            }
-
-                            // Also update PDF
-                            const pdfData = response.data.pdf;
-                            setCurrentPDFs(prev => ({
-                              ...prev,
-                              [postId]: `data:application/pdf;base64,${pdfData}`
-                            }));
-
-                            // Reload PDF history
-                            await loadPdfHistory(postId);
-                          } catch (error: any) {
-                            console.error("Slide regeneration failed:", error);
-                            alert(`Slide regeneration failed: ${error.response?.data?.detail || error.message}`);
-                          } finally {
-                            // Clear regenerating state
-                            setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: null }));
-                          }
-                        }}
-                        onDownloadPDF={() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          const pdfData = currentPDFs[postId];
-                          if (!pdfData) {
-                            alert("No PDF generated yet.");
-                            return;
-                          }
-
-                          // Create download link
-                          const link = document.createElement('a');
-                          link.href = pdfData;
-                          link.download = `linkedin-carousel-${postId}.pdf`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        onDownloadImage={() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          const imageData = currentImages[postId];
-                          if (!imageData) {
-                            alert("No image generated yet.");
-                            return;
-                          }
-
-                          // Create download link
-                          const link = document.createElement('a');
-                          link.href = imageData;
-                          link.download = `linkedin-post-${postId}.png`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        onShowImageHistory={() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          setShowImageHistory(prev => ({ ...prev, [postId]: true }));
-                          loadImageHistory(postId);
-                        }}
-                        onShowPdfHistory={() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          setShowPdfHistory(prev => ({ ...prev, [postId]: true }));
-                          loadPdfHistory(postId);
-                        }}
-                        onRegenerate={() => handleRegenerate(idx)}
-                        onSchedule={() => {
-                          // TODO: Open schedule modal
-                          alert("Schedule feature coming soon!");
-                        }}
-                        onPost={async () => {
-                          const postId = postIdMap[msg.id];
-                          if (!postId) {
-                            addToast({
-                              title: "Error",
-                              description: "Post ID not found. Please regenerate the post.",
-                              variant: "error",
-                            });
-                            return;
-                          }
-                          
-                          // Always show confirmation dialog before publishing
-                          setPostToPublish(postId);
-                          setConfirmDialogOpen(true);
-                        }}
-                        published={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return msg.published_to_linkedin || publishedPosts.has(postId);
-                        })()}
-                        currentImage={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return currentImages[postId];
-                        })()}
-                        currentPDF={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return currentPDFs[postId];
-                        })()}
-                        currentPDFSlides={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return currentPDFSlides[postId] || [];
-                        })()}
-                        generatingImage={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return !!generatingImages[postId];
-                        })()}
-                        generatingPDF={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return !!generatingPDFs[postId];
-                        })()}
-                        generatingPDFProgress={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return pdfProgress[postId];
-                        })()}
-                        regeneratingSlideIndex={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return regeneratingSlideIndex[postId] ?? null;
-                        })()}
-                        currentSlideIndex={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return currentSlideIndex[postId] ?? 0;
-                        })()}
-                        onSlideChange={(slideIndex: number) => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          setCurrentSlideIndex(prev => ({ ...prev, [postId]: slideIndex }));
-                        }}
-                        imageHistory={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return imageHistory[postId] || [];
-                        })()}
-                        pdfHistory={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return pdfHistory[postId] || [];
-                        })()}
-                        showImageHistory={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return !!showImageHistory[postId];
-                        })()}
-                        showPdfHistory={(() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          return !!showPdfHistory[postId];
-                        })()}
-                        onCloseImageHistory={() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          setShowImageHistory(prev => ({ ...prev, [postId]: false }));
-                        }}
-                        onClosePdfHistory={() => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          setShowPdfHistory(prev => ({ ...prev, [postId]: false }));
-                        }}
-                        onSelectImage={async (imageId: string) => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          try {
-                            await api.images.setCurrent(imageId);
-                            await loadCurrentImage(postId);
-                            await loadImageHistory(postId);
-                          } catch (error) {
-                            console.error("Failed to set current image:", error);
-                          }
-                        }}
-                        onSelectPDF={async (pdfId: string) => {
-                          const postId = postIdMap[msg.id] || msg.id;
-                          try {
-                            await api.pdfs.setCurrent(pdfId);
-                            await loadCurrentPDF(postId);
-                            await loadPdfHistory(postId);
-                          } catch (error) {
-                            console.error("Failed to set current PDF:", error);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="bg-white rounded-lg px-5 py-3 shadow-linkedin-sm border border-[#E0DFDC]">
-                        <p className="text-sm text-black whitespace-pre-wrap">
-                          {displayContent}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Token Usage Display */}
-                    {msg.token_usage && (
-                      <div className="space-y-2">
-                        {/* Main Generation Tokens */}
-                        <div className="flex items-center gap-3 text-xs bg-[#F9F9F9] px-3 py-2 rounded-lg border border-[#E0DFDC]">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[#666666] font-medium">Tokens:</span>
-                            <span className="font-mono font-semibold text-[#0A66C2]">
-                              {msg.token_usage.total_tokens.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[#666666]">Input:</span>
-                            <span className="font-mono text-green-600 font-medium">
-                              {msg.token_usage.input_tokens.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[#666666]">Output:</span>
-                            <span className="font-mono text-orange-600 font-medium">
-                              {msg.token_usage.output_tokens.toLocaleString()}
-                            </span>
-                          </div>
-                          {msg.token_usage.cost && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-[#666666]">Cost:</span>
-                              <span className="font-mono text-purple-600 font-medium">
-                                ${msg.token_usage.cost.total_cost.toFixed(6)}
-                              </span>
-                            </div>
-                          )}
-                          {msg.token_usage.provider && (
-                            <div className="flex items-center gap-1 ml-auto">
-                              <span className="text-[#666666] text-[10px]">
-                                {msg.token_usage.provider.charAt(0).toUpperCase() + msg.token_usage.provider.slice(1)}
-                                {msg.token_usage.model && ` (${msg.token_usage.model})`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Image Prompt Generation Tokens (Separate Provider) */}
-                        {msg.token_usage.image_prompt_tokens && (
-                          <div className="flex items-center gap-3 text-xs bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[#666666] font-medium">Image Prompts:</span>
-                              <span className="font-mono font-semibold text-blue-600">
-                                {msg.token_usage.image_prompt_tokens.total_tokens.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[#666666]">Input:</span>
-                              <span className="font-mono text-green-600 font-medium">
-                                {msg.token_usage.image_prompt_tokens.input_tokens.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[#666666]">Output:</span>
-                              <span className="font-mono text-orange-600 font-medium">
-                                {msg.token_usage.image_prompt_tokens.output_tokens.toLocaleString()}
-                              </span>
-                            </div>
-                            {msg.token_usage.image_prompt_cost && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-[#666666]">Cost:</span>
-                                <span className="font-mono text-purple-600 font-medium">
-                                  ${msg.token_usage.image_prompt_cost.total_cost.toFixed(6)}
-                                </span>
-                              </div>
-                            )}
-                            {msg.token_usage.image_prompt_provider && (
-                              <div className="flex items-center gap-1 ml-auto">
-                                <span className="text-[#666666] text-[10px]">
-                                  {msg.token_usage.image_prompt_provider.charAt(0).toUpperCase() + msg.token_usage.image_prompt_provider.slice(1)}
-                                  {msg.token_usage.image_prompt_model && ` (${msg.token_usage.image_prompt_model})`}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Cloudflare Image Generation Cost (Separate Provider) */}
-                        {msg.token_usage.cloudflare_cost && (
-                          <div className="flex items-center gap-3 text-xs bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[#666666] font-medium">Image Generation:</span>
-                              <span className="font-mono font-semibold text-purple-600">
-                                {msg.token_usage.cloudflare_cost.image_count || 1} image{(msg.token_usage.cloudflare_cost.image_count || 1) > 1 ? 's' : ''}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[#666666]">Cost:</span>
-                              <span className="font-mono text-purple-600 font-medium">
-                                ${msg.token_usage.cloudflare_cost.total_cost.toFixed(6)}
-                              </span>
-                            </div>
-                            {msg.token_usage.cloudflare_cost.cost_per_image && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-[#666666] text-[10px]">(${msg.token_usage.cloudflare_cost.cost_per_image.toFixed(6)}/image)</span>
-                              </div>
-                            )}
-                            {msg.token_usage.cloudflare_model && (
-                              <div className="flex items-center gap-1 ml-auto">
-                                <span className="text-[#666666] text-[10px]">
-                                  Cloudflare ({msg.token_usage.cloudflare_model.replace('@cf/leonardo/', '').replace('@cf/', '')})
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-          })}
-
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-white rounded-lg px-4 py-3 sm:px-5 sm:py-4 shadow-linkedin-sm border border-[#E0DFDC]">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-sm text-[#666666] font-medium">{loadingMessage}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area - Fixed at Bottom */}
-        <div className="flex-shrink-0 pt-4 sm:pt-6 pb-1 sm:pb-2 z-10 bg-[#F3F2F0]">
-          {/* Image Preview Area */}
-          {imagePreviews.length > 0 && (
-            <div className="bg-white rounded-t-xl sm:rounded-t-2xl border border-b-0 border-[#E0DFDC] p-3 sm:p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs sm:text-sm text-[#666666] font-medium">
-                  Attached Images ({imagePreviews.length}/{MAX_IMAGES})
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllImages}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs px-2 h-7"
-                >
-                  <Trash2 className="w-3 h-3 mr-1" />
-                  Clear All
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {imagePreviews.map((preview, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={preview}
-                      alt={`Upload ${index + 1}`}
-                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-[#E0DFDC]"
-                    />
-                    <button
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                  {/* Inspiration Button */}
+                  <div className="mb-4 sm:mb-6 px-2">
+                    <Button
+                      onClick={handleInspiration}
+                      disabled={loading}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full px-6 py-5 sm:px-10 sm:py-7 text-base sm:text-lg font-semibold shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none w-full sm:w-auto"
+                      size="lg"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                    <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] px-1 rounded">
-                      {(uploadedImages[index]?.size / 1024 / 1024).toFixed(1)}MB
-                    </span>
+                      {loading ? (
+                        <>
+                          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                          Generate random post for me
+                        </>
+                      )}
+                    </Button>
                   </div>
-                ))}
-                {imagePreviews.length < MAX_IMAGES && (
-                  <button
-                    onClick={() => imageInputRef.current?.click()}
-                    className="w-16 h-16 sm:w-20 sm:h-20 border-2 border-dashed border-[#E0DFDC] rounded-lg flex flex-col items-center justify-center text-[#666666] hover:border-[#0A66C2] hover:text-[#0A66C2] transition-colors"
-                  >
-                    <ImagePlus className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span className="text-[10px] mt-0.5">Add</span>
-                  </button>
-                )}
+
+                  {/* Helper text */}
+                  <p className="text-xs sm:text-sm text-[#999999] px-2">
+                    Or type your own topic in the input below
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Hidden file input for images */}
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-            multiple
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          
-          <div className={`bg-white ${imagePreviews.length > 0 ? 'rounded-b-xl sm:rounded-b-2xl' : 'rounded-xl sm:rounded-2xl'} shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden`}>
-            <div className="relative flex items-start">
-              {/* Image upload icon button on the left */}
-              <button
-                onClick={() => imageInputRef.current?.click()}
-                disabled={uploadedImages.length >= MAX_IMAGES}
-                className={`absolute left-2 top-3 sm:left-3 sm:top-4 p-1.5 rounded-lg transition-colors z-10 ${
-                  uploadedImages.length >= MAX_IMAGES
+            )}
+
+            {messages.map((msg, idx) => {
+              // Check if content is JSON and extract data if needed
+              let displayContent = msg.post_content || msg.content;
+              let displayFormatType = msg.format_type;
+              let displayImagePrompt = msg.image_prompt;
+              let displayImagePrompts = msg.image_prompts;
+              let displayMetadata = msg.metadata;
+
+              // ALWAYS check if content or post_content is JSON and try to parse it
+              // This handles cases where JSON was stored in the database
+              const contentToCheck = msg.post_content || msg.content;
+              if (typeof contentToCheck === 'string' && contentToCheck.trim().length > 0) {
+                const trimmed = contentToCheck.trim();
+
+                // More aggressive check: if it contains JSON-like structure, try to parse
+                const looksLikeJson = trimmed.startsWith('{') ||
+                  trimmed.startsWith('```') ||
+                  trimmed.startsWith('"```') ||
+                  (trimmed.includes('"post_content"') && (trimmed.includes('"format_type"') || trimmed.includes('format_type')));
+
+                if (looksLikeJson) {
+                  console.log('🔍 Attempting to parse JSON content:', {
+                    starts_with: trimmed.substring(0, 50),
+                    length: trimmed.length
+                  });
+
+                  const parsed = parseJsonContent(contentToCheck);
+                  if (parsed && parsed.post_content && parsed.post_content.trim().length > 0) {
+                    console.log('✅ Successfully parsed JSON content:', {
+                      original_length: contentToCheck.length,
+                      extracted_content_length: parsed.post_content.length,
+                      format_type: parsed.format_type,
+                      has_image_prompts: !!parsed.image_prompts?.length,
+                      has_metadata: !!parsed.metadata
+                    });
+                    displayContent = parsed.post_content;
+                    displayFormatType = parsed.format_type || displayFormatType;
+                    displayImagePrompt = parsed.image_prompt || displayImagePrompt;
+                    displayImagePrompts = parsed.image_prompts || displayImagePrompts;
+                    displayMetadata = parsed.metadata || displayMetadata;
+                  } else {
+                    console.warn('⚠️ Failed to parse JSON content:', {
+                      starts_with: trimmed.substring(0, 100),
+                      length: trimmed.length,
+                      has_post_content_key: trimmed.includes('"post_content"'),
+                      parsed_result: parsed
+                    });
+                  }
+                }
+              }
+
+              return (
+                <div key={msg.id}>
+                  {msg.role === "user" ? (
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] sm:max-w-[600px] flex flex-col items-end gap-2">
+                        {/* Display attached images above the message */}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 justify-end">
+                            {msg.attachments.map((attachment, idx) => (
+                              <div key={idx} className="relative">
+                                <img
+                                  src={attachment.preview || `data:${attachment.type};base64,${attachment.data}`}
+                                  alt={attachment.name}
+                                  className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-[#0A66C2]/30"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="bg-[#0A66C2] text-white rounded-xl sm:rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-linkedin-sm">
+                          <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                            {msg.content}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-start">
+                      <div className="max-w-[95%] sm:max-w-[700px] w-full space-y-3 sm:space-y-4">
+                        {/* LinkedIn Post Preview */}
+                        {displayContent ? (
+                          <LinkedInPostPreview
+                            postContent={displayContent}
+                            formatType={displayFormatType || "text"}
+                            imagePrompt={displayImagePrompt}
+                            imagePrompts={displayImagePrompts}
+                            userProfile={{
+                              name: user?.name || "Your Name",
+                              headline: "Professional | Content Creator",
+                              avatar: user?.linkedin_profile_picture,
+                            }}
+                            onCopyText={() => copyToClipboard(displayContent)}
+                            onCopyImagePrompt={() => {
+                              if (msg.image_prompt) {
+                                copyToClipboard(msg.image_prompt);
+                              }
+                            }}
+                            onCopySlidePrompts={() => {
+                              if (msg.image_prompts && msg.image_prompts.length > 0) {
+                                // Format slide prompts nicely: one per line with slide numbers
+                                const formattedPrompts = msg.image_prompts
+                                  .map((prompt: string, index: number) => `Slide ${index + 1}:\n${prompt}`)
+                                  .join('\n\n');
+                                copyToClipboard(formattedPrompts);
+                              }
+                            }}
+                            onRegenerateImage={async () => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              if (!msg.image_prompt) return;
+
+                              setGeneratingImages(prev => ({ ...prev, [postId]: true }));
+
+                              try {
+                                const response = await api.images.generateFromPost(postId);
+                                const imageData = response.data.image;
+
+                                // Store the current image
+                                setCurrentImages(prev => ({
+                                  ...prev,
+                                  [postId]: `data:image/png;base64,${imageData}`
+                                }));
+
+                                // Update token usage with Cloudflare cost if provided
+                                console.log("DEBUG: Image regeneration response:", {
+                                  has_cloudflare_cost: !!response.data.cloudflare_cost,
+                                  cloudflare_cost: response.data.cloudflare_cost,
+                                  current_msg_token_usage: msg.token_usage
+                                });
+
+                                if (response.data.cloudflare_cost) {
+                                  setMessages(prev => prev.map(m => {
+                                    if (m.id === msg.id) {
+                                      const updated = {
+                                        ...m,
+                                        token_usage: {
+                                          ...(m.token_usage || {}),
+                                          cloudflare_cost: response.data.cloudflare_cost
+                                        }
+                                      };
+                                      console.log("DEBUG: Updated message:", {
+                                        id: updated.id,
+                                        cloudflare_cost: updated.token_usage?.cloudflare_cost
+                                      });
+                                      return updated;
+                                    }
+                                    return m;
+                                  }));
+                                } else {
+                                  console.warn("DEBUG: No cloudflare_cost in response");
+                                }
+
+                                // Reload image history
+                                await loadImageHistory(postId);
+                              } catch (error: any) {
+                                console.error("Image regeneration failed:", error);
+                                alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
+                              } finally {
+                                setGeneratingImages(prev => ({ ...prev, [postId]: false }));
+                              }
+                            }}
+                            onGenerateImageWithPrompt={async (customPrompt: string) => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              if (!customPrompt.trim()) return;
+
+                              setGeneratingImages(prev => ({ ...prev, [postId]: true }));
+
+                              try {
+                                const response = await api.images.generateWithPrompt(postId, customPrompt);
+                                const imageData = response.data.image;
+
+                                // Store the current image
+                                setCurrentImages(prev => ({
+                                  ...prev,
+                                  [postId]: `data:image/png;base64,${imageData}`
+                                }));
+
+                                // Update message's image_prompt with the custom prompt
+                                setMessages(prev => prev.map(m => {
+                                  if (m.id === msg.id) {
+                                    const updated = {
+                                      ...m,
+                                      image_prompt: customPrompt,
+                                      token_usage: response.data.cloudflare_cost ? {
+                                        ...(m.token_usage || {}),
+                                        cloudflare_cost: response.data.cloudflare_cost
+                                      } : m.token_usage
+                                    };
+                                    return updated;
+                                  }
+                                  return m;
+                                }));
+
+                                // Reload image history
+                                await loadImageHistory(postId);
+                              } catch (error: any) {
+                                console.error("Image generation with custom prompt failed:", error);
+                                alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
+                              } finally {
+                                setGeneratingImages(prev => ({ ...prev, [postId]: false }));
+                              }
+                            }}
+                            onRegenerateImagePrompt={async () => {
+                              const postId = postIdMap[msg.id] || msg.id;
+
+                              try {
+                                const response = await api.images.regeneratePrompt(postId);
+                                const newPrompt = response.data.image_prompt;
+                                const tokenUsage = response.data.token_usage;
+
+                                // Update message's image_prompt and token_usage
+                                setMessages(prev => prev.map(m => {
+                                  if (m.id === msg.id) {
+                                    return {
+                                      ...m,
+                                      image_prompt: newPrompt,
+                                      token_usage: tokenUsage ? {
+                                        ...m.token_usage,
+                                        input_tokens: m.token_usage?.input_tokens || 0,
+                                        output_tokens: m.token_usage?.output_tokens || 0,
+                                        total_tokens: m.token_usage?.total_tokens || 0,
+                                        image_prompt_tokens: tokenUsage.image_prompt_tokens,
+                                        image_prompt_cost: tokenUsage.image_prompt_cost,
+                                        image_prompt_provider: tokenUsage.image_prompt_provider,
+                                        image_prompt_model: tokenUsage.image_prompt_model,
+                                      } : m.token_usage
+                                    };
+                                  }
+                                  return m;
+                                }));
+
+                                return newPrompt;
+                              } catch (error: any) {
+                                console.error("Image prompt regeneration failed:", error);
+                                alert(`Prompt regeneration failed: ${error.response?.data?.detail || error.message}`);
+                                return undefined;
+                              }
+                            }}
+                            onRegeneratePDF={async (slideIndices?: number[]) => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              if (!msg.image_prompts || msg.image_prompts.length === 0) return;
+
+                              // If no slide indices provided or empty array, show selection modal
+                              // Also handle case where event object might be passed instead of undefined
+                              if (slideIndices === undefined || slideIndices === null || !Array.isArray(slideIndices) || slideIndices.length === 0) {
+                                setShowSlideSelectionModal(prev => ({ ...prev, [postId]: true }));
+                                return;
+                              }
+
+                              // Determine prompts to use based on slide indices
+                              const promptsToRegenerate = slideIndices.length === msg.image_prompts.length
+                                ? msg.image_prompts // Regenerate all
+                                : slideIndices.map(idx => msg.image_prompts![idx]);
+
+                              setGeneratingPDFs(prev => ({ ...prev, [postId]: true }));
+                              setPdfProgress(prev => ({ ...prev, [postId]: { current: 0, total: promptsToRegenerate.length } }));
+
+                              // Start polling for progress
+                              const progressInterval = setInterval(async () => {
+                                try {
+                                  const progressResponse = await api.pdfs.getProgress(postId);
+                                  const progress = progressResponse.data;
+                                  setPdfProgress(prev => ({
+                                    ...prev,
+                                    [postId]: { current: progress.current || 0, total: progress.total || promptsToRegenerate.length }
+                                  }));
+
+                                  if (progress.completed || progress.status === 'completed') {
+                                    clearInterval(progressInterval);
+                                  }
+                                } catch (error) {
+                                  // Ignore progress polling errors
+                                }
+                              }, 1000); // Poll every second
+
+                              try {
+                                const response = await api.pdfs.generateCarousel(
+                                  postId,
+                                  promptsToRegenerate,
+                                  slideIndices.length === msg.image_prompts.length ? undefined : slideIndices
+                                );
+                                const pdfData = response.data.pdf;
+                                const slideImages = response.data.slide_images || [];
+
+                                clearInterval(progressInterval);
+
+                                // Store the current PDF
+                                setCurrentPDFs(prev => ({
+                                  ...prev,
+                                  [postId]: `data:application/pdf;base64,${pdfData}`
+                                }));
+
+                                // Store slide images for preview
+                                setCurrentPDFSlides(prev => ({
+                                  ...prev,
+                                  [postId]: slideImages
+                                }));
+
+                                // Update token usage with Cloudflare cost if provided
+                                if (response.data.cloudflare_cost) {
+                                  setMessages(prev => prev.map(m => {
+                                    if (m.id === msg.id) {
+                                      return {
+                                        ...m,
+                                        token_usage: {
+                                          ...(m.token_usage || {}),
+                                          cloudflare_cost: response.data.cloudflare_cost
+                                        }
+                                      };
+                                    }
+                                    return m;
+                                  }));
+                                }
+
+                                // Load PDF history
+                                await loadPdfHistory(postId);
+                              } catch (error: any) {
+                                clearInterval(progressInterval);
+                                console.error("PDF regeneration failed:", error);
+                                alert(`PDF regeneration failed: ${error.response?.data?.detail || error.message}`);
+                              } finally {
+                                setGeneratingPDFs(prev => ({ ...prev, [postId]: false }));
+                                setPdfProgress(prev => ({ ...prev, [postId]: { current: promptsToRegenerate.length, total: promptsToRegenerate.length } }));
+                              }
+                            }}
+                            onRegenerateSlide={async (slideIndex: number) => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              if (!msg.image_prompts || msg.image_prompts.length === 0) return;
+                              if (slideIndex < 0 || slideIndex >= msg.image_prompts.length) return;
+
+                              // Store the current slide index before regeneration
+                              const slideIndexToMaintain = slideIndex;
+
+                              // Set regenerating state for this specific slide
+                              setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: slideIndex }));
+
+                              try {
+                                const promptForSlide = msg.image_prompts[slideIndex];
+                                const response = await api.pdfs.generateCarousel(
+                                  postId,
+                                  [promptForSlide],
+                                  [slideIndex]
+                                );
+                                const slideImages = response.data.slide_images || [];
+
+                                // Replace ALL slides with the new PDF slides (backend returns all slides)
+                                if (slideImages.length > 0) {
+                                  // Update slide index FIRST to ensure CarouselSlider receives correct initialSlide
+                                  setCurrentSlideIndex(prev => ({
+                                    ...prev,
+                                    [postId]: slideIndexToMaintain
+                                  }));
+
+                                  // Then update slides - this will trigger CarouselSlider to use the updated initialSlide
+                                  setCurrentPDFSlides(prev => ({
+                                    ...prev,
+                                    [postId]: slideImages
+                                  }));
+                                }
+
+                                // Also update PDF
+                                const pdfData = response.data.pdf;
+                                setCurrentPDFs(prev => ({
+                                  ...prev,
+                                  [postId]: `data:application/pdf;base64,${pdfData}`
+                                }));
+
+                                // Reload PDF history
+                                await loadPdfHistory(postId);
+                              } catch (error: any) {
+                                console.error("Slide regeneration failed:", error);
+                                alert(`Slide regeneration failed: ${error.response?.data?.detail || error.message}`);
+                              } finally {
+                                // Clear regenerating state
+                                setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: null }));
+                              }
+                            }}
+                            onDownloadPDF={() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              const pdfData = currentPDFs[postId];
+                              if (!pdfData) {
+                                alert("No PDF generated yet.");
+                                return;
+                              }
+
+                              // Create download link
+                              const link = document.createElement('a');
+                              link.href = pdfData;
+                              link.download = `linkedin-carousel-${postId}.pdf`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            onDownloadImage={() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              const imageData = currentImages[postId];
+                              if (!imageData) {
+                                alert("No image generated yet.");
+                                return;
+                              }
+
+                              // Create download link
+                              const link = document.createElement('a');
+                              link.href = imageData;
+                              link.download = `linkedin-post-${postId}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            onShowImageHistory={() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              setShowImageHistory(prev => ({ ...prev, [postId]: true }));
+                              loadImageHistory(postId);
+                            }}
+                            onShowPdfHistory={() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              setShowPdfHistory(prev => ({ ...prev, [postId]: true }));
+                              loadPdfHistory(postId);
+                            }}
+                            onRegenerate={() => handleRegenerate(idx)}
+                            onSchedule={displayFormatType !== "video_script" && !(msg.published_to_linkedin || publishedPosts.has(postIdMap[msg.id] || msg.id)) ? () => {
+                              const postId = postIdMap[msg.id];
+                              if (!postId) {
+                                addToast({
+                                  title: "Error",
+                                  description: "Post ID not found. Please regenerate the post.",
+                                  variant: "error",
+                                });
+                                return;
+                              }
+                              setPostToSchedule({
+                                id: postId,
+                                content: msg.post_content || msg.content,
+                                formatType: msg.format_type,
+                                published: false,
+                              });
+                              setScheduleModalOpen(true);
+                            } : undefined}
+                            onPost={displayFormatType !== "video_script" ? async () => {
+                              const postId = postIdMap[msg.id];
+                              if (!postId) {
+                                addToast({
+                                  title: "Error",
+                                  description: "Post ID not found. Please regenerate the post.",
+                                  variant: "error",
+                                });
+                                return;
+                              }
+
+                              // Always show confirmation dialog before publishing
+                              setPostToPublish(postId);
+                              setConfirmDialogOpen(true);
+                            } : undefined}
+                            published={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return msg.published_to_linkedin || publishedPosts.has(postId);
+                            })()}
+                            onTogglePublished={displayFormatType !== "video_script" ? (published: boolean) => {
+                              const postId = postIdMap[msg.id];
+                              if (!postId) {
+                                addToast({
+                                  title: "Error",
+                                  description: "Post ID not found. Please regenerate the post.",
+                                  variant: "error",
+                                });
+                                return;
+                              }
+                              handleTogglePublished(postId, published);
+                            } : undefined}
+                            currentImage={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return currentImages[postId];
+                            })()}
+                            currentPDF={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return currentPDFs[postId];
+                            })()}
+                            currentPDFSlides={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return currentPDFSlides[postId] || [];
+                            })()}
+                            generatingImage={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return !!generatingImages[postId];
+                            })()}
+                            generatingPDF={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return !!generatingPDFs[postId];
+                            })()}
+                            generatingPDFProgress={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return pdfProgress[postId];
+                            })()}
+                            regeneratingSlideIndex={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return regeneratingSlideIndex[postId] ?? null;
+                            })()}
+                            currentSlideIndex={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return currentSlideIndex[postId] ?? 0;
+                            })()}
+                            onSlideChange={(slideIndex: number) => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              setCurrentSlideIndex(prev => ({ ...prev, [postId]: slideIndex }));
+                            }}
+                            imageHistory={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return imageHistory[postId] || [];
+                            })()}
+                            pdfHistory={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return pdfHistory[postId] || [];
+                            })()}
+                            showImageHistory={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return !!showImageHistory[postId];
+                            })()}
+                            showPdfHistory={(() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              return !!showPdfHistory[postId];
+                            })()}
+                            onCloseImageHistory={() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              setShowImageHistory(prev => ({ ...prev, [postId]: false }));
+                            }}
+                            onClosePdfHistory={() => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              setShowPdfHistory(prev => ({ ...prev, [postId]: false }));
+                            }}
+                            onSelectImage={async (imageId: string) => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              try {
+                                await api.images.setCurrent(imageId);
+                                await loadCurrentImage(postId);
+                                await loadImageHistory(postId);
+                              } catch (error) {
+                                console.error("Failed to set current image:", error);
+                              }
+                            }}
+                            onSelectPDF={async (pdfId: string) => {
+                              const postId = postIdMap[msg.id] || msg.id;
+                              try {
+                                await api.pdfs.setCurrent(pdfId);
+                                await loadCurrentPDF(postId);
+                                await loadPdfHistory(postId);
+                              } catch (error) {
+                                console.error("Failed to set current PDF:", error);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="bg-white rounded-lg px-5 py-3 shadow-linkedin-sm border border-[#E0DFDC]">
+                            <p className="text-sm text-black whitespace-pre-wrap">
+                              {displayContent}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Token Usage Display */}
+                        {msg.token_usage && (
+                          <div className="space-y-2">
+                            {/* Main Generation Tokens */}
+                            <div className="flex items-center gap-3 text-xs bg-[#F9F9F9] px-3 py-2 rounded-lg border border-[#E0DFDC]">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#666666] font-medium">Tokens:</span>
+                                <span className="font-mono font-semibold text-[#0A66C2]">
+                                  {msg.token_usage.total_tokens.toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#666666]">Input:</span>
+                                <span className="font-mono text-green-600 font-medium">
+                                  {msg.token_usage.input_tokens.toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#666666]">Output:</span>
+                                <span className="font-mono text-orange-600 font-medium">
+                                  {msg.token_usage.output_tokens.toLocaleString()}
+                                </span>
+                              </div>
+                              {msg.token_usage.cost && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[#666666]">Cost:</span>
+                                  <span className="font-mono text-purple-600 font-medium">
+                                    ${msg.token_usage.cost.total_cost.toFixed(6)}
+                                  </span>
+                                </div>
+                              )}
+                              {msg.token_usage.provider && (
+                                <div className="flex items-center gap-1 ml-auto">
+                                  <span className="text-[#666666] text-[10px]">
+                                    {msg.token_usage.provider.charAt(0).toUpperCase() + msg.token_usage.provider.slice(1)}
+                                    {msg.token_usage.model && ` (${msg.token_usage.model})`}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Image Prompt Generation Tokens (Separate Provider) */}
+                            {msg.token_usage.image_prompt_tokens && (
+                              <div className="flex items-center gap-3 text-xs bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[#666666] font-medium">Image Prompts:</span>
+                                  <span className="font-mono font-semibold text-blue-600">
+                                    {msg.token_usage.image_prompt_tokens.total_tokens.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[#666666]">Input:</span>
+                                  <span className="font-mono text-green-600 font-medium">
+                                    {msg.token_usage.image_prompt_tokens.input_tokens.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[#666666]">Output:</span>
+                                  <span className="font-mono text-orange-600 font-medium">
+                                    {msg.token_usage.image_prompt_tokens.output_tokens.toLocaleString()}
+                                  </span>
+                                </div>
+                                {msg.token_usage.image_prompt_cost && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[#666666]">Cost:</span>
+                                    <span className="font-mono text-purple-600 font-medium">
+                                      ${msg.token_usage.image_prompt_cost.total_cost.toFixed(6)}
+                                    </span>
+                                  </div>
+                                )}
+                                {msg.token_usage.image_prompt_provider && (
+                                  <div className="flex items-center gap-1 ml-auto">
+                                    <span className="text-[#666666] text-[10px]">
+                                      {msg.token_usage.image_prompt_provider.charAt(0).toUpperCase() + msg.token_usage.image_prompt_provider.slice(1)}
+                                      {msg.token_usage.image_prompt_model && ` (${msg.token_usage.image_prompt_model})`}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Cloudflare Image Generation Cost (Separate Provider) */}
+                            {msg.token_usage.cloudflare_cost && (
+                              <div className="flex items-center gap-3 text-xs bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[#666666] font-medium">Image Generation:</span>
+                                  <span className="font-mono font-semibold text-purple-600">
+                                    {msg.token_usage.cloudflare_cost.image_count || 1} image{(msg.token_usage.cloudflare_cost.image_count || 1) > 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[#666666]">Cost:</span>
+                                  <span className="font-mono text-purple-600 font-medium">
+                                    ${msg.token_usage.cloudflare_cost.total_cost.toFixed(6)}
+                                  </span>
+                                </div>
+                                {msg.token_usage.cloudflare_cost.cost_per_image && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[#666666] text-[10px]">(${msg.token_usage.cloudflare_cost.cost_per_image.toFixed(6)}/image)</span>
+                                  </div>
+                                )}
+                                {msg.token_usage.cloudflare_model && (
+                                  <div className="flex items-center gap-1 ml-auto">
+                                    <span className="text-[#666666] text-[10px]">
+                                      Cloudflare ({msg.token_usage.cloudflare_model.replace('@cf/leonardo/', '').replace('@cf/', '')})
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-white rounded-lg px-4 py-3 sm:px-5 sm:py-4 shadow-linkedin-sm border border-[#E0DFDC]">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1.5">
+                      <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-sm text-[#666666] font-medium">{loadingMessage}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area - Fixed at Bottom */}
+          <div className="flex-shrink-0 pt-4 sm:pt-6 pb-1 sm:pb-2 z-10 bg-[#F3F2F0]">
+            {/* Image Preview Area */}
+            {imagePreviews.length > 0 && (
+              <div className="bg-white rounded-t-xl sm:rounded-t-2xl border border-b-0 border-[#E0DFDC] p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs sm:text-sm text-[#666666] font-medium">
+                    Attached Images ({imagePreviews.length}/{MAX_IMAGES})
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllImages}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs px-2 h-7"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Clear All
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {imagePreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={preview}
+                        alt={`Upload ${index + 1}`}
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-[#E0DFDC]"
+                      />
+                      <button
+                        onClick={() => removeImage(index)}
+                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] px-1 rounded">
+                        {(uploadedImages[index]?.size / 1024 / 1024).toFixed(1)}MB
+                      </span>
+                    </div>
+                  ))}
+                  {imagePreviews.length < MAX_IMAGES && (
+                    <button
+                      onClick={() => imageInputRef.current?.click()}
+                      className="w-16 h-16 sm:w-20 sm:h-20 border-2 border-dashed border-[#E0DFDC] rounded-lg flex flex-col items-center justify-center text-[#666666] hover:border-[#0A66C2] hover:text-[#0A66C2] transition-colors"
+                    >
+                      <ImagePlus className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <span className="text-[10px] mt-0.5">Add</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Hidden file input for images */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+              multiple
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+
+            <div className={`bg-white ${imagePreviews.length > 0 ? 'rounded-b-xl sm:rounded-b-2xl' : 'rounded-xl sm:rounded-2xl'} shadow-linkedin-lg border border-[#E0DFDC] overflow-hidden`}>
+              <div className="relative flex items-start">
+                {/* Image upload icon button on the left */}
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={uploadedImages.length >= MAX_IMAGES}
+                  className={`absolute left-2 top-3 sm:left-3 sm:top-4 p-1.5 rounded-lg transition-colors z-10 ${uploadedImages.length >= MAX_IMAGES
                     ? 'text-gray-300 cursor-not-allowed'
                     : uploadedImages.length > 0
-                    ? 'text-blue-600 hover:bg-blue-50'
-                    : 'text-[#666666] hover:bg-gray-100'
-                }`}
-                title={uploadedImages.length >= MAX_IMAGES ? `Maximum ${MAX_IMAGES} images` : "Attach images"}
-              >
-                <ImagePlus className="w-5 h-5 sm:w-5 sm:h-5" />
-                {uploadedImages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                    {uploadedImages.length}
-                  </span>
-                )}
-              </button>
-              
-              <Textarea
-                placeholder="Describe what you want to post about..."
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  if (e.target.value.trim()) {
-                    setShowMobileButtons(true);
-                  }
-                }}
-                onFocus={() => setShowMobileButtons(true)}
-                onClick={() => setShowMobileButtons(true)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                rows={3}
-                className="border-0 resize-none focus-visible:ring-0 text-sm sm:text-base pl-12 sm:pl-14 pr-4 py-3 sm:pr-5 sm:py-4 w-full"
-              />
-            </div>
-            <div className={`px-3 py-2 sm:px-4 sm:py-3 bg-[#F9F9F9] border-t border-[#E0DFDC] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 ${showMobileButtons ? 'flex' : 'hidden sm:flex'}`}>
-              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowContextModal(true)}
-                  className={`${hasContext ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'text-[#666666] hover:bg-green-50'} text-xs sm:text-sm px-2 sm:px-3`}
+                      ? 'text-blue-600 hover:bg-blue-50'
+                      : 'text-[#666666] hover:bg-gray-100'
+                    }`}
+                  title={uploadedImages.length >= MAX_IMAGES ? `Maximum ${MAX_IMAGES} images` : "Attach images"}
                 >
-                  Context
-                  {hasContext ? (
-                    <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 text-green-600 flex-shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 text-gray-400 flex-shrink-0" />
+                  <ImagePlus className="w-5 h-5 sm:w-5 sm:h-5" />
+                  {uploadedImages.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                      {uploadedImages.length}
+                    </span>
                   )}
-                </Button>
-                <div ref={postTypeButtonRef} className="inline-block">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowPostTypeMenu(!showPostTypeMenu)}
-                    className={`text-[#666666] hover:bg-[#F3F2F0] ${showPostTypeMenu ? "bg-[#F3F2F0]" : ""
-                      } text-xs sm:text-sm px-2 sm:px-3`}
-                  >
-                    {(() => {
-                      const iconMap: Record<string, typeof FileText> = {
-                        auto: Zap,
-                        image: Image,
-                        text: FileText,
-                        carousel: Layers,
-                        video_script: Video,
-                      };
-                      const IconComponent = iconMap[postType] || FileText;
-                      return <IconComponent className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />;
-                    })()}
-                    {postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType === "video_script" ? "Video script" : postType}
-                  </Button>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const newTrendingState = !useTrendingTopic;
-                    setUseTrendingTopic(newTrendingState);
-                    // Auto-enable web search when Trending is toggled on
-                    if (newTrendingState) {
-                      setInternetSearch(true);
+                </button>
+
+                <Textarea
+                  placeholder="Describe what you want to post about..."
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    if (e.target.value.trim()) {
+                      setShowMobileButtons(true);
                     }
-                    // When Trending is toggled off, web search remains on (don't auto-disable)
                   }}
-                  className={`${useTrendingTopic
-                    ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
-                    : "text-[#666666] hover:bg-orange-50 hover:text-orange-600"
-                    } text-xs sm:text-sm px-2 sm:px-3`}
-                >
-                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
-                  Trending
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setInternetSearch(!internetSearch)}
-                  className={`${internetSearch
-                    ? "text-green-600 bg-green-50 hover:bg-green-100"
-                    : "text-[#666666] hover:bg-green-50 hover:text-green-600"
-                    } text-xs sm:text-sm px-2 sm:px-3`}
-                >
-                  <Globe className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
-                  Web Search
-                </Button>
-                <div ref={optionsButtonRef} className="inline-block">
+                  onFocus={() => setShowMobileButtons(true)}
+                  onClick={() => setShowMobileButtons(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  rows={3}
+                  className="border-0 resize-none focus-visible:ring-0 text-sm sm:text-base pl-12 sm:pl-14 pr-4 py-3 sm:pr-5 sm:py-4 w-full"
+                />
+              </div>
+              <div className={`px-3 py-2 sm:px-4 sm:py-3 bg-[#F9F9F9] border-t border-[#E0DFDC] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 ${showMobileButtons ? 'flex' : 'hidden sm:flex'}`}>
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowOptions(!showOptions)}
-                    className={`${areOptionsChanged
-                      ? "text-purple-600 bg-purple-50 hover:bg-purple-100"
-                      : "text-[#666666] hover:bg-purple-50 hover:text-purple-600"
+                    onClick={() => setShowContextModal(true)}
+                    className={`${hasContext ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'text-[#666666] hover:bg-green-50'} text-xs sm:text-sm px-2 sm:px-3`}
+                  >
+                    Context
+                    {hasContext ? (
+                      <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 text-green-600 flex-shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 text-gray-400 flex-shrink-0" />
+                    )}
+                  </Button>
+                  <div ref={postTypeButtonRef} className="inline-block">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPostTypeMenu(!showPostTypeMenu)}
+                      className={`text-[#666666] hover:bg-[#F3F2F0] ${showPostTypeMenu ? "bg-[#F3F2F0]" : ""
+                        } text-xs sm:text-sm px-2 sm:px-3`}
+                    >
+                      {(() => {
+                        const iconMap: Record<string, typeof FileText> = {
+                          auto: Zap,
+                          image: Image,
+                          text: FileText,
+                          carousel: Layers,
+                          video_script: Video,
+                        };
+                        const IconComponent = iconMap[postType] || FileText;
+                        return <IconComponent className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />;
+                      })()}
+                      {postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : postType === "video_script" ? "Video script" : postType}
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const newTrendingState = !useTrendingTopic;
+                      setUseTrendingTopic(newTrendingState);
+                      // Auto-enable web search when Trending is toggled on
+                      if (newTrendingState) {
+                        setInternetSearch(true);
+                      }
+                      // When Trending is toggled off, web search remains on (don't auto-disable)
+                    }}
+                    className={`${useTrendingTopic
+                      ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
+                      : "text-[#666666] hover:bg-orange-50 hover:text-orange-600"
                       } text-xs sm:text-sm px-2 sm:px-3`}
                   >
-                    <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
-                    Options
+                    <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    Trending
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setInternetSearch(!internetSearch)}
+                    className={`${internetSearch
+                      ? "text-green-600 bg-green-50 hover:bg-green-100"
+                      : "text-[#666666] hover:bg-green-50 hover:text-green-600"
+                      } text-xs sm:text-sm px-2 sm:px-3`}
+                  >
+                    <Globe className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    Web Search
+                  </Button>
+                  <div ref={optionsButtonRef} className="inline-block">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowOptions(!showOptions)}
+                      className={`${areOptionsChanged
+                        ? "text-purple-600 bg-purple-50 hover:bg-purple-100"
+                        : "text-[#666666] hover:bg-purple-50 hover:text-purple-600"
+                        } text-xs sm:text-sm px-2 sm:px-3`}
+                    >
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                      Options
+                    </Button>
+                  </div>
                 </div>
+                <Button
+                  onClick={handleSend}
+                  disabled={loading || !input.trim()}
+                  className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full px-4 sm:px-6 text-xs sm:text-sm sm:text-base whitespace-nowrap"
+                >
+                  <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                  Generate
+                </Button>
               </div>
-              <Button
-                onClick={handleSend}
-                disabled={loading || !input.trim()}
-                className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full px-4 sm:px-6 text-xs sm:text-sm sm:text-base whitespace-nowrap"
-              >
-                <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
-                Generate
-              </Button>
-            </div>
             </div>
           </div>
 
@@ -2545,52 +2610,72 @@ export default function GeneratePage() {
             />
           );
         })}
-    </div>
+      </div>
 
-    {/* Confirmation Dialog */}
-    <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{getConfirmationTitle()}</DialogTitle>
-          <DialogDescription>{getConfirmationDescription()}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setConfirmDialogOpen(false);
-              setPostToPublish(null);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            className="bg-[#0A66C2] hover:bg-[#004182] text-white"
-            onClick={async () => {
-              setConfirmDialogOpen(false);
-              if (postToPublish) {
-                await publishPostWithModal(postToPublish);
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{getConfirmationTitle()}</DialogTitle>
+            <DialogDescription>{getConfirmationDescription()}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmDialogOpen(false);
                 setPostToPublish(null);
-              }
-            }}
-          >
-            {getConfirmButtonText()}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#0A66C2] hover:bg-[#004182] text-white"
+              onClick={async () => {
+                setConfirmDialogOpen(false);
+                if (postToPublish) {
+                  await publishPostWithModal(postToPublish);
+                  setPostToPublish(null);
+                }
+              }}
+            >
+              {getConfirmButtonText()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    {/* Publishing Modal */}
-    <PublishingModal
-      open={publishingModalOpen}
-      status={publishingStatus}
-      errorMessage={publishingError}
-      onClose={() => {
-        setPublishingModalOpen(false);
-        setPublishingStatus("publishing");
-        setPublishingError("");
-      }}
-    />
+      {/* Publishing Modal */}
+      <PublishingModal
+        open={publishingModalOpen}
+        status={publishingStatus}
+        errorMessage={publishingError}
+        onClose={() => {
+          setPublishingModalOpen(false);
+          setPublishingStatus("publishing");
+          setPublishingError("");
+        }}
+      />
+
+      {/* Schedule Modal */}
+      {postToSchedule && (
+        <ScheduleModal
+          open={scheduleModalOpen}
+          onOpenChange={setScheduleModalOpen}
+          postId={postToSchedule.id}
+          postContent={postToSchedule.content}
+          formatType={postToSchedule.formatType}
+          published={postToSchedule.published}
+          userProfile={user ? {
+            name: user.name || "User",
+            headline: user.headline || "",
+            avatar: user.avatar,
+          } : undefined}
+          onScheduleSuccess={() => {
+            setPostToSchedule(null);
+          }}
+        />
+      )}
     </>
   );
 }

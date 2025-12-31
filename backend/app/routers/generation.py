@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from ..database import get_db
@@ -13,10 +13,14 @@ from ..schemas.generation import (
     PostMetadata,
     GenerationHistoryResponse,
     UpdateGenerationRequest,
-    TokenUsage
+    TokenUsage,
+    SchedulePostRequest,
+    ScheduledPostResponse,
+    ScheduledPostsListResponse
 )
 from ..services.ai_service import generate_completion, generate_conversation_title, research_topic_with_search
 from ..services.linkedin_service import LinkedInService
+from ..services.post_publishing_service import publish_post_to_linkedin
 from ..models import User
 from ..prompts.system_prompts import build_post_generation_prompt
 from ..prompts.templates import get_format_specific_instructions
@@ -1249,7 +1253,7 @@ async def get_generation_history(
             user_rating=post.user_rating,
             published_to_linkedin=post.published_to_linkedin,
             conversation_id=post.conversation_id,
-            scheduled_at=None,  # Not implemented yet
+            scheduled_at=post.scheduled_at,
             generation_options=post.generation_options
         )
         for post in posts
@@ -1310,6 +1314,7 @@ async def rate_generation(
         "message": "Rating saved"
     }
 
+
 @router.post("/{post_id}/publish")
 async def publish_post(
     post_id: str,
@@ -1331,133 +1336,25 @@ async def publish_post(
     
     # Note: We allow republishing - the frontend will show a confirmation dialog
     
-    # Get user and check LinkedIn connection
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if not user.linkedin_connected or not user.linkedin_access_token:
-        raise HTTPException(
-            status_code=400, 
-            detail="LinkedIn account not connected. Please connect your LinkedIn account in settings."
-        )
-    
-    # Check if token is expired and refresh if needed
-    access_token = user.linkedin_access_token
-    if user.linkedin_token_expires_at and datetime.utcnow() >= user.linkedin_token_expires_at:
-        if user.linkedin_refresh_token:
-            try:
-                token_data = await LinkedInService.refresh_access_token(user.linkedin_refresh_token)
-                access_token = token_data["access_token"]
-                user.linkedin_access_token = access_token
-                user.linkedin_token_expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 5184000))
-                db.commit()
-            except Exception as e:
-                raise HTTPException(
-                    status_code=401, 
-                    detail=f"Token expired. Please reconnect your LinkedIn account: {str(e)}"
-                )
-        else:
-            raise HTTPException(
-                status_code=401, 
-                detail="Token expired. Please reconnect your LinkedIn account."
-            )
-    
-    # Get post content (use edited content if available, otherwise use generated content)
-    post_content = post.user_edited_content if post.user_edited_content else post.content
-    
-    if not post_content or not post_content.strip():
-        raise HTTPException(status_code=400, detail="Post content is empty")
-    
-    # Get current image or PDF for attachment
-    image_urn = None
-    image_urns = None
-    document_urn = None
-    
-    # Check for carousel PDF (carousel posts - PDF only, no fallback)
-    if post.format == PostFormat.CAROUSEL:
-        current_pdf = db.query(GeneratedPDF).filter(
-            GeneratedPDF.post_id == post_id,
-            GeneratedPDF.is_current == True
-        ).first()
-        
-        if not current_pdf:
-            raise HTTPException(
-                status_code=400, 
-                detail="No PDF found for this carousel post. Please generate a PDF first."
-            )
-        
-        if not current_pdf.pdf_data:
-            raise HTTPException(
-                status_code=400, 
-                detail="PDF data is missing. Please regenerate the PDF."
-            )
-        
-        # Upload PDF document - required for carousel posts (strictly PDF only)
-        try:
-            document_urn = await LinkedInService.upload_document(
-                access_token=access_token,
-                linkedin_id=user.linkedin_id,
-                pdf_base64=current_pdf.pdf_data
-            )
-        except Exception as e:
-            error_message = str(e)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to upload PDF document to LinkedIn: {error_message}"
-            )
-        
-        # Ensure image_urns is None for carousel posts (PDF only)
-        image_urns = None
-    
-    # Check for single image (image posts)
-    elif post.format == PostFormat.IMAGE:
-        current_image = db.query(GeneratedImage).filter(
-            GeneratedImage.post_id == post_id,
-            GeneratedImage.is_current == True
-        ).first()
-        
-        if current_image and current_image.image_data:
-            try:
-                image_urn = await LinkedInService.upload_image(
-                    access_token=access_token,
-                    linkedin_id=user.linkedin_id,
-                    image_base64=current_image.image_data
-                )
-            except Exception as e:
-                # If image upload fails, publish as text-only
-                print(f"Failed to upload image: {str(e)}")
-                image_urn = None
-    
     try:
-        # Publish to LinkedIn
-        result = await LinkedInService.publish_post(
-            access_token=access_token,
-            linkedin_id=user.linkedin_id,
-            content=post_content,
-            visibility="PUBLIC",
-            image_urn=image_urn,
-            image_urns=image_urns,
-            document_urn=document_urn
-        )
-        
-        # Update post status
-        post.published_to_linkedin = True
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Post published to LinkedIn successfully",
-            "linkedin_post_id": result.get("id"),
-            "linkedin_post_url": result.get("url")
-        }
-        
+        result = await publish_post_to_linkedin(post_id, db)
+        return result
+    except ValueError as e:
+        error_message = str(e)
+        if "not found" in error_message.lower():
+            raise HTTPException(status_code=404, detail=error_message)
+        elif "not connected" in error_message.lower():
+            raise HTTPException(status_code=400, detail=error_message)
+        elif "expired" in error_message.lower():
+            raise HTTPException(status_code=401, detail=error_message)
+        else:
+            raise HTTPException(status_code=400, detail=error_message)
     except Exception as e:
         error_message = str(e)
         # Provide more helpful error messages
         if "401" in error_message or "unauthorized" in error_message.lower():
             raise HTTPException(
-                status_code=401,
+                status_code=401, 
                 detail="LinkedIn authorization failed. Please reconnect your LinkedIn account."
             )
         elif "403" in error_message or "forbidden" in error_message.lower():
@@ -1470,6 +1367,184 @@ async def publish_post(
                 status_code=500,
                 detail=f"Failed to publish post to LinkedIn: {error_message}"
             )
+
+@router.post("/posts/{post_id}/schedule")
+async def schedule_post(
+    post_id: str,
+    request: SchedulePostRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Schedule a post for future publication.
+    """
+    # Get the post
+    post = db.query(GeneratedPost).filter(
+        GeneratedPost.id == post_id,
+        GeneratedPost.user_id == user_id
+    ).first()
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Don't allow scheduling if already published
+    if post.published_to_linkedin:
+        raise HTTPException(status_code=400, detail="Cannot schedule a post that is already published. Please mark it as not published first.")
+    
+    # Validate scheduled time is in the future
+    # Ensure both datetimes are timezone-aware for comparison
+    now_utc = datetime.now(timezone.utc)
+    scheduled_at_utc = request.scheduled_at
+    
+    # If scheduled_at is timezone-aware, convert to UTC; if naive, assume UTC
+    if scheduled_at_utc.tzinfo is not None:
+        scheduled_at_utc = scheduled_at_utc.astimezone(timezone.utc)
+    else:
+        scheduled_at_utc = scheduled_at_utc.replace(tzinfo=timezone.utc)
+    
+    if scheduled_at_utc <= now_utc:
+        raise HTTPException(status_code=400, detail="Scheduled time must be in the future")
+    
+    # Update post with scheduled time (store as naive UTC datetime for database)
+    post.scheduled_at = scheduled_at_utc.replace(tzinfo=None)
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Post scheduled successfully",
+        "scheduled_at": post.scheduled_at
+    }
+
+@router.delete("/posts/{post_id}/schedule")
+async def cancel_schedule(
+    post_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel a scheduled post.
+    """
+    # Get the post
+    post = db.query(GeneratedPost).filter(
+        GeneratedPost.id == post_id,
+        GeneratedPost.user_id == user_id
+        ).first()
+        
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    if not post.scheduled_at:
+        raise HTTPException(status_code=400, detail="Post is not scheduled")
+    
+    # Clear scheduled time
+    post.scheduled_at = None
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Schedule cancelled successfully"
+    }
+
+@router.post("/posts/{post_id}/publish-now")
+async def publish_scheduled_post_now(
+    post_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Publish a scheduled post immediately.
+    """
+    # Get the post
+    post = db.query(GeneratedPost).filter(
+        GeneratedPost.id == post_id,
+        GeneratedPost.user_id == user_id
+    ).first()
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Allow scheduling even if already published - user can repost
+    try:
+        result = await publish_post_to_linkedin(post_id, db)
+        return result
+    except ValueError as e:
+        error_message = str(e)
+        if "not found" in error_message.lower():
+            raise HTTPException(status_code=404, detail=error_message)
+        elif "not connected" in error_message.lower():
+            raise HTTPException(status_code=400, detail=error_message)
+        elif "expired" in error_message.lower():
+            raise HTTPException(status_code=401, detail=error_message)
+        else:
+            raise HTTPException(status_code=400, detail=error_message)
+    except Exception as e:
+        error_message = str(e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to publish post: {error_message}"
+        )
+
+@router.get("/scheduled-posts", response_model=ScheduledPostsListResponse)
+async def get_scheduled_posts(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all scheduled posts for the current user.
+    Includes both unpublished and published posts that are scheduled.
+    """
+    # Get all scheduled posts (including those that are already published)
+    posts = db.query(GeneratedPost).filter(
+        GeneratedPost.user_id == user_id,
+        GeneratedPost.scheduled_at.isnot(None)
+    ).order_by(GeneratedPost.scheduled_at.asc()).all()
+    
+    scheduled_posts = []
+    for post in posts:
+        scheduled_posts.append(ScheduledPostResponse(
+            id=post.id,
+            content=post.user_edited_content if post.user_edited_content else post.content,
+            format=post.format.value if post.format else None,
+            scheduled_at=post.scheduled_at,
+            conversation_id=post.conversation_id,
+            generation_options=post.generation_options
+        ))
+    
+    return ScheduledPostsListResponse(posts=scheduled_posts)
+
+@router.patch("/posts/{post_id}/published-status")
+async def toggle_published_status(
+    post_id: str,
+    published: bool,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually toggle the published status of a post.
+    """
+    # Get the post
+    post = db.query(GeneratedPost).filter(
+        GeneratedPost.id == post_id,
+        GeneratedPost.user_id == user_id
+        ).first()
+        
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Update published status
+    post.published_to_linkedin = published
+    
+    # If marking as not published and it's scheduled, clear the schedule
+    if not published and post.scheduled_at:
+        post.scheduled_at = None
+    
+        db.commit()
+        
+        return {
+            "success": True,
+        "message": f"Post marked as {'published' if published else 'not published'}",
+        "published_to_linkedin": post.published_to_linkedin
+    }
 
 def format_video_script_dict(script_dict: dict) -> str:
     """
