@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Sparkles,
   Wand2,
+  CheckCircle2,
 } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import { CarouselSlider } from './CarouselSlider';
@@ -93,6 +94,7 @@ interface LinkedInPostPreviewProps {
   onClosePdfHistory?: () => void;
   onSelectImage?: (imageId: string) => void;
   onSelectPDF?: (pdfId: string) => void;
+  published?: boolean; // Whether the post has been published
   className?: string;
 }
 
@@ -227,6 +229,7 @@ export function LinkedInPostPreview({
   onClosePdfHistory,
   onSelectImage,
   onSelectPDF,
+  published = false,
   className = '',
 }: LinkedInPostPreviewProps) {
   const [showFullscreenImage, setShowFullscreenImage] = useState(false);
@@ -743,15 +746,43 @@ export function LinkedInPostPreview({
 
           {/* Post to LinkedIn */}
           {onPost && (
-            <Button
-              onClick={onPost}
-              size="sm"
-              className="flex items-center gap-1 h-7 text-xs px-2 bg-[#0A66C2] hover:bg-[#004182] text-white"
-              title="Publish to LinkedIn now"
-            >
-              <ExternalLink className="w-3 h-3" />
-              <span>Publish</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onPost}
+                size="sm"
+                disabled={generatingImage || generatingPDF || regeneratingSlideIndex !== null}
+                className={`flex items-center gap-1 h-7 text-xs px-2 ${
+                  published 
+                    ? "bg-green-600 hover:bg-green-700 text-white" 
+                    : generatingImage || generatingPDF || regeneratingSlideIndex !== null
+                    ? "bg-gray-400 cursor-not-allowed text-white opacity-60"
+                    : "bg-[#0A66C2] hover:bg-[#004182] text-white"
+                }`}
+                title={
+                  published 
+                    ? "Published to LinkedIn" 
+                    : generatingImage 
+                    ? "Please wait for image generation to complete"
+                    : generatingPDF
+                    ? "Please wait for carousel generation to complete"
+                    : regeneratingSlideIndex !== null
+                    ? "Please wait for slide regeneration to complete"
+                    : "Publish to LinkedIn now"
+                }
+              >
+                {published ? (
+                  <>
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Published</span>
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Publish</span>
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
       </div>

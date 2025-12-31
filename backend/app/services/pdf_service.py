@@ -10,8 +10,21 @@ from PIL import Image
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.units import inch
 
-async def create_pdf_from_images(image_base64_list: List[str], slide_prompts: List[str]) -> str:
+# LinkedIn carousel dimensions (in points, 72 DPI = 1 point = 1 pixel)
+# Square format: 1080x1080 pixels (most common)
+LINKEDIN_SQUARE_WIDTH = 1080
+LINKEDIN_SQUARE_HEIGHT = 1080
+# Portrait format: 1080x1350 pixels (better for mobile)
+LINKEDIN_PORTRAIT_WIDTH = 1080
+LINKEDIN_PORTRAIT_HEIGHT = 1350
+
+async def create_pdf_from_images(
+    image_base64_list: List[str], 
+    slide_prompts: List[str],
+    format: str = "square"  # "square" (1080x1080) or "portrait" (1080x1350)
+) -> str:
     """
     Create a PDF from multiple base64-encoded images
     
@@ -35,14 +48,18 @@ async def create_pdf_from_images(image_base64_list: List[str], slide_prompts: Li
         if len(img) < 100:  # Basic validation - base64 images should be longer
             raise ValueError(f"Image data too short at index {i} (likely invalid)")
     
-    # Create PDF buffer
+    # Create PDF buffer with LinkedIn-exact dimensions
     buffer = io.BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
     
-    # LinkedIn carousel dimensions (optimized for mobile)
-    # Standard LinkedIn carousel: 1080x1080px (square)
-    # We'll use letter size but scale images to fit
-    page_width, page_height = letter
+    # Use LinkedIn's exact pixel dimensions (in points, 72 DPI)
+    if format == "portrait":
+        page_width = LINKEDIN_PORTRAIT_WIDTH
+        page_height = LINKEDIN_PORTRAIT_HEIGHT
+    else:  # default to square
+        page_width = LINKEDIN_SQUARE_WIDTH
+        page_height = LINKEDIN_SQUARE_HEIGHT
+    
+    pdf = canvas.Canvas(buffer, pagesize=(page_width, page_height))
     
     for i, image_base64 in enumerate(image_base64_list):
         try:
@@ -76,39 +93,26 @@ async def create_pdf_from_images(image_base64_list: List[str], slide_prompts: Li
             elif image.mode not in ('RGB', 'L'):
                 image = image.convert('RGB')
             
-            # Calculate dimensions to fit page while maintaining aspect ratio
+            # Resize image to match LinkedIn's exact page dimensions
+            # This ensures no cropping and perfect fit
             img_width, img_height = image.size
             if img_width == 0 or img_height == 0:
                 raise ValueError(f"Invalid image dimensions for slide {i + 1}")
             
-            aspect_ratio = img_width / img_height
+            # Resize image to match page dimensions exactly
+            # Use high-quality resampling to maintain image quality
+            # Use LANCZOS resampling for best quality (compatible with both old and new PIL versions)
+            try:
+                # Pillow 9.0.0+ uses Image.Resampling
+                resampling = Image.Resampling.LANCZOS
+            except AttributeError:
+                # Older Pillow versions use Image.LANCZOS directly
+                resampling = Image.LANCZOS
+            resized_image = image.resize((int(page_width), int(page_height)), resampling)
             
-            # Scale to fit page (with margins)
-            margin = 20
-            max_width = page_width - (margin * 2)
-            max_height = page_height - (margin * 2)
-            
-            if aspect_ratio > 1:
-                # Landscape
-                width = min(max_width, img_width)
-                height = width / aspect_ratio
-            else:
-                # Portrait or square
-                height = min(max_height, img_height)
-                width = height * aspect_ratio
-            
-            # Center image on page
-            x = (page_width - width) / 2
-            y = (page_height - height) / 2
-            
-            # Add image to PDF
-            img_reader = ImageReader(image)
-            pdf.drawImage(img_reader, x, y, width=width, height=height, preserveAspectRatio=True)
-            
-            # Add page number (optional, small text at bottom)
-            pdf.setFont("Helvetica", 8)
-            pdf.setFillColorRGB(0.5, 0.5, 0.5)
-            pdf.drawString(margin, margin, f"Slide {i + 1} of {len(image_base64_list)}")
+            # Add image to PDF - fill entire page (0,0 to page_width, page_height)
+            img_reader = ImageReader(resized_image)
+            pdf.drawImage(img_reader, 0, 0, width=page_width, height=page_height, preserveAspectRatio=False)
             
             # Start new page for next image (except last one)
             if i < len(image_base64_list) - 1:
@@ -146,7 +150,8 @@ async def create_pdf_from_images(image_base64_list: List[str], slide_prompts: Li
 async def create_carousel_pdf(
     slide_images: List[str],
     slide_prompts: List[str],
-    model: str = "cloudflare"
+    model: str = "cloudflare",
+    format: str = "square"  # "square" (1080x1080) or "portrait" (1080x1350)
 ) -> dict:
     """
     Create a carousel PDF from slide images
@@ -162,7 +167,7 @@ async def create_carousel_pdf(
     if len(slide_images) != len(slide_prompts):
         raise ValueError("Number of images must match number of prompts")
     
-    pdf_base64 = await create_pdf_from_images(slide_images, slide_prompts)
+    pdf_base64 = await create_pdf_from_images(slide_images, slide_prompts, format=format)
     
     return {
         "pdf": pdf_base64,

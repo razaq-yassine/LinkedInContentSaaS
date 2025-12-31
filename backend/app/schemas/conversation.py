@@ -25,6 +25,7 @@ class MessageResponse(BaseModel):
     image_prompts: Optional[List[str]] = None  # For carousel posts
     metadata: Optional[Dict[str, Any]] = None
     token_usage: Optional[Dict[str, Any]] = None  # Token usage data from generation_options
+    published_to_linkedin: Optional[bool] = False  # Whether the post has been published
     
     class Config:
         from_attributes = True

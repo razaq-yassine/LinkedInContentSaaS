@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConversationList } from "@/components/ConversationList";
+import { ToasterProvider } from "@/components/ui/toaster";
 import { 
   PenSquare, 
   MessageSquare, 
@@ -135,6 +136,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <ToasterProvider>
     <div className="min-h-screen bg-[#F3F2F0] flex">
       {/* Sidebar */}
       <aside
@@ -310,6 +312,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <main className="flex-1 lg:ml-[280px] pt-14 sm:pt-16 lg:pt-0">{children}</main>
     </div>
+    </ToasterProvider>
   );
 }
 

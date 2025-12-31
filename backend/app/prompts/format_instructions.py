@@ -80,75 +80,61 @@ Generate a comprehensive video script for LinkedIn:
 
 The script should be engaging, valuable, and optimized for LinkedIn video format."""
 
-# JSON Format Templates (Optimized for token efficiency)
+# JSON Format Templates (Optimized for token efficiency - minimal fields only)
 CAROUSEL_JSON_FORMAT = """{
     "title": "Concise title (3-8 words)",
     "post_content": "LinkedIn post text with hashtags at end",
-    "format_type": "carousel",
-    "image_prompts": ["Slide 1: prompt with consistent theme", "Slide 2: same theme", "4-8 slides total, same colors/style"],
-    "metadata": {
-        "hashtags": ["#tag1", "#tag2", "#tag3"],
-        "tone": "professional|casual|thought-leader|educator",
-        "estimated_engagement": "low|medium|high"
-    }
+    "image_prompts": ["Slide 1: prompt with consistent theme", "Slide 2: same theme", "4-15 slides total, same colors/style"],
+    "hashtags": ["#tag1", "#tag2", "#tag3"]
 }
 
-Rules: All slides use SAME colors/style. Educational posts need text overlays. Include hashtags in post_content AND metadata."""
+Rules: 
+- All slides use SAME colors/style
+- Educational posts need text overlays
+- Include hashtags in post_content AND as separate array"""
 
 IMAGE_JSON_FORMAT = """{
     "title": "Concise title (3-8 words)",
     "post_content": "LinkedIn post text with hashtags at end",
-    "format_type": "image",
     "image_prompt": "Visual prompt: real-world if specific tools/platforms, cartoon if abstract. 1200x628px, professional.",
-    "metadata": {
-        "hashtags": ["#tag1", "#tag2", "#tag3"],
-        "tone": "professional|casual|thought-leader|educator",
-        "estimated_engagement": "low|medium|high"
-    }
+    "hashtags": ["#tag1", "#tag2", "#tag3"]
 }
 
-Rules: Include hashtags in post_content AND metadata."""
+Rules: 
+- Include hashtags in post_content AND as separate array"""
 
 VIDEO_SCRIPT_JSON_FORMAT = """{
     "title": "A concise, descriptive title for this post (3-8 words, captures the main topic)",
     "post_content": "Complete video script formatted as readable text:\n\n[Hook - 3-5 seconds]\nYour attention-grabbing opening line here. Make it conversational and engaging.\n\n[Introduction - 10-15 seconds]\nSet up the context and why this topic matters. Establish credibility.\n\n[Main Content - 40-60 seconds]\nBreak down your main points:\n\nPoint 1: [Brief description]\n[Visual cue: what to show]\nYour script text here with natural pauses and conversational flow.\n\nPoint 2: [Brief description]\n[Visual cue: what to show]\nYour script text here.\n\nPoint 3: [Brief description]\n[Visual cue: what to show]\nYour script text here.\n\n[Summary - 10-15 seconds]\nReinforce the key takeaway. Tie back to the hook if possible.\n\n[CTA - 5-10 seconds]\nClear call-to-action that encourages engagement.\n\nTotal duration: 60-90 seconds. Write naturally as if speaking, not reading.",
-    "format_type": "video_script",
-    "metadata": {
-        "hashtags": ["tag1", "tag2", "tag3"],
-        "tone": "professional|casual|thought-leader|educator",
-        "estimated_engagement": "low|medium|high"
-    }
+    "hashtags": ["tag1", "tag2", "tag3"]
 }
 
-CRITICAL: post_content MUST be a single formatted string, NOT a dictionary or structured object. Format it as readable text with clear sections marked by brackets like [Hook], [Introduction], etc. Users will read this script when creating their video."""
+CRITICAL: 
+- post_content MUST be a single formatted string, NOT a dictionary or structured object"""
 
 TEXT_JSON_FORMAT = """{
     "title": "Concise title (3-8 words)",
     "post_content": "Post content with hashtags at end",
-    "format_type": "text",
-    "image_prompt": null,
-    "metadata": {
-        "hashtags": ["#tag1", "#tag2", "#tag3"],
-        "tone": "professional|casual|thought-leader|educator",
-        "estimated_engagement": "low|medium|high"
-    }
+    "hashtags": ["#tag1", "#tag2", "#tag3"]
 }
 
-Rules: Include hashtags in post_content AND metadata."""
+Rules: 
+- Include hashtags in post_content AND as separate array
+- Return ONLY these fields (no format_type, no tone, no estimated_engagement, no image_prompt, no metadata wrapper)"""
 
 # Response Format Requirements
 RESPONSE_FORMAT_REQUIREMENTS = """
 ## Response Format
-Respond with ONLY valid JSON (no markdown blocks).
+Respond with ONLY valid JSON (no markdown blocks, no explanations).
 
-Rules:
-- title: REQUIRED - A concise, descriptive title for this post (3-8 words, captures the main topic). This will be used as the conversation title.
-- post_content: Normal LinkedIn post text (what users read)
-- image_prompt/image_prompts: SEPARATE from post_content (for generation only)
-- Write post_content as standalone post, independent of image prompts
-- CRITICAL: metadata.hashtags MUST be an array with the exact number of hashtags requested (default: 4)
-- Hashtags should be relevant to the content and industry
-- Only use empty array if user explicitly requested zero hashtags"""
+REQUIRED FIELDS:
+- title: Concise title (3-8 words) for conversation title
+- post_content: LinkedIn post text with hashtags included
+- hashtags: Array of hashtags (exact count requested, default: 4)
+- image_prompt: Only for image posts (single string)
+- image_prompts: Only for carousel posts (array of strings, 4-15 slides)
+
+CRITICAL: hashtags MUST be an array with the exact number requested (default: 4). Only use empty array if user explicitly requested zero hashtags."""
 
 def get_format_instructions(post_type: str) -> str:
     """Get format-specific instructions"""

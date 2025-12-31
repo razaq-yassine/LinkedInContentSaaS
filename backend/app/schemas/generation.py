@@ -76,6 +76,10 @@ class GenerationHistoryResponse(BaseModel):
     topic: Optional[str]
     created_at: datetime
     user_rating: Optional[int]
+    published_to_linkedin: Optional[bool] = False
+    conversation_id: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    generation_options: Optional[Dict[str, Any]] = None
     
     class Config:
         from_attributes = True

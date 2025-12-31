@@ -936,20 +936,57 @@ async def linkedin_connect(
 
 @router.get("/linkedin/callback")
 async def linkedin_callback(
-    code: str = Query(...),
-    state: str = Query(...),
+    request: Request,
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    error_description: str = Query(None),
     db: Session = Depends(get_db)
 ):
     """Handle LinkedIn OAuth callback"""
+    # Try to get redirect_context from state if available (for popup responses)
+    redirect_context = "login"  # Default to login for error responses
+    if state and state in oauth_states:
+        redirect_context = oauth_states[state].get("redirect_context", "login")
+    
+    # Check for LinkedIn error responses first
+    if error:
+        error_msg = error_description or error
+        if redirect_context == "settings":
+            return create_popup_response(False, "linkedin-oauth-error", f"LinkedIn OAuth error: {error_msg}")
+        raise HTTPException(status_code=400, detail=f"LinkedIn OAuth error: {error_msg}")
+    
+    # Check if code is missing
+    if not code:
+        # Get all query parameters for debugging
+        all_params = dict(request.query_params)
+        error_msg = f"Missing authorization code. Query parameters received: {all_params}. Please verify that the redirect URI in your LinkedIn app matches exactly: {settings.linkedin_redirect_uri}"
+        if redirect_context == "settings":
+            return create_popup_response(False, "linkedin-oauth-error", error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Check if state is missing
+    if not state:
+        error_msg = f"Missing state parameter. This may indicate a redirect URI mismatch. Expected redirect URI: {settings.linkedin_redirect_uri}"
+        if redirect_context == "settings":
+            return create_popup_response(False, "linkedin-oauth-error", error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+    
     if state not in oauth_states:
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
+        error_msg = "Invalid state parameter. The OAuth session may have expired. Please try again."
+        if redirect_context == "settings":
+            return create_popup_response(False, "linkedin-oauth-error", error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
     
     state_data = oauth_states.pop(state)
     user_id = state_data.get("user_id")
     redirect_context = state_data.get("redirect_context", "settings")
     
     if datetime.utcnow() - state_data["created_at"] > timedelta(minutes=5):
-        raise HTTPException(status_code=400, detail="State expired")
+        error_msg = "State expired. Please try again."
+        if redirect_context == "settings":
+            return create_popup_response(False, "linkedin-oauth-error", error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
     
     try:
         token_data = await LinkedInService.exchange_code_for_token(code)

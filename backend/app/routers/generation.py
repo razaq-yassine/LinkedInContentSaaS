@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import uuid
 
 from ..database import get_db
-from ..models import UserProfile, GeneratedPost, Conversation, ConversationMessage, MessageRole, PostFormat
+from ..models import UserProfile, GeneratedPost, Conversation, ConversationMessage, MessageRole, PostFormat, GeneratedImage, GeneratedPDF
 from ..routers.auth import get_current_user_id
 from ..schemas.generation import (
     PostGenerationRequest,
@@ -16,6 +16,8 @@ from ..schemas.generation import (
     TokenUsage
 )
 from ..services.ai_service import generate_completion, generate_conversation_title, research_topic_with_search
+from ..services.linkedin_service import LinkedInService
+from ..models import User
 from ..prompts.system_prompts import build_post_generation_prompt
 from ..prompts.templates import get_format_specific_instructions
 from ..prompts.format_instructions import (
@@ -194,6 +196,35 @@ async def generate_post(
                 hashtag_count = 0
             
             parsed_options['hashtag_count'] = hashtag_count
+            
+            # Parse slide count preferences for carousel posts
+            slide_count = None
+            slide_patterns = [
+                (r'(\d+)\s*slides?', lambda m: int(m.group(1))),
+                (r'slides?.*?(\d+)', lambda m: int(m.group(1))),
+                (r'(\d+)\s*images?', lambda m: int(m.group(1))),
+                (r'images?.*?(\d+)', lambda m: int(m.group(1))),
+            ]
+            
+            # Check for explicit numbers first
+            for pattern, extractor in slide_patterns:
+                match = re.search(pattern, user_message, re.IGNORECASE)
+                if match:
+                    try:
+                        count = extractor(match)
+                        if 4 <= count <= 15:  # Valid range
+                            slide_count = count
+                            break
+                        elif count > 15:
+                            # Cap at 15 maximum
+                            slide_count = 15
+                            break
+                    except:
+                        pass
+            
+            if slide_count:
+                parsed_options['slide_count'] = slide_count
+            
             return parsed_options
         
         # Override options with prompt preferences (prompt has priority)
@@ -747,7 +778,8 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             elif post_type == 'video_script':
                 format_type = 'video_script'
             else:
-                format_type = response_data.get("format_type", post_type)
+                # format_type removed from output - use post_type from input
+                format_type = post_type
             
             # Handle image prompts based on format
             image_prompt = None
@@ -763,7 +795,13 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                         image_prompts = [single_prompt]
                     else:
                         # Generate prompts if missing
-                        image_prompts_result, carousel_token_usage = await generate_carousel_image_prompts(post_content, profile.context_json or {})
+                        # Pass slide_count from request_options if available
+                        requested_slide_count = request_options.get('slide_count')
+                        image_prompts_result, carousel_token_usage = await generate_carousel_image_prompts(
+                            post_content, 
+                            profile.context_json or {}, 
+                            requested_slide_count=requested_slide_count
+                        )
                         image_prompts = image_prompts_result
                         # Track image prompt tokens separately (different provider)
                         image_prompt_input_tokens += carousel_token_usage.get("input_tokens", 0)
@@ -795,7 +833,11 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                         "total_tokens": image_token_usage.get("total_tokens", 0)
                     }
             
+            # Extract metadata - hashtags are now at top level, but support legacy format
             metadata_dict = response_data.get("metadata", {})
+            # If hashtags are at top level (new format), move to metadata for compatibility
+            if "hashtags" in response_data and "hashtags" not in metadata_dict:
+                metadata_dict["hashtags"] = response_data.get("hashtags", [])
         except json.JSONDecodeError:
             # Fallback to plain text response
             post_content = raw_response
@@ -817,7 +859,13 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 }
             elif post_type == 'carousel':
                 format_type = 'carousel'
-                image_prompts_result, carousel_token_usage = await generate_carousel_image_prompts(post_content, profile.context_json or {})
+                # Pass slide_count from request_options if available
+                requested_slide_count = request_options.get('slide_count')
+                image_prompts_result, carousel_token_usage = await generate_carousel_image_prompts(
+                    post_content, 
+                    profile.context_json or {}, 
+                    requested_slide_count=requested_slide_count
+                )
                 image_prompts = image_prompts_result
                 image_prompt = image_prompts[0] if image_prompts and len(image_prompts) > 0 else None
                 # Track image prompt tokens separately (different provider)
@@ -1115,10 +1163,11 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 # If no hashtags at all, log a warning
                 print(f"WARNING: No hashtags found in metadata or content. Requested: {hashtag_count_requested}")
         
+        # Build metadata for response (hashtags only - tone and estimated_engagement removed)
         metadata = PostMetadata(
             hashtags=hashtags_from_metadata if hashtag_count_requested > 0 else [],
-            tone=metadata_dict.get("tone", "professional"),
-            estimated_engagement=metadata_dict.get("estimated_engagement", "medium")
+            tone="professional",  # Default value, not from AI output
+            estimated_engagement="medium"  # Default value, not from AI output
         )
         
         # Get the conversation title to return in response
@@ -1197,7 +1246,11 @@ async def get_generation_history(
             format=post.format.value,
             topic=post.topic,
             created_at=post.created_at,
-            user_rating=post.user_rating
+            user_rating=post.user_rating,
+            published_to_linkedin=post.published_to_linkedin,
+            conversation_id=post.conversation_id,
+            scheduled_at=None,  # Not implemented yet
+            generation_options=post.generation_options
         )
         for post in posts
     ]
@@ -1256,6 +1309,167 @@ async def rate_generation(
         "success": True,
         "message": "Rating saved"
     }
+
+@router.post("/{post_id}/publish")
+async def publish_post(
+    post_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Publish a generated post to LinkedIn.
+    Requires LinkedIn account to be connected.
+    """
+    # Get the post
+    post = db.query(GeneratedPost).filter(
+        GeneratedPost.id == post_id,
+        GeneratedPost.user_id == user_id
+    ).first()
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Note: We allow republishing - the frontend will show a confirmation dialog
+    
+    # Get user and check LinkedIn connection
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.linkedin_connected or not user.linkedin_access_token:
+        raise HTTPException(
+            status_code=400, 
+            detail="LinkedIn account not connected. Please connect your LinkedIn account in settings."
+        )
+    
+    # Check if token is expired and refresh if needed
+    access_token = user.linkedin_access_token
+    if user.linkedin_token_expires_at and datetime.utcnow() >= user.linkedin_token_expires_at:
+        if user.linkedin_refresh_token:
+            try:
+                token_data = await LinkedInService.refresh_access_token(user.linkedin_refresh_token)
+                access_token = token_data["access_token"]
+                user.linkedin_access_token = access_token
+                user.linkedin_token_expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 5184000))
+                db.commit()
+            except Exception as e:
+                raise HTTPException(
+                    status_code=401, 
+                    detail=f"Token expired. Please reconnect your LinkedIn account: {str(e)}"
+                )
+        else:
+            raise HTTPException(
+                status_code=401, 
+                detail="Token expired. Please reconnect your LinkedIn account."
+            )
+    
+    # Get post content (use edited content if available, otherwise use generated content)
+    post_content = post.user_edited_content if post.user_edited_content else post.content
+    
+    if not post_content or not post_content.strip():
+        raise HTTPException(status_code=400, detail="Post content is empty")
+    
+    # Get current image or PDF for attachment
+    image_urn = None
+    image_urns = None
+    document_urn = None
+    
+    # Check for carousel PDF (carousel posts - PDF only, no fallback)
+    if post.format == PostFormat.CAROUSEL:
+        current_pdf = db.query(GeneratedPDF).filter(
+            GeneratedPDF.post_id == post_id,
+            GeneratedPDF.is_current == True
+        ).first()
+        
+        if not current_pdf:
+            raise HTTPException(
+                status_code=400, 
+                detail="No PDF found for this carousel post. Please generate a PDF first."
+            )
+        
+        if not current_pdf.pdf_data:
+            raise HTTPException(
+                status_code=400, 
+                detail="PDF data is missing. Please regenerate the PDF."
+            )
+        
+        # Upload PDF document - required for carousel posts (strictly PDF only)
+        try:
+            document_urn = await LinkedInService.upload_document(
+                access_token=access_token,
+                linkedin_id=user.linkedin_id,
+                pdf_base64=current_pdf.pdf_data
+            )
+        except Exception as e:
+            error_message = str(e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload PDF document to LinkedIn: {error_message}"
+            )
+        
+        # Ensure image_urns is None for carousel posts (PDF only)
+        image_urns = None
+    
+    # Check for single image (image posts)
+    elif post.format == PostFormat.IMAGE:
+        current_image = db.query(GeneratedImage).filter(
+            GeneratedImage.post_id == post_id,
+            GeneratedImage.is_current == True
+        ).first()
+        
+        if current_image and current_image.image_data:
+            try:
+                image_urn = await LinkedInService.upload_image(
+                    access_token=access_token,
+                    linkedin_id=user.linkedin_id,
+                    image_base64=current_image.image_data
+                )
+            except Exception as e:
+                # If image upload fails, publish as text-only
+                print(f"Failed to upload image: {str(e)}")
+                image_urn = None
+    
+    try:
+        # Publish to LinkedIn
+        result = await LinkedInService.publish_post(
+            access_token=access_token,
+            linkedin_id=user.linkedin_id,
+            content=post_content,
+            visibility="PUBLIC",
+            image_urn=image_urn,
+            image_urns=image_urns,
+            document_urn=document_urn
+        )
+        
+        # Update post status
+        post.published_to_linkedin = True
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Post published to LinkedIn successfully",
+            "linkedin_post_id": result.get("id"),
+            "linkedin_post_url": result.get("url")
+        }
+        
+    except Exception as e:
+        error_message = str(e)
+        # Provide more helpful error messages
+        if "401" in error_message or "unauthorized" in error_message.lower():
+            raise HTTPException(
+                status_code=401,
+                detail="LinkedIn authorization failed. Please reconnect your LinkedIn account."
+            )
+        elif "403" in error_message or "forbidden" in error_message.lower():
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to post to LinkedIn. Please check your LinkedIn app permissions."
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to publish post to LinkedIn: {error_message}"
+            )
 
 def format_video_script_dict(script_dict: dict) -> str:
     """
@@ -1453,13 +1667,23 @@ Write the complete prompt as a single, detailed description ready for image gene
             "provider": "unknown"
         }
 
-async def generate_carousel_image_prompts(post_content: str, context: dict) -> tuple[list[str], Dict[str, Any]]:
+async def generate_carousel_image_prompts(post_content: str, context: dict, requested_slide_count: Optional[int] = None) -> tuple[list[str], Dict[str, Any]]:
     """
     Generate multiple AI image prompts for carousel slides that match the post content and are LinkedIn-friendly
+    
+    Args:
+        post_content: The post content
+        context: User context dict
+        requested_slide_count: Optional explicit slide count from user (will be capped at 15)
     """
     try:
-        # Extract slide count from content (estimate based on structure)
-        slide_count = max(4, min(8, post_content.count('\n\n') + 1))
+        # Use requested slide count if provided, otherwise estimate from content
+        if requested_slide_count:
+            # Cap at 15 maximum
+            slide_count = max(4, min(15, requested_slide_count))
+        else:
+            # Extract slide count from content (estimate based on structure)
+            slide_count = max(4, min(15, post_content.count('\n\n') + 1))
         
         industry = context.get('industry', 'business')
         expertise = context.get('expertise_areas', [])
@@ -1526,7 +1750,7 @@ CRITICAL REQUIREMENTS:
    - Text overlay space consideration
 
 Return ONLY a valid JSON array of strings. Each prompt should be creative, detailed, and ready for image generation. Output ONLY the JSON array - no explanations.""",
-            user_message=f"""Create {slide_count} creative, detailed image prompts for this LinkedIn carousel post:
+            user_message=f"""Create {slide_count} creative, detailed image prompts for this LinkedIn carousel post (maximum 15 slides allowed):
 
 POST CONTENT:
 {post_content}
@@ -1553,6 +1777,8 @@ TASK:
 
 CRITICAL: All slides must be visually consistent - same colors, same style (realistic OR cartoon), same type of elements. They should feel like a cohesive series.{" For educational content, text overlays are REQUIRED on every slide." if is_educational else ""}
 
+CRITICAL: Return EXACTLY {slide_count} prompts (maximum 15 slides). Do NOT exceed 15 slides even if requested.
+
 Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
             temperature=0.8
         )
@@ -1568,7 +1794,12 @@ Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
             
             prompts = json.loads(cleaned_prompt)
             if isinstance(prompts, list) and len(prompts) > 0:
-                # Ensure we have the right number of prompts
+                # CRITICAL: Limit to 15 slides maximum (even if AI generated more)
+                if len(prompts) > 15:
+                    print(f"WARNING: AI generated {len(prompts)} prompts, limiting to 15")
+                    prompts = prompts[:15]
+                
+                # Ensure we have the right number of prompts (within 4-15 range)
                 if len(prompts) >= slide_count:
                     return prompts[:slide_count], token_usage
                 elif len(prompts) < slide_count:

@@ -170,19 +170,63 @@ async def generate_carousel_pdf(
             prompts_to_process = request.prompts
         
         for i, prompt in enumerate(prompts_to_process):
+            # Retry logic for rate limit errors
+            max_retries = 3
+            retry_delay = 2  # Start with 2 seconds
+            result = None
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    # Update progress
+                    pdf_generation_progress[request.post_id]["current"] = i + 1
+                    
+                    # Generate images at LinkedIn's exact carousel dimensions
+                    # Square format: 1080x1080 (most common and recommended)
+                    result = await generate_image(
+                        prompt=prompt,
+                        guidance=7.5,
+                        num_steps=25,
+                        height=1080,
+                        width=1080
+                    )
+                    # Success - break out of retry loop
+                    break
+                    
+                except Exception as e:
+                    error_message = str(e)
+                    is_rate_limit = "429" in error_message or "Capacity temporarily exceeded" in error_message or "rate limit" in error_message.lower()
+                    
+                    if is_rate_limit and attempt < max_retries - 1:
+                        # Rate limit error - retry with exponential backoff
+                        wait_time = retry_delay * (2 ** attempt)  # 2s, 4s, 8s
+                        print(f"Rate limit hit for slide {i + 1}, attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s before retry...")
+                        await asyncio.sleep(wait_time)
+                        last_error = e
+                        continue
+                    else:
+                        # Not a rate limit or max retries reached - raise immediately
+                        raise
+            
+            # If we exhausted retries, raise the last error
+            if result is None:
+                error_message = str(last_error) if last_error else f"Failed to generate image for slide {i + 1} after {max_retries} attempts"
+                pdf_generation_progress[request.post_id]["status"] = "error"
+                is_rate_limit = "429" in error_message or "Capacity temporarily exceeded" in error_message or "rate limit" in error_message.lower()
+                
+                if is_rate_limit:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail=f"Cloudflare API rate limit exceeded after {max_retries} retries. Please wait a moment and try again. Error: {error_message}"
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Failed to generate image for slide {i + 1}: {error_message}"
+                    )
+            
+            # Validate image result
             try:
-                # Update progress
-                pdf_generation_progress[request.post_id]["current"] = i + 1
-                
-                result = await generate_image(
-                    prompt=prompt,
-                    guidance=7.5,
-                    num_steps=25,
-                    height=1200,
-                    width=1200
-                )
-                
-                # Validate image result
                 if not result or "image" not in result:
                     raise ValueError(f"No image data returned for slide {i + 1}")
                 
@@ -196,8 +240,8 @@ async def generate_carousel_pdf(
                 
                 # Calculate cost for this image
                 image_metadata = result.get("metadata", {})
-                height = image_metadata.get("height", 1200)
-                width = image_metadata.get("width", 1200)
+                height = image_metadata.get("height", 1080)
+                width = image_metadata.get("width", 1080)
                 num_steps = image_metadata.get("num_steps", 25)
                 model = image_metadata.get("model", cloudflare_settings.cloudflare_image_model if cloudflare_settings else None)
                 
@@ -216,11 +260,12 @@ async def generate_carousel_pdf(
                 pdf_generation_progress[request.post_id]["status"] = "error"
                 import traceback
                 error_trace = traceback.format_exc()
-                print(f"Image generation error for slide {i + 1}: {str(e)}")
+                error_message = str(e)
+                print(f"Image validation error for slide {i + 1}: {error_message}")
                 print(f"Traceback: {error_trace}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to generate image for slide {i + 1}: {str(e)}"
+                    detail=f"Failed to process image for slide {i + 1}: {error_message}"
                 )
         
         # Validate we have images
@@ -293,10 +338,13 @@ async def generate_carousel_pdf(
         
         # Create PDF from images
         try:
+            # Create PDF with LinkedIn's exact square format (1080x1080)
+            # Create PDF with LinkedIn's exact square format (1080x1080)
             pdf_result = await create_carousel_pdf(
                 slide_images=slide_images,
                 slide_prompts=final_prompts,
-                model=model_used or "cloudflare"
+                model=model_used or "cloudflare",
+                format="square"  # LinkedIn square format: 1080x1080 pixels
             )
         except Exception as pdf_error:
             pdf_generation_progress[request.post_id]["status"] = "error"

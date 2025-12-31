@@ -30,7 +30,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(
-    new Set(['today', 'yesterday', 'week'])
+    new Set(['today'])
   );
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editTitle, setEditTitle] = React.useState('');

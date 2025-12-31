@@ -45,6 +45,16 @@ import { GenerationOptionsMenu } from "@/components/GenerationOptionsMenu";
 import { PostTypeMenu } from "@/components/PostTypeMenu";
 import { SlideSelectionModal } from "@/components/SlideSelectionModal";
 import TokenUsage from "@/components/TokenUsage";
+import { useToast } from "@/components/ui/toaster";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PublishingModal } from "@/components/PublishingModal";
 
 interface MessageAttachment {
   type: string;
@@ -59,6 +69,7 @@ interface Message {
   content: string;
   post_content?: string;
   format_type?: string;
+  published_to_linkedin?: boolean;
   image_prompt?: string;
   image_prompts?: string[]; // For carousel posts
   post_id?: string; // Post ID for assistant messages
@@ -360,12 +371,19 @@ export default function GeneratePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const conversationId = searchParams.get("conversation");
+  const { addToast } = useToast();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string>("Crafting your post...");
   const [user, setUser] = useState<any>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [postToPublish, setPostToPublish] = useState<string | null>(null);
+  const [publishedPosts, setPublishedPosts] = useState<Set<string>>(new Set());
+  const [publishingModalOpen, setPublishingModalOpen] = useState(false);
+  const [publishingStatus, setPublishingStatus] = useState<"publishing" | "success" | "error">("publishing");
+  const [publishingError, setPublishingError] = useState<string>("");
   const [showOptions, setShowOptions] = useState(false);
   const [showContextModal, setShowContextModal] = useState(false);
   const [hasContext, setHasContext] = useState(false);
@@ -729,15 +747,22 @@ export default function GeneratePage() {
           metadata: metadata,
           token_usage: tokenUsage, // Include token_usage from backend
           attachments: attachments, // Image attachments for user messages
+          published_to_linkedin: msg.published_to_linkedin || false, // Published status from backend
         };
       });
       setMessages(uiMessages);
 
       // Build post ID mapping and load images/PDFs
       const newPostIdMap: Record<string, string> = {};
+      const publishedPostsSet = new Set<string>();
       for (const msg of uiMessages) {
         if (msg.role === "assistant" && msg.post_id) {
           newPostIdMap[msg.id] = msg.post_id;
+          
+          // Track published posts from backend
+          if (msg.published_to_linkedin) {
+            publishedPostsSet.add(msg.post_id);
+          }
 
           if (msg.format_type === 'image' && msg.image_prompt) {
             await loadCurrentImage(msg.post_id);
@@ -750,6 +775,7 @@ export default function GeneratePage() {
         }
       }
       setPostIdMap(newPostIdMap);
+      setPublishedPosts(publishedPostsSet); // Initialize with published posts from backend
     } catch (error: any) {
       // Only log if it's not a network error (backend might be down)
       if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
@@ -1313,6 +1339,94 @@ export default function GeneratePage() {
     { name: "Dickie Bush", initials: "DB", image: "/creators/dickie-bush.jpg" },
   ];
 
+  // Helper functions for confirmation dialog
+  const getConfirmationTitle = () => {
+    if (!postToPublish) return "Publish to LinkedIn";
+    const msg = messages.find(m => postIdMap[m.id] === postToPublish);
+    const isPublished = msg?.published_to_linkedin || publishedPosts.has(postToPublish);
+    return isPublished ? "Post Already Published" : "Publish to LinkedIn";
+  };
+
+  const getConfirmationDescription = () => {
+    if (!postToPublish) return "";
+    const msg = messages.find(m => postIdMap[m.id] === postToPublish);
+    const isPublished = msg?.published_to_linkedin || publishedPosts.has(postToPublish);
+    return isPublished 
+      ? "This post has already been published to LinkedIn. Are you sure you want to publish it again?"
+      : "This post will be published to your LinkedIn profile and will be visible to your network. Are you sure you want to continue?";
+  };
+
+  const getConfirmButtonText = () => {
+    if (!postToPublish) return "Publish to LinkedIn";
+    const msg = messages.find(m => postIdMap[m.id] === postToPublish);
+    const isPublished = msg?.published_to_linkedin || publishedPosts.has(postToPublish);
+    return isPublished ? "Publish Again" : "Publish to LinkedIn";
+  };
+
+  async function publishPost(postId: string) {
+    try {
+      const response = await api.generate.publish(postId);
+      if (response.data.success) {
+        // Update published status in state
+        setPublishedPosts(prev => new Set(prev).add(postId));
+        
+        // Update published status in messages
+        setMessages(prev => prev.map(m => {
+          if (m.post_id === postId) {
+            return { ...m, published_to_linkedin: true };
+          }
+          return m;
+        }));
+        
+        addToast({
+          title: "Published successfully!",
+          description: "Your post has been published to LinkedIn.",
+          variant: "success",
+          duration: 5000,
+        });
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to publish post";
+      addToast({
+        title: "Publish failed",
+        description: errorMessage,
+        variant: "error",
+        duration: 7000,
+      });
+      throw error; // Re-throw to handle in modal
+    }
+  }
+
+  async function publishPostWithModal(postId: string) {
+    // Show publishing modal
+    setPublishingModalOpen(true);
+    setPublishingStatus("publishing");
+    setPublishingError("");
+
+    try {
+      const response = await api.generate.publish(postId);
+      if (response.data.success) {
+        // Update published status in state
+        setPublishedPosts(prev => new Set(prev).add(postId));
+        
+        // Update published status in messages
+        setMessages(prev => prev.map(m => {
+          if (m.post_id === postId) {
+            return { ...m, published_to_linkedin: true };
+          }
+          return m;
+        }));
+        
+        // Show success state
+        setPublishingStatus("success");
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to publish post";
+      setPublishingStatus("error");
+      setPublishingError(errorMessage);
+    }
+  }
+
   return (
     <>
       <TokenUsage tokenUsage={tokenUsage} />
@@ -1865,10 +1979,25 @@ export default function GeneratePage() {
                           // TODO: Open schedule modal
                           alert("Schedule feature coming soon!");
                         }}
-                        onPost={() => {
-                          // TODO: Open LinkedIn posting flow
-                          alert("LinkedIn posting coming soon!");
+                        onPost={async () => {
+                          const postId = postIdMap[msg.id];
+                          if (!postId) {
+                            addToast({
+                              title: "Error",
+                              description: "Post ID not found. Please regenerate the post.",
+                              variant: "error",
+                            });
+                            return;
+                          }
+                          
+                          // Always show confirmation dialog before publishing
+                          setPostToPublish(postId);
+                          setConfirmDialogOpen(true);
                         }}
+                        published={(() => {
+                          const postId = postIdMap[msg.id] || msg.id;
+                          return msg.published_to_linkedin || publishedPosts.has(postId);
+                        })()}
                         currentImage={(() => {
                           const postId = postIdMap[msg.id] || msg.id;
                           return currentImages[postId];
@@ -2096,7 +2225,7 @@ export default function GeneratePage() {
         </div>
 
         {/* Input Area - Fixed at Bottom */}
-        <div className="flex-shrink-0 pt-4 sm:pt-6 pb-4 sm:pb-6 z-10 bg-[#F3F2F0]">
+        <div className="flex-shrink-0 pt-4 sm:pt-6 pb-1 sm:pb-2 z-10 bg-[#F3F2F0]">
           {/* Image Preview Area */}
           {imagePreviews.length > 0 && (
             <div className="bg-white rounded-t-xl sm:rounded-t-2xl border border-b-0 border-[#E0DFDC] p-3 sm:p-4">
@@ -2417,6 +2546,51 @@ export default function GeneratePage() {
           );
         })}
     </div>
+
+    {/* Confirmation Dialog */}
+    <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{getConfirmationTitle()}</DialogTitle>
+          <DialogDescription>{getConfirmationDescription()}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setConfirmDialogOpen(false);
+              setPostToPublish(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="bg-[#0A66C2] hover:bg-[#004182] text-white"
+            onClick={async () => {
+              setConfirmDialogOpen(false);
+              if (postToPublish) {
+                await publishPostWithModal(postToPublish);
+                setPostToPublish(null);
+              }
+            }}
+          >
+            {getConfirmButtonText()}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Publishing Modal */}
+    <PublishingModal
+      open={publishingModalOpen}
+      status={publishingStatus}
+      errorMessage={publishingError}
+      onClose={() => {
+        setPublishingModalOpen(false);
+        setPublishingStatus("publishing");
+        setPublishingError("");
+      }}
+    />
     </>
   );
 }

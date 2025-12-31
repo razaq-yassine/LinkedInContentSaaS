@@ -7,13 +7,29 @@ import { Button } from "@/components/ui/button";
 import { PostHistoryItem } from "@/components/PostHistoryItem";
 import { Calendar, Plus } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/toaster";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PublishingModal } from "@/components/PublishingModal";
 
 export default function HistoryPage() {
   const router = useRouter();
+  const { addToast } = useToast();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState("all");
   const [user, setUser] = useState<any>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [postToPublish, setPostToPublish] = useState<string | null>(null);
+  const [publishingModalOpen, setPublishingModalOpen] = useState(false);
+  const [publishingStatus, setPublishingStatus] = useState<"publishing" | "success" | "error">("publishing");
+  const [publishingError, setPublishingError] = useState<string>("");
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -38,9 +54,87 @@ export default function HistoryPage() {
     navigator.clipboard.writeText(text);
   };
 
-  const handlePublish = (postId: string) => {
-    // TODO: Implement LinkedIn publishing
-    alert("LinkedIn publishing coming soon!");
+  const handlePublish = async (postId: string) => {
+    // Always show confirmation dialog before publishing
+    setPostToPublish(postId);
+    setConfirmDialogOpen(true);
+  };
+
+  const publishPost = async (postId: string) => {
+    try {
+      const response = await api.generate.publish(postId);
+      if (response.data.success) {
+        // Reload posts to update the UI
+        await loadHistory();
+        // Show success toast
+        addToast({
+          title: "Published successfully!",
+          description: "Your post has been published to LinkedIn.",
+          variant: "success",
+          duration: 5000,
+        });
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to publish post";
+      addToast({
+        title: "Publish failed",
+        description: errorMessage,
+        variant: "error",
+        duration: 7000,
+      });
+      throw error; // Re-throw to handle in modal
+    }
+  };
+
+  async function publishPostWithModal(postId: string) {
+    // Show publishing modal
+    setPublishingModalOpen(true);
+    setPublishingStatus("publishing");
+    setPublishingError("");
+
+    try {
+      const response = await api.generate.publish(postId);
+      if (response.data.success) {
+        // Reload posts to update the UI
+        await loadHistory();
+        
+        // Show success state
+        setPublishingStatus("success");
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to publish post";
+      setPublishingStatus("error");
+      setPublishingError(errorMessage);
+    }
+  }
+
+  const handleConfirmPublish = async () => {
+    setConfirmDialogOpen(false);
+    if (postToPublish) {
+      await publishPostWithModal(postToPublish);
+      setPostToPublish(null);
+    }
+  };
+
+  // Helper functions for confirmation dialog
+  const getConfirmationTitle = () => {
+    if (!postToPublish) return "Publish to LinkedIn";
+    const post = posts.find((p) => p.id === postToPublish);
+    return post?.published_to_linkedin ? "Post Already Published" : "Publish to LinkedIn";
+  };
+
+  const getConfirmationDescription = () => {
+    if (!postToPublish) return "";
+    const post = posts.find((p) => p.id === postToPublish);
+    return post?.published_to_linkedin
+      ? "This post has already been published to LinkedIn. Are you sure you want to publish it again?"
+      : "This post will be published to your LinkedIn profile and will be visible to your network. Are you sure you want to continue?";
+  };
+
+  const getConfirmButtonText = () => {
+    if (!postToPublish) return "Publish to LinkedIn";
+    const post = posts.find((p) => p.id === postToPublish);
+    return post?.published_to_linkedin ? "Publish Again" : "Publish to LinkedIn";
   };
 
   const handleSchedule = (postId: string) => {
@@ -170,7 +264,47 @@ export default function HistoryPage() {
             </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{getConfirmationTitle()}</DialogTitle>
+            <DialogDescription>{getConfirmationDescription()}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmDialogOpen(false);
+                setPostToPublish(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#0A66C2] hover:bg-[#004182] text-white"
+              onClick={handleConfirmPublish}
+            >
+              {getConfirmButtonText()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Publishing Modal */}
+      <PublishingModal
+        open={publishingModalOpen}
+        status={publishingStatus}
+        errorMessage={publishingError}
+        onClose={() => {
+          setPublishingModalOpen(false);
+          setPublishingStatus("publishing");
+          setPublishingError("");
+        }}
+      />
     </div>
   );
 }
+
 

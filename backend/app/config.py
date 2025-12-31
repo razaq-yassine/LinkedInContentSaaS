@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
     linkedin_redirect_uri: str = "http://localhost:8000/api/auth/linkedin/callback"
+    linkedin_scopes: str = "openid profile email w_member_social"  # Can be customized if needed
     
     # Google OAuth
     google_client_id: str = ""

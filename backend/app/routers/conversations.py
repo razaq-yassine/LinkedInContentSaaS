@@ -108,6 +108,7 @@ async def get_conversation(
             if post:
                 message_data["format"] = post.format.value
                 message_data["post_id"] = msg.post_id  # Include post_id in response
+                message_data["published_to_linkedin"] = post.published_to_linkedin or False  # Include published status
                 # Get image_prompt/image_prompts from generation_options
                 if post.generation_options:
                     gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
@@ -124,6 +125,10 @@ async def get_conversation(
                         message_data["image_prompts"] = None
                     message_data["metadata"] = None
                     message_data["token_usage"] = None
+            else:
+                message_data["published_to_linkedin"] = False
+        else:
+            message_data["published_to_linkedin"] = False
         
         messages.append(MessageResponse(**message_data))
     
