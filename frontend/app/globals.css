@@ -291,3 +291,204 @@
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
 }
+
+/* Theme Variations */
+/* Ocean Theme */
+.theme-ocean {
+  --linkedin-primary: #0891b2;
+  --linkedin-primary-hover: #0e7490;
+  --linkedin-primary-light: #22d3ee;
+  --primary: 8 145 178;
+  --ring: 8 145 178;
+  --chart-1: 8 145 178;
+  --sidebar-primary: 8 145 178;
+  --sidebar-ring: 8 145 178;
+}
+
+/* Sunset Theme */
+.theme-sunset {
+  --linkedin-primary: #ea580c;
+  --linkedin-primary-hover: #c2410c;
+  --linkedin-primary-light: #fb923c;
+  --primary: 234 88 12;
+  --ring: 234 88 12;
+  --chart-1: 234 88 12;
+  --sidebar-primary: 234 88 12;
+  --sidebar-ring: 234 88 12;
+}
+
+/* Forest Theme */
+.theme-forest {
+  --linkedin-primary: #16a34a;
+  --linkedin-primary-hover: #15803d;
+  --linkedin-primary-light: #4ade80;
+  --primary: 22 163 74;
+  --ring: 22 163 74;
+  --chart-1: 22 163 74;
+  --sidebar-primary: 22 163 74;
+  --sidebar-ring: 22 163 74;
+}
+
+/* Midnight Theme (dark blue) */
+.theme-midnight {
+  --linkedin-primary: #6366f1;
+  --linkedin-primary-hover: #4f46e5;
+  --linkedin-primary-light: #818cf8;
+  --primary: 99 102 241;
+  --ring: 99 102 241;
+  --chart-1: 99 102 241;
+  --sidebar-primary: 99 102 241;
+  --sidebar-ring: 99 102 241;
+}
+
+/* Rose Theme */
+.theme-rose {
+  --linkedin-primary: #e11d48;
+  --linkedin-primary-hover: #be123c;
+  --linkedin-primary-light: #fb7185;
+  --primary: 225 29 72;
+  --ring: 225 29 72;
+  --chart-1: 225 29 72;
+  --sidebar-primary: 225 29 72;
+  --sidebar-ring: 225 29 72;
+}
+
+/* Purple Theme */
+.theme-purple {
+  --linkedin-primary: #9333ea;
+  --linkedin-primary-hover: #7e22ce;
+  --linkedin-primary-light: #a855f7;
+  --primary: 147 51 234;
+  --ring: 147 51 234;
+  --chart-1: 147 51 234;
+  --sidebar-primary: 147 51 234;
+  --sidebar-ring: 147 51 234;
+}
+
+/* No Animations Mode */
+.no-animations,
+.no-animations * {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Sidebar Styles */
+[data-sidebar-style="compact"] .sidebar-container {
+  width: 72px !important;
+}
+
+[data-sidebar-style="compact"] .sidebar-container .sidebar-label,
+[data-sidebar-style="compact"] .sidebar-container .sidebar-expanded-content {
+  display: none !important;
+}
+
+[data-sidebar-style="compact"] .sidebar-container .sidebar-icon-only {
+  display: flex !important;
+}
+
+[data-sidebar-style="floating"] .sidebar-container {
+  margin: 16px;
+  border-radius: 16px;
+  height: calc(100vh - 32px) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+[data-sidebar-style="hidden"] .sidebar-container {
+  transform: translateX(-100%) !important;
+}
+
+[data-sidebar-style="hidden"] .main-content {
+  margin-left: 0 !important;
+}
+
+/* Card Styles */
+[data-card-style="elevated"] .card,
+[data-card-style="elevated"] .themed-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+[data-card-style="flat"] .card,
+[data-card-style="flat"] .themed-card {
+  box-shadow: none;
+}
+
+[data-card-style="bordered"] .card,
+[data-card-style="bordered"] .themed-card {
+  box-shadow: none;
+  border-width: 2px;
+}
+
+[data-card-style="glass"] .card,
+[data-card-style="glass"] .themed-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dark [data-card-style="glass"] .card,
+.dark [data-card-style="glass"] .themed-card {
+  background: rgba(30, 30, 30, 0.7);
+}
+
+/* App Theme Backgrounds */
+[data-app-theme="professional-light"] {
+  --app-bg: #f8fafc;
+}
+
+[data-app-theme="modern-dark"] {
+  --app-bg: #0f172a;
+}
+
+[data-app-theme="ocean-breeze"] {
+  --app-bg: #ecfeff;
+}
+
+[data-app-theme="sunset-warm"] {
+  --app-bg: #fff7ed;
+}
+
+[data-app-theme="forest-calm"] {
+  --app-bg: #f0fdf4;
+}
+
+[data-app-theme="midnight-purple"] {
+  --app-bg: #faf5ff;
+}
+
+[data-app-theme="rose-gold"] {
+  --app-bg: #fff1f2;
+}
+
+[data-app-theme="slate-minimal"] {
+  --app-bg: #f1f5f9;
+}
+
+/* Public Theme Classes */
+[data-public-theme="modern-gradient"] .public-page {
+  background: linear-gradient(to right, #667eea, #764ba2);
+}
+
+[data-public-theme="minimal-light"] .public-page {
+  background: linear-gradient(to bottom right, #ffffff, #f8fafc);
+}
+
+[data-public-theme="dark-elegance"] .public-page {
+  background: linear-gradient(to bottom right, #1a1a2e, #16213e);
+  color: white;
+}
+
+[data-public-theme="vibrant-startup"] .public-page {
+  background: linear-gradient(to right, #ff6b6b, #feca57);
+}
+
+[data-public-theme="corporate-blue"] .public-page {
+  background: linear-gradient(to bottom right, #0A66C2, #004182);
+  color: white;
+}
+
+[data-public-theme="nature-green"] .public-page {
+  background: linear-gradient(to right, #11998e, #38ef7d);
+  color: white;
+}

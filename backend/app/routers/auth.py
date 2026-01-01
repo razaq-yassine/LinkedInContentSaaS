@@ -9,7 +9,7 @@ import secrets
 import httpx
 
 from ..database import get_db
-from ..models import User, UserProfile, Subscription, UserToken, TokenType
+from ..models import User, UserProfile, Subscription, UserToken, TokenType, AdminSetting
 from ..schemas.auth import (
     MockLoginRequest, LoginResponse, UserResponse,
     RegisterRequest, RegisterResponse, LoginRequest,
@@ -222,6 +222,18 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """Register a new user with email and password"""
+    # Check maintenance mode first
+    maintenance_setting = db.query(AdminSetting).filter(AdminSetting.key == "maintenance_mode").first()
+    if maintenance_setting and maintenance_setting.value.lower() == "true":
+        message_setting = db.query(AdminSetting).filter(AdminSetting.key == "maintenance_message").first()
+        message = message_setting.value if message_setting else "System is under maintenance."
+        raise HTTPException(status_code=503, detail=message)
+    
+    # Check if registration is enabled
+    registration_setting = db.query(AdminSetting).filter(AdminSetting.key == "registration_enabled").first()
+    if registration_setting and registration_setting.value.lower() == "false":
+        raise HTTPException(status_code=403, detail="New user registration is currently disabled.")
+    
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == request.email).first()
     if existing_user:
@@ -230,8 +242,12 @@ async def register(
     # Hash password
     password_hash = pwd_context.hash(request.password)
     
-    # In dev mode, auto-verify email
-    auto_verify = settings.dev_mode
+    # Check if email verification is required from database settings
+    require_verification_setting = db.query(AdminSetting).filter(AdminSetting.key == "require_email_verification").first()
+    require_verification = require_verification_setting and require_verification_setting.value.lower() == "true"
+    
+    # In dev mode or if verification not required, auto-verify email
+    auto_verify = settings.dev_mode or not require_verification
     
     # Create user
     user_id = str(uuid.uuid4())
@@ -296,6 +312,13 @@ async def register(
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Login with email and password"""
+    # Check maintenance mode first
+    maintenance_setting = db.query(AdminSetting).filter(AdminSetting.key == "maintenance_mode").first()
+    if maintenance_setting and maintenance_setting.value.lower() == "true":
+        message_setting = db.query(AdminSetting).filter(AdminSetting.key == "maintenance_message").first()
+        message = message_setting.value if message_setting else "System is under maintenance."
+        raise HTTPException(status_code=503, detail=message)
+    
     user = db.query(User).filter(User.email == request.email).first()
     
     if not user:
@@ -310,8 +333,12 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     if not pwd_context.verify(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    # Skip email verification check in dev mode
-    if not user.email_verified and not settings.dev_mode:
+    # Check email verification required setting from database
+    require_verification_setting = db.query(AdminSetting).filter(AdminSetting.key == "require_email_verification").first()
+    require_verification = require_verification_setting and require_verification_setting.value.lower() == "true"
+    
+    # Skip email verification check in dev mode or if setting is disabled
+    if not user.email_verified and require_verification and not settings.dev_mode:
         raise HTTPException(
             status_code=403, 
             detail="Please verify your email before logging in. Check your inbox for the verification link."

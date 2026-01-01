@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import List, Optional
 from datetime import datetime, timedelta
+import os
+import uuid
+import shutil
 
 from ..database import get_db
 from ..models import (
@@ -13,7 +16,8 @@ from ..routers.admin_auth import get_current_admin
 from ..schemas.admin_schemas import (
     UserDetailResponse, UserProfileDetail, UserSubscriptionDetail, UserStatsDetail,
     SubscriptionPlanResponse, CreateSubscriptionPlanRequest, UpdateSubscriptionPlanRequest,
-    GlobalSettingResponse, UpdateGlobalSettingRequest, DashboardStatsResponse
+    GlobalSettingResponse, UpdateGlobalSettingRequest, CreateGlobalSettingRequest,
+    PublicSettingsResponse, DashboardStatsResponse
 )
 
 router = APIRouter()
@@ -295,6 +299,57 @@ async def update_setting(
     
     return {"success": True, "message": f"Setting '{key}' updated successfully"}
 
+
+@router.post("/settings", response_model=GlobalSettingResponse)
+async def create_setting(
+    request: CreateGlobalSettingRequest,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    existing = db.query(AdminSetting).filter(AdminSetting.key == request.key).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Setting with this key already exists")
+    
+    import uuid
+    new_setting = AdminSetting(
+        id=str(uuid.uuid4()),
+        key=request.key,
+        value=request.value,
+        description=request.description
+    )
+    
+    db.add(new_setting)
+    db.commit()
+    db.refresh(new_setting)
+    
+    return GlobalSettingResponse(
+        id=new_setting.id,
+        key=new_setting.key,
+        value=new_setting.value,
+        description=new_setting.description,
+        updated_at=new_setting.updated_at
+    )
+
+
+@router.delete("/settings/{key}")
+async def delete_setting(
+    key: str,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    protected_keys = ["system_prompt", "content_format_guidelines", "comment_worthiness_rubric"]
+    if key in protected_keys:
+        raise HTTPException(status_code=400, detail="Cannot delete protected system settings")
+    
+    setting = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting not found")
+    
+    db.delete(setting)
+    db.commit()
+    
+    return {"success": True, "message": f"Setting '{key}' deleted successfully"}
+
 @router.get("/subscription-plans", response_model=List[SubscriptionPlanResponse])
 async def get_subscription_plans(
     admin: Admin = Depends(get_current_admin),
@@ -468,3 +523,46 @@ async def delete_user(
     db.commit()
     
     return {"success": True, "message": "User deleted successfully"}
+
+
+@router.post("/upload/logo")
+async def upload_logo(
+    file: UploadFile = File(...),
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Upload a logo image for the application."""
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Allowed: JPEG, PNG, WebP, SVG"
+        )
+    
+    # Validate file size (max 2MB)
+    contents = await file.read()
+    if len(contents) > 2 * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail="File size must be less than 2MB"
+        )
+    
+    # Create uploads directory if it doesn't exist
+    upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads", "logos")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generate unique filename
+    file_extension = os.path.splitext(file.filename)[1] if file.filename else ".png"
+    unique_filename = f"logo_{uuid.uuid4().hex}{file_extension}"
+    file_path = os.path.join(upload_dir, unique_filename)
+    
+    # Save the file
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    # Return the URL path (relative to the API)
+    logo_url = f"/uploads/logos/{unique_filename}"
+    
+    return {"success": True, "url": logo_url, "filename": unique_filename}

@@ -150,6 +150,22 @@ class UpdateGlobalSettingRequest(BaseModel):
     value: str
 
 
+class CreateGlobalSettingRequest(BaseModel):
+    key: str
+    value: str
+    description: Optional[str] = None
+    category: Optional[str] = "general"
+    setting_type: Optional[str] = "text"  # text, boolean, number, json, select
+
+
+class PublicSettingsResponse(BaseModel):
+    maintenance_mode: bool
+    maintenance_message: Optional[str]
+    theme: str
+    registration_enabled: bool
+    app_name: str
+
+
 class DashboardStatsResponse(BaseModel):
     total_users: int
     active_users_30d: int

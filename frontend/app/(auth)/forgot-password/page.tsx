@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api-client";
+import { ArrowLeft, Brain, KeyRound, Mail } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -35,17 +35,19 @@ export default function ForgotPasswordPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-slate-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(30,41,59,1),rgba(2,6,23,1))]" />
+        <div className="absolute top-20 right-20 w-72 h-72 bg-violet-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        
+        <div className="w-full max-w-md p-8 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl relative z-10">
           <div className="text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+            <div className="w-16 h-16 bg-violet-500/20 border border-violet-500/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-8 h-8 text-violet-400" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">Check your email</h1>
-            <p className="text-slate-600 mb-6">
-              If an account exists with <strong>{email}</strong>, we've sent a password reset link. Please check your inbox.
+            <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
+            <p className="text-slate-400 mb-6">
+              If an account exists with <strong className="text-white">{email}</strong>, we've sent a password reset link. Please check your inbox.
             </p>
             <p className="text-sm text-slate-500 mb-6">
               Didn't receive the email? Check your spam folder or{" "}
@@ -54,43 +56,72 @@ export default function ForgotPasswordPage() {
                   setSubmitted(false);
                   setEmail("");
                 }}
-                className="text-blue-600 hover:underline"
+                className="text-violet-400 hover:underline"
               >
                 try again
               </button>
             </p>
             <Link href="/login">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
                 Back to Login
               </Button>
             </Link>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(30,41,59,1),rgba(2,6,23,1))]" />
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.15),transparent_50%)]" />
+      <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(6,182,212,0.1),transparent_50%)]" />
+      <div className="absolute top-20 right-20 w-72 h-72 bg-violet-500/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+      
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.02)_1px,transparent_1px)] bg-[size:50px_50px]" />
+      
+      {/* Back button */}
+      <div className="absolute top-6 left-6 z-20">
+        <Link href="/login">
+          <Button variant="ghost" className="gap-2 text-slate-400 hover:text-white hover:bg-slate-800">
+            <ArrowLeft className="w-4 h-4" />
+            Back to login
+          </Button>
+        </Link>
+      </div>
+      
+      <div className="w-full max-w-md p-8 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl relative z-10">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600 mb-2">ContentAI</h1>
-          <p className="text-slate-600">Reset your password</p>
+          <Link href="/" className="inline-flex items-center gap-2 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
+              <Brain className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">ContentAI</span>
+          </Link>
+          
+          <div className="w-14 h-14 bg-violet-500/20 border border-violet-500/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <KeyRound className="w-7 h-7 text-violet-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Reset your password</h1>
+          <p className="text-slate-400">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm">
             {error}
           </div>
         )}
 
-        <p className="text-sm text-slate-600 mb-6">
-          Enter your email address and we'll send you a link to reset your password.
-        </p>
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-slate-300">Email</Label>
             <Input
               id="email"
               type="email"
@@ -98,21 +129,26 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="py-6 px-4 rounded-xl bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-violet-500 focus:ring-violet-500"
             />
           </div>
 
-          <Button className="w-full" type="submit" disabled={loading}>
+          <Button 
+            className="w-full py-6 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white rounded-xl font-semibold text-base transition-all shadow-lg shadow-violet-500/25" 
+            type="submit" 
+            disabled={loading}
+          >
             {loading ? "Sending..." : "Send Reset Link"}
           </Button>
         </form>
 
-        <p className="text-sm text-center text-slate-600 mt-6">
+        <p className="text-sm text-center text-slate-400 mt-6">
           Remember your password?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline font-medium">
+          <Link href="/login" className="text-violet-400 hover:text-violet-300 font-semibold">
             Sign in
           </Link>
         </p>
-      </Card>
+      </div>
     </div>
   );
 }

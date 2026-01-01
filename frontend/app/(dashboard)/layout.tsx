@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConversationList } from "@/components/ConversationList";
 import { ToasterProvider } from "@/components/ui/toaster";
+import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { 
   PenSquare, 
   MessageSquare, 
@@ -29,6 +30,7 @@ import {
   User
 } from "lucide-react";
 import { api } from "@/lib/api-client";
+import axios from "axios";
 
 export default function DashboardLayout({
   children,
@@ -41,8 +43,35 @@ export default function DashboardLayout({
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [checkingMaintenance, setCheckingMaintenance] = useState(true);
 
   useEffect(() => {
+    // Check maintenance mode first
+    const checkMaintenance = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/public/settings`
+        );
+        const data = response.data;
+        const isMaintenanceMode = data.maintenance_mode === 'true' || data.maintenance_mode === true;
+        
+        if (isMaintenanceMode) {
+          setMaintenanceMode(true);
+          setMaintenanceMessage(data.maintenance_message || '');
+          // Clear user session when maintenance mode is active
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      } catch (error) {
+        console.error('Failed to check maintenance status:', error);
+      } finally {
+        setCheckingMaintenance(false);
+      }
+    };
+    checkMaintenance();
+
     const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
 
@@ -131,43 +160,67 @@ export default function DashboardLayout({
     { href: "/context", label: "Profile Context", icon: Sparkles },
   ];
 
+  // Show loading while checking maintenance
+  if (checkingMaintenance) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+      </div>
+    );
+  }
+
+  // Show maintenance page if maintenance mode is active
+  if (maintenanceMode) {
+    return <MaintenanceBanner message={maintenanceMessage} variant="fullpage" />;
+  }
+
   if (!user) {
     return null;
   }
 
   return (
     <ToasterProvider>
-    <div className="min-h-screen bg-[#F3F2F0] flex">
+    <div className="min-h-screen bg-[#F3F2F0] dark:bg-slate-900 flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r border-[#E0DFDC] transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+        className={`sidebar-container fixed inset-y-0 left-0 z-50 w-[280px] bg-white dark:bg-slate-900 border-r border-[#E0DFDC] dark:border-slate-700 transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="px-4 py-4 border-b border-[#E0DFDC]">
+          <div className="px-4 py-4 border-b border-[#E0DFDC] dark:border-slate-700 sidebar-expanded-content">
             <Link href="/generate" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-[#0A66C2] rounded-lg flex items-center justify-center">
                 <PenSquare className="w-5 h-5 text-white" />
               </div>
-              <span className="text-lg font-bold text-black">ContentAI</span>
+              <span className="text-lg font-bold text-black dark:text-white sidebar-label">ContentAI</span>
             </Link>
           </div>
 
           {/* New Post Button */}
-          <div className="px-4 py-4">
+          <div className="px-4 py-4 sidebar-expanded-content">
             <Button
               onClick={handleNewConversation}
               className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full font-semibold"
             >
               <PenSquare className="w-4 h-4 mr-2" />
-              Create a post
+              <span className="sidebar-label">Create a post</span>
+            </Button>
+          </div>
+          {/* Compact New Post Button (icon only) */}
+          <div className="px-2 py-4 sidebar-icon-only hidden">
+            <Button
+              onClick={handleNewConversation}
+              className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full font-semibold p-3"
+              title="Create a post"
+            >
+              <PenSquare className="w-5 h-5" />
             </Button>
           </div>
 
           {/* Conversations */}
-          <div className="flex-1 overflow-y-auto px-2 py-2">
+          <div className="flex-1 overflow-y-auto px-2 py-2 sidebar-expanded-content">
             <ConversationList
               conversations={conversations}
               activeConversationId={activeConversationId}
@@ -178,7 +231,7 @@ export default function DashboardLayout({
           </div>
 
           {/* Navigation */}
-          <div className="border-t border-[#E0DFDC] px-2 py-2">
+          <div className="border-t border-[#E0DFDC] dark:border-slate-700 px-2 py-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -188,20 +241,20 @@ export default function DashboardLayout({
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-1 ${
                     isActive
-                      ? "bg-[#E7F3FF] text-[#0A66C2] font-semibold"
-                      : "text-[#666666] hover:bg-[#F3F2F0]"
+                      ? "bg-[#E7F3FF] dark:bg-slate-800 text-[#0A66C2] dark:text-blue-400 font-semibold"
+                      : "text-[#666666] dark:text-slate-400 hover:bg-[#F3F2F0] dark:hover:bg-slate-800"
                   }`}
                   onClick={() => setIsSidebarOpen(false)}
                 >
                   <Icon className="w-5 h-5" />
-                  <span className="text-sm">{item.label}</span>
+                  <span className="text-sm sidebar-label">{item.label}</span>
                 </Link>
               );
             })}
           </div>
 
           {/* User Profile */}
-          <div className="border-t border-[#E0DFDC] p-4">
+          <div className="border-t border-[#E0DFDC] dark:border-slate-700 p-4 sidebar-expanded-content">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 w-full hover:bg-[#F3F2F0] rounded-lg p-2 transition-colors">
@@ -310,7 +363,7 @@ export default function DashboardLayout({
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-[280px] pt-14 sm:pt-16 lg:pt-0">{children}</main>
+      <main className="main-content flex-1 lg:ml-[280px] pt-14 sm:pt-16 lg:pt-0 dark:bg-slate-900">{children}</main>
     </div>
     </ToasterProvider>
   );

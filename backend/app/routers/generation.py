@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import uuid
 
 from ..database import get_db
-from ..models import UserProfile, GeneratedPost, Conversation, ConversationMessage, MessageRole, PostFormat, GeneratedImage, GeneratedPDF
+from ..models import UserProfile, GeneratedPost, Conversation, ConversationMessage, MessageRole, PostFormat, GeneratedImage, GeneratedPDF, AdminSetting
 from ..routers.auth import get_current_user_id
 from ..schemas.generation import (
     PostGenerationRequest,
@@ -34,6 +34,15 @@ import re
 import traceback
 
 router = APIRouter()
+
+def check_maintenance_mode(db: Session) -> tuple[bool, str]:
+    """Check if maintenance mode is enabled and return status with message"""
+    setting = db.query(AdminSetting).filter(AdminSetting.key == "maintenance_mode").first()
+    if setting and setting.value.lower() == "true":
+        message_setting = db.query(AdminSetting).filter(AdminSetting.key == "maintenance_message").first()
+        message = message_setting.value if message_setting else "System is under maintenance. Please try again later."
+        return True, message
+    return False, ""
 
 def get_recent_post_titles(db: Session, user_id: str, hours: int = 24) -> List[str]:
     """
@@ -118,6 +127,14 @@ async def generate_post(
     - format_style: top_creator/story/data/question
     """
     try:
+        # Check maintenance mode first
+        is_maintenance, maintenance_msg = check_maintenance_mode(db)
+        if is_maintenance:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Service unavailable: {maintenance_msg}"
+            )
+        
         # Get user profile
         profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
         if not profile or not profile.onboarding_completed:
