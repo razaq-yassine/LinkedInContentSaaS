@@ -10,6 +10,7 @@ from ..database import get_db
 from ..routers.auth import get_current_user_id
 from ..services.cloudflare_ai import generate_image
 from ..services.pdf_service import create_carousel_pdf
+from ..services.usage_tracking_service import log_image_generation
 from ..models import GeneratedPost, GeneratedPDF, GeneratedImage
 
 router = APIRouter()
@@ -378,6 +379,23 @@ async def generate_carousel_pdf(
         )
         db.add(generated_pdf)
         db.commit()
+        
+        # Log image generation usage for carousel slides
+        try:
+            if images_generated > 0:
+                # Assuming default dimensions for carousel images
+                log_image_generation(
+                    db=db,
+                    user_id=user_id,
+                    post_id=request.post_id,
+                    image_count=images_generated,
+                    height=1200,
+                    width=1200,
+                    num_steps=25,
+                    model=model_used or "cloudflare"
+                )
+        except Exception as e:
+            print(f"Warning: Failed to log PDF/carousel generation usage: {str(e)}")
         
         # Mark as completed
         pdf_generation_progress[request.post_id]["status"] = "completed"

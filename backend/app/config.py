@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./linkedin_content_saas.db"
     
     # AI Provider Selection
-    ai_provider: str = "gemini"  # Options: "openai" or "gemini"
+    ai_provider: str = "gemini"  # Options: "openai", "gemini", or "claude"
     
     # OpenAI
     openai_api_key: str = ""
@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"  # Options: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash-exp, gemini-2.0-flash-lite-exp, gemini-1.5-flash, gemini-1.5-pro
     gemini_onboarding_model: str = ""  # Separate model for onboarding (CV analysis). If empty, uses gemini_model
+    
+    # Claude (Anthropic)
+    claude_api_key: str = ""
+    claude_model: str = "claude-haiku-4-5"  # Options: claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5
+    
+    # Brave Search API
+    brave_api_key: str = ""
+    brave_search_enabled: bool = True
     
     # Cloudflare Workers AI
     cloudflare_account_id: str = ""

@@ -21,6 +21,7 @@ from ..schemas.generation import (
 from ..services.ai_service import generate_completion, generate_conversation_title, research_topic_with_search
 from ..services.linkedin_service import LinkedInService
 from ..services.post_publishing_service import publish_post_to_linkedin
+from ..services.usage_tracking_service import log_text_generation, log_search_usage
 from ..models import User
 from ..prompts.system_prompts import build_post_generation_prompt
 from ..prompts.templates import get_format_specific_instructions
@@ -1103,6 +1104,33 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         db.add(post)
         db.commit()
         db.refresh(post)
+        
+        # Log usage tracking
+        try:
+            # Log text generation
+            if total_input_tokens > 0 or total_output_tokens > 0:
+                log_text_generation(
+                    db=db,
+                    user_id=user_id,
+                    post_id=post.id,
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    model=model_name or "unknown",
+                    provider=provider_name or "unknown"
+                )
+            
+            # Log search usage if web search was used
+            if request.options.get("useSearch"):
+                log_search_usage(
+                    db=db,
+                    user_id=user_id,
+                    post_id=post.id,
+                    search_count=1,
+                    search_query=request.topic
+                )
+        except Exception as e:
+            # Log error but don't fail the request
+            print(f"Warning: Failed to log usage: {str(e)}")
         
         # Save conversation messages (user prompt + AI response)
         if conversation_id:

@@ -1,8 +1,10 @@
 from openai import OpenAI
 from google import genai
 from google.genai import types
+from anthropic import Anthropic
 from typing import Dict, List, Optional, Any
 from ..config import get_settings
+from .brave_search import search_web, format_search_results
 
 settings = get_settings()
 
@@ -11,6 +13,9 @@ openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_k
 
 # Initialize Gemini client (new SDK)
 gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+
+# Initialize Claude client (Anthropic SDK v0.39.0+)
+claude_client = Anthropic(api_key=settings.claude_api_key) if settings.claude_api_key else None
 
 async def generate_completion(
     system_prompt: str,
@@ -23,14 +28,14 @@ async def generate_completion(
     use_onboarding_model: bool = False
 ) -> tuple[str, Dict[str, Any]]:
     """
-    Generate a completion using either OpenAI or Gemini based on AI_PROVIDER setting
+    Generate a completion using OpenAI, Gemini, or Claude based on AI_PROVIDER setting
     
     Args:
         system_prompt: System instructions
         user_message: User query
         model: Optional model override (uses settings default if not provided)
         temperature: Generation temperature
-        use_search: Enable web search (only supported by Gemini)
+        use_search: Enable web search via Brave API (works with all providers)
         conversation_history: Optional list of previous messages in format [{"role": "user|assistant", "content": "..."}]
         image_attachments: Optional list of image attachments for vision analysis [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
         use_onboarding_model: If True, uses the onboarding-specific model (for CV analysis)
@@ -42,15 +47,24 @@ async def generate_completion(
         - total_tokens: int
         - model: str
         - provider: str
-    """
+"""
     provider = settings.ai_provider.lower()
     
+    # Perform web search if requested (unified across all providers)
+    search_context = ""
+    if use_search and settings.brave_search_enabled:
+        try:
+            search_results = await search_web(user_message, count=5)
+            search_context = format_search_results(search_results)
+            # Prepend search results to user message
+            user_message = f"{search_context}\n\nBased on the above search results, {user_message}"
+        except Exception as e:
+            print(f"Warning: Web search failed: {str(e)}")
+            # Continue without search results
+    
     if provider == "gemini":
-        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search, conversation_history, image_attachments, use_onboarding_model)
+        return await _generate_with_gemini(system_prompt, user_message, temperature, conversation_history, image_attachments, use_onboarding_model)
     elif provider == "openai":
-        if use_search:
-            # OpenAI doesn't have built-in search, fall back to standard completion
-            print("Warning: Web search not supported by OpenAI, using standard completion")
         # Use model from settings if not explicitly provided
         if model:
             openai_model = model
@@ -59,6 +73,9 @@ async def generate_completion(
         else:
             openai_model = settings.openai_model
         return await _generate_with_openai(system_prompt, user_message, openai_model, temperature, conversation_history, image_attachments)
+    elif provider == "claude":
+        claude_model = model or settings.claude_model
+        return await _generate_with_claude(system_prompt, user_message, claude_model, temperature, conversation_history, image_attachments)
     else:
         raise Exception(f"Unknown AI provider: {provider}")
 
@@ -145,19 +162,18 @@ async def _generate_with_gemini(
     system_prompt: str,
     user_message: str,
     temperature: float = 0.7,
-    use_search: bool = False,
     conversation_history: Optional[List[Dict[str, str]]] = None,
     image_attachments: Optional[List[Dict[str, Any]]] = None,
     use_onboarding_model: bool = False
 ) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using Google Gemini API (new google-genai SDK) with optional vision support
+    NOTE: Google Search grounding REMOVED - web search now handled by Brave API
     
     Args:
         system_prompt: System instructions
         user_message: Current user query
         temperature: Generation temperature
-        use_search: Enable Google Search grounding for web searches
         conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
         image_attachments: Optional list of image attachments for vision [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
         use_onboarding_model: If True, uses the onboarding-specific model (for CV analysis)
@@ -188,14 +204,10 @@ async def _generate_with_gemini(
         # Combine system prompt, conversation history, and current user message
         combined_prompt = f"{system_prompt}\n\n{history_text}User: {user_message}"
         
-        # Prepare configuration
+        # Prepare configuration (NO GOOGLE SEARCH TOOL - using Brave instead)
         config_params = {
             "temperature": temperature,
         }
-        
-        # Add Google Search tool if requested
-        if use_search:
-            config_params["tools"] = [types.Tool(google_search=types.GoogleSearch())]
         
         config = types.GenerateContentConfig(**config_params)
         
@@ -247,6 +259,104 @@ async def _generate_with_gemini(
         return response.text, token_usage
     except Exception as e:
         raise Exception(f"Gemini API error: {str(e)}")
+
+async def _generate_with_claude(
+    system_prompt: str,
+    user_message: str,
+    model: str = "claude-haiku-4-5",
+    temperature: float = 0.7,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    image_attachments: Optional[List[Dict[str, Any]]] = None
+) -> tuple[str, Dict[str, Any]]:
+    """
+    Generate a completion using Anthropic Claude API
+    
+    Model naming verified: claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-5
+    SDK version: anthropic>=0.39.0
+    
+    Args:
+        system_prompt: System instructions
+        user_message: Current user query
+        model: Claude model to use (e.g., claude-haiku-4-5)
+        temperature: Generation temperature
+        conversation_history: Optional list of previous messages
+        image_attachments: Optional list of image attachments
+    
+    Returns:
+        Tuple of (response_text, token_usage_dict)
+    """
+    if not claude_client:
+        raise Exception("Claude API key not configured")
+    
+    try:
+        import base64
+        
+        # Build messages list
+        messages = []
+        
+        # Add conversation history
+        if conversation_history:
+            for msg in conversation_history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role in ["user", "assistant"]:
+                    messages.append({"role": role, "content": content})
+        
+        # Build current message content
+        current_content = []
+        
+        # Add images if present (Claude supports vision)
+        if image_attachments and len(image_attachments) > 0:
+            for img in image_attachments:
+                current_content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img['type'],
+                        "data": img['data']
+                    }
+                })
+            print(f"Claude: Processing {len(image_attachments)} image(s) for vision analysis")
+        
+        # Add text
+        current_content.append({
+            "type": "text",
+            "text": user_message
+        })
+        
+        messages.append({
+            "role": "user",
+            "content": current_content if len(current_content) > 1 else user_message
+        })
+        
+        # Call Claude API (Anthropic SDK v0.39.0+)
+        response = claude_client.messages.create(
+            model=model,
+            max_tokens=4096,
+            temperature=temperature,
+            system=system_prompt,
+            messages=messages
+        )
+        
+        # Extract response text
+        response_text = ""
+        for block in response.content:
+            if block.type == "text":
+                response_text += block.text
+        
+        # Build token usage dict
+        token_usage = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+            "model": model,
+            "provider": "claude"
+        }
+        
+        return response_text, token_usage
+        
+    except Exception as e:
+        raise Exception(f"Claude API error: {str(e)}")
 
 async def generate_profile_from_cv(cv_text: str) -> tuple[str, Dict[str, Any]]:
     """

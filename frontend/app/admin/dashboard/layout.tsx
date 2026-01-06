@@ -10,7 +10,9 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  BarChart3,
+  FileText
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
@@ -43,7 +45,9 @@ export default function AdminDashboardLayout({
 
   const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Analytics', href: '/admin/dashboard/analytics', icon: BarChart3 },
     { name: 'Users', href: '/admin/dashboard/users', icon: Users },
+    { name: 'Posts', href: '/admin/dashboard/posts', icon: FileText },
     { name: 'Subscription Plans', href: '/admin/dashboard/plans', icon: CreditCard },
     { name: 'Global Settings', href: '/admin/dashboard/settings', icon: Settings },
   ];

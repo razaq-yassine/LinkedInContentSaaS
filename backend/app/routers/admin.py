@@ -10,7 +10,7 @@ import shutil
 from ..database import get_db
 from ..models import (
     User, UserProfile, AdminSetting, GeneratedPost, GeneratedComment,
-    Subscription, SubscriptionPlanConfig, Conversation, Admin
+    Subscription, SubscriptionPlanConfig, Conversation, Admin, UsageTracking
 )
 from ..routers.admin_auth import get_current_admin
 from ..schemas.admin_schemas import (
@@ -19,6 +19,16 @@ from ..schemas.admin_schemas import (
     GlobalSettingResponse, UpdateGlobalSettingRequest, CreateGlobalSettingRequest,
     PublicSettingsResponse, DashboardStatsResponse
 )
+from ..schemas.analytics import (
+    UsageSummaryResponse, TopUserResponse, UserUsageDetailResponse,
+    TimelineDataPoint, PostWithUsageResponse, PostsListResponse,
+    PostUsageDetailResponse, AnalyticsFilters, PostsListFilters
+)
+from ..services.usage_tracking_service import (
+    get_usage_summary, get_user_usage, get_top_users_by_usage,
+    get_usage_timeline, get_revenue_summary
+)
+from ..services.cost_calculator import cents_to_cost
 
 router = APIRouter()
 
@@ -566,3 +576,349 @@ async def upload_logo(
     logo_url = f"/uploads/logos/{unique_filename}"
     
     return {"success": True, "url": logo_url, "filename": unique_filename}
+
+
+# Analytics Endpoints
+
+@router.get("/analytics/summary", response_model=UsageSummaryResponse)
+async def get_analytics_summary(
+    period: str = "month",  # "today", "week", "month", "all"
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get overall analytics summary with costs and revenue"""
+    
+    # Calculate date range based on period
+    end_date = datetime.utcnow()
+    if period == "today":
+        start_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        start_date = end_date - timedelta(days=7)
+    elif period == "month":
+        start_date = end_date - timedelta(days=30)
+    else:  # all
+        start_date = None
+    
+    # Get usage summary
+    usage_summary = get_usage_summary(db, start_date, end_date)
+    
+    # Get revenue summary
+    revenue_summary = get_revenue_summary(db, start_date, end_date)
+    
+    # Calculate net profit
+    total_cost = usage_summary["total_cost"]
+    monthly_revenue = revenue_summary["total_monthly_revenue"]
+    yearly_revenue = revenue_summary["total_yearly_revenue"]
+    
+    net_profit_monthly = monthly_revenue - total_cost
+    net_profit_yearly = yearly_revenue - (total_cost * 12)  # Annualize cost
+    
+    return UsageSummaryResponse(
+        total_tokens=usage_summary["total_tokens"],
+        total_cost=usage_summary["total_cost"],
+        total_requests=usage_summary["total_requests"],
+        total_monthly_revenue=monthly_revenue,
+        total_yearly_revenue=yearly_revenue,
+        net_profit_monthly=net_profit_monthly,
+        net_profit_yearly=net_profit_yearly,
+        service_breakdown=usage_summary["service_breakdown"],
+        model_breakdown=usage_summary["model_breakdown"]
+    )
+
+
+@router.get("/analytics/timeline", response_model=List[TimelineDataPoint])
+async def get_analytics_timeline(
+    days: int = 30,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get usage timeline for charting"""
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    timeline = get_usage_timeline(db, start_date, end_date, granularity="day")
+    
+    return [TimelineDataPoint(**point) for point in timeline]
+
+
+@router.get("/analytics/top-users", response_model=List[TopUserResponse])
+async def get_analytics_top_users(
+    limit: int = 10,
+    sort_by: str = "cost",
+    period: str = "month",
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get top users by usage"""
+    
+    # Calculate date range
+    end_date = datetime.utcnow()
+    if period == "today":
+        start_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        start_date = end_date - timedelta(days=7)
+    elif period == "month":
+        start_date = end_date - timedelta(days=30)
+    else:  # all
+        start_date = None
+    
+    top_users = get_top_users_by_usage(db, limit, start_date, end_date, sort_by)
+    
+    return [TopUserResponse(**user) for user in top_users]
+
+
+@router.get("/users/{user_id}/usage", response_model=UserUsageDetailResponse)
+async def get_user_usage_detail(
+    user_id: str,
+    period: str = "month",
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get detailed usage for a specific user"""
+    
+    # Check if user exists
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Calculate date range
+    end_date = datetime.utcnow()
+    if period == "today":
+        start_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        start_date = end_date - timedelta(days=7)
+    elif period == "month":
+        start_date = end_date - timedelta(days=30)
+    else:  # all
+        start_date = None
+    
+    # Get usage summary for user
+    usage_summary = get_user_usage(db, user_id, start_date, end_date)
+    
+    # Get recent usage records
+    query = db.query(UsageTracking).filter(UsageTracking.user_id == user_id)
+    if start_date:
+        query = query.filter(UsageTracking.created_at >= start_date)
+    recent_usage = query.order_by(UsageTracking.created_at.desc()).limit(20).all()
+    
+    recent_usage_list = []
+    for record in recent_usage:
+        recent_usage_list.append({
+            "id": record.id,
+            "service_type": record.service_type.value,
+            "tokens": record.total_tokens,
+            "cost": cents_to_cost(record.estimated_cost),
+            "model": record.model,
+            "created_at": record.created_at.isoformat()
+        })
+    
+    return UserUsageDetailResponse(
+        user_id=user.id,
+        email=user.email,
+        name=user.name,
+        total_tokens=usage_summary["total_tokens"],
+        total_cost=usage_summary["total_cost"],
+        total_requests=usage_summary["total_requests"],
+        service_breakdown=usage_summary["service_breakdown"],
+        model_breakdown=usage_summary["model_breakdown"],
+        recent_usage=recent_usage_list
+    )
+
+
+@router.get("/posts", response_model=PostsListResponse)
+async def get_posts_with_usage(
+    search: Optional[str] = None,
+    format: Optional[str] = None,
+    user_id: Optional[str] = None,
+    sort_by: str = "cost",  # "cost", "tokens", "date"
+    sort_order: str = "desc",
+    skip: int = 0,
+    limit: int = 20,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get all posts with usage/cost data (sortable, filterable)"""
+    
+    # Base query
+    query = db.query(GeneratedPost)
+    
+    # Apply filters
+    if search:
+        query = query.filter(
+            or_(
+                GeneratedPost.content.contains(search),
+                GeneratedPost.topic.contains(search)
+            )
+        )
+    if format:
+        query = query.filter(GeneratedPost.format == format)
+    if user_id:
+        query = query.filter(GeneratedPost.user_id == user_id)
+    
+    # Get total count before pagination
+    total = query.count()
+    
+    # Get all posts (we need to calculate costs)
+    all_posts = query.all()
+    
+    # Calculate costs for each post
+    posts_with_cost = []
+    total_cost_sum = 0.0
+    total_tokens_sum = 0
+    
+    for post in all_posts:
+        # Get usage records for this post
+        usage_records = db.query(UsageTracking).filter(
+            UsageTracking.post_id == post.id
+        ).all()
+        
+        post_tokens = sum(r.total_tokens for r in usage_records)
+        post_cost_cents = sum(r.estimated_cost for r in usage_records)
+        post_cost = cents_to_cost(post_cost_cents)
+        
+        models_used = list(set(r.model for r in usage_records if r.model))
+        has_image = any(r.service_type.value == "image_generation" for r in usage_records)
+        has_search = any(r.service_type.value == "search" for r in usage_records)
+        
+        # Get user info
+        user = db.query(User).filter(User.id == post.user_id).first()
+        
+        posts_with_cost.append({
+            "post": post,
+            "total_tokens": post_tokens,
+            "total_cost": post_cost,
+            "models_used": models_used,
+            "has_image": has_image,
+            "has_search": has_search,
+            "user_email": user.email if user else "Unknown",
+            "user_name": user.name if user else None
+        })
+        
+        total_cost_sum += post_cost
+        total_tokens_sum += post_tokens
+    
+    # Sort posts
+    if sort_by == "cost":
+        posts_with_cost.sort(key=lambda x: x["total_cost"], reverse=(sort_order == "desc"))
+    elif sort_by == "tokens":
+        posts_with_cost.sort(key=lambda x: x["total_tokens"], reverse=(sort_order == "desc"))
+    else:  # date
+        posts_with_cost.sort(key=lambda x: x["post"].created_at, reverse=(sort_order == "desc"))
+    
+    # Apply pagination
+    paginated_posts = posts_with_cost[skip:skip + limit]
+    
+    # Build response
+    posts_response = []
+    for item in paginated_posts:
+        post = item["post"]
+        content_preview = post.content[:100] + "..." if len(post.content) > 100 else post.content
+        
+        posts_response.append(PostWithUsageResponse(
+            id=post.id,
+            content=content_preview,
+            format=post.format.value,
+            topic=post.topic,
+            created_at=post.created_at,
+            user_email=item["user_email"],
+            user_name=item["user_name"],
+            total_tokens=item["total_tokens"],
+            total_cost=item["total_cost"],
+            models_used=item["models_used"],
+            has_image=item["has_image"],
+            has_search=item["has_search"]
+        ))
+    
+    avg_cost = total_cost_sum / total if total > 0 else 0.0
+    
+    return PostsListResponse(
+        posts=posts_response,
+        total=total,
+        skip=skip,
+        limit=limit,
+        total_cost=total_cost_sum,
+        total_tokens=total_tokens_sum,
+        avg_cost_per_post=avg_cost
+    )
+
+
+@router.get("/posts/{post_id}", response_model=PostUsageDetailResponse)
+async def get_post_usage_detail(
+    post_id: str,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get detailed usage breakdown for a specific post"""
+    
+    # Get post
+    post = db.query(GeneratedPost).filter(GeneratedPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Get user
+    user = db.query(User).filter(User.id == post.user_id).first()
+    
+    # Get usage records
+    usage_records = db.query(UsageTracking).filter(
+        UsageTracking.post_id == post_id
+    ).all()
+    
+    # Aggregate by service type
+    text_gen_cost = 0.0
+    text_input_tokens = 0
+    text_output_tokens = 0
+    text_model = None
+    text_provider = None
+    
+    image_gen_cost = 0.0
+    image_count = 0
+    image_model = None
+    
+    search_cost = 0.0
+    search_count = 0
+    
+    for record in usage_records:
+        cost = cents_to_cost(record.estimated_cost)
+        
+        if record.service_type.value == "text_generation":
+            text_gen_cost += cost
+            text_input_tokens += record.input_tokens
+            text_output_tokens += record.output_tokens
+            if not text_model:
+                text_model = record.model
+                text_provider = record.provider
+        elif record.service_type.value == "image_generation":
+            image_gen_cost += cost
+            image_count += record.image_count
+            if not image_model:
+                image_model = record.model
+        elif record.service_type.value == "search":
+            search_cost += cost
+            search_count += record.search_count
+    
+    total_cost = text_gen_cost + image_gen_cost + search_cost
+    total_tokens = text_input_tokens + text_output_tokens
+    
+    return PostUsageDetailResponse(
+        post_id=post.id,
+        content=post.content,
+        format=post.format.value,
+        topic=post.topic,
+        created_at=post.created_at,
+        user_id=post.user_id,
+        user_email=user.email if user else "Unknown",
+        user_name=user.name if user else None,
+        text_generation_cost=text_gen_cost,
+        text_input_tokens=text_input_tokens,
+        text_output_tokens=text_output_tokens,
+        text_model=text_model,
+        text_provider=text_provider,
+        image_generation_cost=image_gen_cost,
+        image_count=image_count,
+        image_model=image_model,
+        search_cost=search_cost,
+        search_count=search_count,
+        total_cost=total_cost,
+        total_tokens=total_tokens,
+        generation_options=post.generation_options if isinstance(post.generation_options, dict) else None
+    )

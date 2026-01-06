@@ -302,3 +302,48 @@ class SubscriptionPlanConfig(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class ServiceType(str, enum.Enum):
+    TEXT_GENERATION = "text_generation"
+    IMAGE_GENERATION = "image_generation"
+    SEARCH = "search"
+
+
+class UsageTracking(Base):
+    """Tracks usage metrics for AI services"""
+    __tablename__ = "usage_tracking"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id = Column(String(36), ForeignKey("generated_posts.id", ondelete="CASCADE"), nullable=True, index=True)
+    
+    service_type = Column(SQLEnum(ServiceType), nullable=False, index=True)
+    
+    # Token metrics
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    
+    # Cost tracking
+    estimated_cost = Column(Integer, default=0)  # Store in cents to avoid float precision issues
+    model = Column(String(255))
+    provider = Column(String(100))
+    
+    # Image generation specific
+    image_count = Column(Integer, default=0)
+    tiles = Column(Integer, default=0)
+    steps = Column(Integer, default=0)
+    
+    # Search specific
+    search_count = Column(Integer, default=0)
+    search_query = Column(Text, nullable=True)
+    
+    # Additional metadata
+    usage_metadata = Column(JSON)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = relationship("User")
+    post = relationship("GeneratedPost")
+

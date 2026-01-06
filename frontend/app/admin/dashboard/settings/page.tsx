@@ -185,6 +185,20 @@ const SETTING_CATEGORIES: SettingCategory[] = [
     settings: ['system_prompt', 'content_format_guidelines', 'comment_worthiness_rubric', 'default_preferences', 'trending_topics']
   },
   {
+    id: 'usage',
+    title: 'Usage Tracking',
+    description: 'Configure usage tracking and cost estimation',
+    icon: <BarChart3 className="w-5 h-5" />,
+    settings: [
+      'brave_search_pricing_tier', 
+      'brave_search_cost_per_1000', 
+      'brave_free_monthly_limit',
+      'cloudflare_workers_ai_tier',
+      'cloudflare_daily_neuron_limit',
+      'cloudflare_cost_per_1000_neurons'
+    ]
+  },
+  {
     id: 'apikeys',
     title: 'API Keys & .env',
     description: 'Manage API keys and environment configuration',
@@ -211,7 +225,9 @@ const BOOLEAN_SETTINGS = [
 const NUMBER_SETTINGS = [
   'api_rate_limit_per_minute', 'generation_cooldown_seconds', 'max_daily_generations_free',
   'max_daily_generations_premium', 'max_images_per_day_free', 'max_images_per_day_premium',
-  'max_conversations_stored', 'max_post_length'
+  'max_conversations_stored', 'max_post_length',
+  'brave_search_cost_per_1000', 'brave_free_monthly_limit',
+  'cloudflare_daily_neuron_limit', 'cloudflare_cost_per_1000_neurons'
 ];
 
 const SELECT_SETTINGS: Record<string, { options: string[], labels: string[] }> = {
@@ -263,6 +279,11 @@ export default function GlobalSettingsPage() {
   const [savingEnv, setSavingEnv] = useState(false);
   const [expandedEnvCategory, setExpandedEnvCategory] = useState<string | null>('ai_keys');
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [expandedAiProviders, setExpandedAiProviders] = useState<Record<string, boolean>>({
+    openai: true,
+    gemini: false,
+    claude: false
+  });
   
   // Logo upload state
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -444,6 +465,44 @@ export default function GlobalSettingsPage() {
 
   const getEnvValue = (key: string, originalValue: string): string => {
     return envEdits[key] !== undefined ? envEdits[key] : originalValue;
+  };
+
+  const groupAiVariablesByProvider = (variables: EnvVariable[]) => {
+    const providerSelector = variables.find(v => v.key === 'AI_PROVIDER');
+    const openaiVars = variables.filter(v => v.key.startsWith('OPENAI_'));
+    const geminiVars = variables.filter(v => v.key.startsWith('GEMINI_'));
+    const claudeVars = variables.filter(v => v.key.startsWith('CLAUDE_'));
+    
+    return {
+      selector: providerSelector,
+      providers: [
+        {
+          id: 'openai',
+          name: 'OpenAI',
+          icon: '🤖',
+          variables: openaiVars
+        },
+        {
+          id: 'gemini',
+          name: 'Google Gemini',
+          icon: '✨',
+          variables: geminiVars
+        },
+        {
+          id: 'claude',
+          name: 'Anthropic Claude',
+          icon: '🧠',
+          variables: claudeVars
+        }
+      ].filter(p => p.variables.length > 0)
+    };
+  };
+
+  const toggleAiProvider = (providerId: string) => {
+    setExpandedAiProviders(prev => ({
+      ...prev,
+      [providerId]: !prev[providerId]
+    }));
   };
 
   const getKeyStatusIcon = (status: string) => {
@@ -696,6 +755,16 @@ export default function GlobalSettingsPage() {
       comment_worthiness_rubric: 'Comment Worthiness Rubric',
       default_preferences: 'Default Preferences',
       trending_topics: 'Trending Topics',
+      
+      // Usage Tracking - Brave Search
+      brave_search_pricing_tier: 'Brave Search Pricing Tier',
+      brave_search_cost_per_1000: 'Brave Search Cost (per 1000)',
+      brave_free_monthly_limit: 'Brave Free Monthly Limit',
+      
+      // Usage Tracking - Cloudflare
+      cloudflare_workers_ai_tier: 'Cloudflare Workers AI Tier',
+      cloudflare_daily_neuron_limit: 'Daily Neuron Limit',
+      cloudflare_cost_per_1000_neurons: 'Cost per 1000 Neurons',
     };
     return names[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
@@ -796,6 +865,16 @@ export default function GlobalSettingsPage() {
       google_analytics_id: 'Google Analytics tracking ID',
       error_tracking_enabled: 'Track and report errors',
       performance_monitoring_enabled: 'Monitor app performance',
+      
+      // Usage Tracking - Brave Search
+      brave_search_pricing_tier: 'Brave Search API pricing tier (free or paid)',
+      brave_search_cost_per_1000: 'Cost per 1000 Brave Search API calls (USD)',
+      brave_free_monthly_limit: 'Monthly free search limit for Brave Search',
+      
+      // Usage Tracking - Cloudflare Workers AI
+      cloudflare_workers_ai_tier: 'Cloudflare Workers AI tier (free or paid)',
+      cloudflare_daily_neuron_limit: 'Daily free neuron limit (10,000 on both tiers)',
+      cloudflare_cost_per_1000_neurons: 'Cost per 1000 neurons after free tier (USD, paid tier only)',
     };
     return descriptions[key] || '';
   };
@@ -1037,6 +1116,38 @@ export default function GlobalSettingsPage() {
             >
               {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             </button>
+          )}
+        </div>
+      );
+    }
+
+    // Pricing Tier Dropdowns (free/paid)
+    if (key === 'brave_search_pricing_tier' || key === 'cloudflare_workers_ai_tier') {
+      return (
+        <div className="flex items-center space-x-3 mt-2">
+          <select
+            value={value || 'free'}
+            onChange={(e) => updateSetting(key, e.target.value)}
+            disabled={isSaving}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
+          >
+            <option value="free">Free Tier</option>
+            <option value="paid">Paid Tier</option>
+          </select>
+          {isSaving && <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />}
+          {value === 'free' && (
+            <span className="text-xs text-gray-500 italic">
+              {key === 'cloudflare_workers_ai_tier' 
+                ? '(10,000 free neurons/day, hard limit)' 
+                : '(Check your Brave Search plan limits)'}
+            </span>
+          )}
+          {value === 'paid' && (
+            <span className="text-xs text-green-600 italic">
+              {key === 'cloudflare_workers_ai_tier' 
+                ? '(10,000 free neurons/day + $0.011 per 1,000 after)' 
+                : '(Usage-based pricing)'}
+            </span>
           )}
         </div>
       );
@@ -1681,71 +1792,265 @@ export default function GlobalSettingsPage() {
                         
                         {expandedEnvCategory === categoryId && (
                           <div className="p-4 space-y-4">
-                            {category.variables.map((variable) => (
-                              <div key={variable.key} className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-sm font-medium text-gray-700">
-                                    {variable.label}
-                                  </label>
-                                  {variable.hasValue && (
-                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                      Configured
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500 mb-1">{variable.key}</p>
+                            {categoryId === 'ai_keys' ? (
+                              // Tree format for AI provider keys
+                              (() => {
+                                const grouped = groupAiVariablesByProvider(category.variables);
+                                const braveVars = envVariables['brave_search']?.variables || [];
                                 
-                                {variable.type === 'select' ? (
-                                  <select
-                                    value={getEnvValue(variable.key, variable.value)}
-                                    onChange={(e) => handleEnvChange(variable.key, e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  >
-                                    {variable.options?.map(opt => (
-                                      <option key={opt} value={opt}>{opt}</option>
+                                return (
+                                  <div className="space-y-3">
+                                    {/* Global AI Provider Selector */}
+                                    {grouped.selector && (
+                                      <div className="space-y-1 pb-3 border-b">
+                                        <div className="flex items-center justify-between">
+                                          <label className="text-sm font-medium text-gray-700">
+                                            {grouped.selector.label}
+                                          </label>
+                                          {grouped.selector.hasValue && (
+                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                              Configured
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mb-1">{grouped.selector.key}</p>
+                                        <select
+                                          value={getEnvValue(grouped.selector.key, grouped.selector.value)}
+                                          onChange={(e) => handleEnvChange(grouped.selector.key, e.target.value)}
+                                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        >
+                                          {grouped.selector.options?.map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+
+                                    {/* Provider Tree */}
+                                    {grouped.providers.map((provider) => (
+                                      <div key={provider.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                                        <button
+                                          onClick={() => toggleAiProvider(provider.id)}
+                                          className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-lg">{provider.icon}</span>
+                                            <span className="font-medium text-gray-800">{provider.name}</span>
+                                          </div>
+                                          {expandedAiProviders[provider.id] ? (
+                                            <ChevronUp className="w-4 h-4 text-gray-500" />
+                                          ) : (
+                                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                                          )}
+                                        </button>
+
+                                        {expandedAiProviders[provider.id] && (
+                                          <div className="p-3 pl-8 space-y-3 bg-gray-50/50">
+                                            {provider.variables.map((variable) => (
+                                              <div key={variable.key} className="space-y-1">
+                                                <div className="flex items-center justify-between">
+                                                  <label className="text-sm font-medium text-gray-700">
+                                                    {variable.label}
+                                                  </label>
+                                                  {variable.hasValue && (
+                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                      Configured
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <p className="text-xs text-gray-500 mb-1">{variable.key}</p>
+                                                
+                                                {variable.type === 'select' ? (
+                                                  <select
+                                                    value={getEnvValue(variable.key, variable.value)}
+                                                    onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                  >
+                                                    {variable.options?.map(opt => (
+                                                      <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
+                                                  </select>
+                                                ) : variable.type === 'password' ? (
+                                                  <div className="relative">
+                                                    <input
+                                                      type={showPasswords[variable.key] ? 'text' : 'password'}
+                                                      value={getEnvValue(variable.key, variable.value)}
+                                                      onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                                      placeholder={variable.hasValue ? '••••••••' : `Enter ${variable.label}...`}
+                                                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    />
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setShowPasswords(prev => ({ ...prev, [variable.key]: !prev[variable.key] }))}
+                                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                    >
+                                                      {showPasswords[variable.key] ? (
+                                                        <EyeOff className="w-5 h-5" />
+                                                      ) : (
+                                                        <Eye className="w-5 h-5" />
+                                                      )}
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <input
+                                                    type={variable.type === 'number' ? 'number' : 'text'}
+                                                    value={getEnvValue(variable.key, variable.value)}
+                                                    onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                                    placeholder={`Enter ${variable.label}...`}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                  />
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
                                     ))}
-                                  </select>
-                                ) : variable.type === 'boolean' ? (
-                                  <select
-                                    value={getEnvValue(variable.key, variable.value)}
-                                    onChange={(e) => handleEnvChange(variable.key, e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  >
-                                    <option value="true">True</option>
-                                    <option value="false">False</option>
-                                  </select>
-                                ) : variable.type === 'password' ? (
-                                  <div className="relative">
-                                    <input
-                                      type={showPasswords[variable.key] ? 'text' : 'password'}
+
+                                    {/* Brave Search Section */}
+                                    {(braveVars.length > 0 || categoryId === 'brave_search') && (
+                                      <div className="border border-blue-200 rounded-lg overflow-hidden bg-blue-50/30">
+                                        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-lg">🔍</span>
+                                            <div>
+                                              <span className="font-medium text-gray-800">Web Search (Brave API)</span>
+                                              <p className="text-xs text-gray-600 mt-0.5">
+                                                Unified web search for all AI providers
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="p-3 space-y-3 bg-white">
+                                          {braveVars.map((variable) => (
+                                            <div key={variable.key} className="space-y-1">
+                                              <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium text-gray-700">
+                                                  {variable.label}
+                                                </label>
+                                                {variable.hasValue && (
+                                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                    Configured
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <p className="text-xs text-gray-500 mb-1">{variable.key}</p>
+                                              
+                                              {variable.type === 'boolean' ? (
+                                                <select
+                                                  value={getEnvValue(variable.key, variable.value)}
+                                                  onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                >
+                                                  <option value="true">Enabled</option>
+                                                  <option value="false">Disabled</option>
+                                                </select>
+                                              ) : variable.type === 'password' ? (
+                                                <div className="relative">
+                                                  <input
+                                                    type={showPasswords[variable.key] ? 'text' : 'password'}
+                                                    value={getEnvValue(variable.key, variable.value)}
+                                                    onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                                    placeholder={variable.hasValue ? '••••••••' : `Enter ${variable.label}...`}
+                                                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setShowPasswords(prev => ({ ...prev, [variable.key]: !prev[variable.key] }))}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                  >
+                                                    {showPasswords[variable.key] ? (
+                                                      <EyeOff className="w-5 h-5" />
+                                                    ) : (
+                                                      <Eye className="w-5 h-5" />
+                                                    )}
+                                                  </button>
+                                                </div>
+                                              ) : (
+                                                <input
+                                                  type={variable.type === 'number' ? 'number' : 'text'}
+                                                  value={getEnvValue(variable.key, variable.value)}
+                                                  onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                                  placeholder={`Enter ${variable.label}...`}
+                                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                                />
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              // Regular format for non-AI categories
+                              category.variables.map((variable) => (
+                                <div key={variable.key} className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-sm font-medium text-gray-700">
+                                      {variable.label}
+                                    </label>
+                                    {variable.hasValue && (
+                                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                        Configured
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mb-1">{variable.key}</p>
+                                  
+                                  {variable.type === 'select' ? (
+                                    <select
                                       value={getEnvValue(variable.key, variable.value)}
                                       onChange={(e) => handleEnvChange(variable.key, e.target.value)}
-                                      placeholder={variable.hasValue ? '••••••••' : `Enter ${variable.label}...`}
-                                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowPasswords(prev => ({ ...prev, [variable.key]: !prev[variable.key] }))}
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                     >
-                                      {showPasswords[variable.key] ? (
-                                        <EyeOff className="w-5 h-5" />
-                                      ) : (
-                                        <Eye className="w-5 h-5" />
-                                      )}
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <input
-                                    type={variable.type === 'number' ? 'number' : 'text'}
-                                    value={getEnvValue(variable.key, variable.value)}
-                                    onChange={(e) => handleEnvChange(variable.key, e.target.value)}
-                                    placeholder={`Enter ${variable.label}...`}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  />
-                                )}
-                              </div>
-                            ))}
+                                      {variable.options?.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  ) : variable.type === 'boolean' ? (
+                                    <select
+                                      value={getEnvValue(variable.key, variable.value)}
+                                      onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                      <option value="true">True</option>
+                                      <option value="false">False</option>
+                                    </select>
+                                  ) : variable.type === 'password' ? (
+                                    <div className="relative">
+                                      <input
+                                        type={showPasswords[variable.key] ? 'text' : 'password'}
+                                        value={getEnvValue(variable.key, variable.value)}
+                                        onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                        placeholder={variable.hasValue ? '••••••••' : `Enter ${variable.label}...`}
+                                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowPasswords(prev => ({ ...prev, [variable.key]: !prev[variable.key] }))}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                      >
+                                        {showPasswords[variable.key] ? (
+                                          <EyeOff className="w-5 h-5" />
+                                        ) : (
+                                          <Eye className="w-5 h-5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <input
+                                      type={variable.type === 'number' ? 'number' : 'text'}
+                                      value={getEnvValue(variable.key, variable.value)}
+                                      onChange={(e) => handleEnvChange(variable.key, e.target.value)}
+                                      placeholder={`Enter ${variable.label}...`}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                  )}
+                                </div>
+                              ))
+                            )}
                           </div>
                         )}
                       </div>

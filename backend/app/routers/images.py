@@ -8,6 +8,7 @@ from datetime import datetime
 from ..database import get_db
 from ..routers.auth import get_current_user_id
 from ..services.cloudflare_ai import generate_image, generate_image_from_post
+from ..services.usage_tracking_service import log_image_generation
 from ..models import GeneratedPost, GeneratedImage
 
 router = APIRouter()
@@ -237,6 +238,21 @@ async def generate_image_for_post(
         )
         db.add(generated_image)
         db.commit()
+        
+        # Log image generation usage
+        try:
+            log_image_generation(
+                db=db,
+                user_id=user_id,
+                post_id=post_id,
+                image_count=1,
+                height=result["metadata"].get("height", 1120),
+                width=result["metadata"].get("width", 1120),
+                num_steps=result["metadata"].get("num_steps", 25),
+                model=result["metadata"]["model"]
+            )
+        except Exception as e:
+            print(f"Warning: Failed to log image generation usage: {str(e)}")
         
         # Get updated cloudflare_cost from post after commit
         # Re-query the post to ensure we have the latest data

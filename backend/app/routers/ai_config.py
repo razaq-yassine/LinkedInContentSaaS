@@ -26,7 +26,7 @@ AI_PROVIDERS = {
             {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "description": "Fast and versatile"},
             {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "description": "Best quality, longer context"},
         ],
-        "features": ["web_search", "vision", "long_context"],
+        "features": ["vision", "long_context"],
         "api_key_env": "GEMINI_API_KEY",
         "model_env": "GEMINI_MODEL"
     },
@@ -41,6 +41,17 @@ AI_PROVIDERS = {
         "features": ["vision", "function_calling"],
         "api_key_env": "OPENAI_API_KEY",
         "model_env": "OPENAI_MODEL"
+    },
+    "claude": {
+        "name": "Anthropic Claude",
+        "models": [
+            {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "description": "Fastest, most cost-efficient ($1/MTok input)"},
+            {"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5", "description": "Balanced intelligence and speed"},
+            {"id": "claude-opus-4-5", "name": "Claude Opus 4.5", "description": "Most intelligent model"},
+        ],
+        "features": ["vision", "long_context", "extended_thinking"],
+        "api_key_env": "CLAUDE_API_KEY",
+        "model_env": "CLAUDE_MODEL"
     }
 }
 
@@ -186,6 +197,30 @@ async def check_provider_status(provider: str, env_vars: Dict[str, str]) -> Dict
                 response = await client.get(
                     "https://api.openai.com/v1/models",
                     headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    return {"status": "valid", "message": "Connected"}
+                elif response.status_code == 401:
+                    return {"status": "invalid", "message": "Invalid API key"}
+                else:
+                    return {"status": "error", "message": f"API error: {response.status_code}"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    elif provider == "claude":
+        api_key = env_vars.get("CLAUDE_API_KEY", "")
+        if not api_key:
+            return {"status": "unconfigured", "message": "API key not set"}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://api.anthropic.com/v1/models",
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01"
+                    },
                     timeout=10.0
                 )
                 if response.status_code == 200:

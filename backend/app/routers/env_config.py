@@ -21,11 +21,20 @@ ENV_VARIABLES = {
     "ai_keys": {
         "title": "AI Provider Keys",
         "variables": [
-            {"key": "AI_PROVIDER", "label": "AI Provider", "type": "select", "options": ["openai", "gemini"], "default": "gemini", "sensitive": False},
+            {"key": "AI_PROVIDER", "label": "AI Provider", "type": "select", "options": ["openai", "gemini", "claude"], "default": "gemini", "sensitive": False},
             {"key": "OPENAI_API_KEY", "label": "OpenAI API Key", "type": "password", "default": "", "sensitive": True},
             {"key": "OPENAI_MODEL", "label": "OpenAI Model", "type": "select", "options": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"], "default": "gpt-4o", "sensitive": False},
             {"key": "GEMINI_API_KEY", "label": "Gemini API Key", "type": "password", "default": "", "sensitive": True},
             {"key": "GEMINI_MODEL", "label": "Gemini Model", "type": "select", "options": ["gemini-2.5-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"], "default": "gemini-2.5-flash", "sensitive": False},
+            {"key": "CLAUDE_API_KEY", "label": "Claude API Key", "type": "password", "default": "", "sensitive": True},
+            {"key": "CLAUDE_MODEL", "label": "Claude Model", "type": "select", "options": ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5"], "default": "claude-haiku-4-5", "sensitive": False},
+        ]
+    },
+    "brave_search": {
+        "title": "Brave Search API",
+        "variables": [
+            {"key": "BRAVE_API_KEY", "label": "Brave API Key", "type": "password", "default": "", "sensitive": True},
+            {"key": "BRAVE_SEARCH_ENABLED", "label": "Enable Web Search", "type": "boolean", "default": "true", "sensitive": False},
         ]
     },
     "cloudflare": {
@@ -220,11 +229,15 @@ async def check_key_status(
         return await check_openai_key(env_vars.get("OPENAI_API_KEY", ""))
     elif key_type == "gemini":
         return await check_gemini_key(env_vars.get("GEMINI_API_KEY", ""))
+    elif key_type == "claude":
+        return await check_claude_key(env_vars.get("CLAUDE_API_KEY", ""))
     elif key_type == "cloudflare":
         return await check_cloudflare_key(
             env_vars.get("CLOUDFLARE_ACCOUNT_ID", ""),
             env_vars.get("CLOUDFLARE_API_TOKEN", "")
         )
+    elif key_type == "brave":
+        return await check_brave_key(env_vars.get("BRAVE_API_KEY", ""))
     else:
         raise HTTPException(status_code=400, detail=f"Unknown key type: {key_type}")
 
@@ -242,11 +255,17 @@ async def check_all_keys_status(admin: Admin = Depends(get_current_admin)):
     # Check Gemini
     results["gemini"] = await check_gemini_key(env_vars.get("GEMINI_API_KEY", ""))
     
+    # Check Claude
+    results["claude"] = await check_claude_key(env_vars.get("CLAUDE_API_KEY", ""))
+    
     # Check Cloudflare
     results["cloudflare"] = await check_cloudflare_key(
         env_vars.get("CLOUDFLARE_ACCOUNT_ID", ""),
         env_vars.get("CLOUDFLARE_API_TOKEN", "")
     )
+    
+    # Check Brave
+    results["brave"] = await check_brave_key(env_vars.get("BRAVE_API_KEY", ""))
     
     return results
 
@@ -469,6 +488,119 @@ async def check_cloudflare_key(account_id: str, api_token: str) -> KeyStatusResp
     except Exception as e:
         return KeyStatusResponse(
             key="cloudflare",
+            status="error",
+            message=str(e)
+        )
+
+
+async def check_claude_key(api_key: str) -> KeyStatusResponse:
+    """Check Claude API key status using latest Anthropic API"""
+    if not api_key:
+        return KeyStatusResponse(
+            key="claude",
+            status="unconfigured",
+            message="API key not configured"
+        )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Verify key with models endpoint
+            response = await client.get(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01"
+                },
+                timeout=10.0
+            )
+            
+            if response.status_code == 401:
+                return KeyStatusResponse(
+                    key="claude",
+                    status="invalid",
+                    message="Invalid API key"
+                )
+            elif response.status_code == 200:
+                return KeyStatusResponse(
+                    key="claude",
+                    status="valid",
+                    message="API key is valid",
+                    balance="See Anthropic Console for usage",
+                    quota={
+                        "haiku_pricing": "$1/MTok input, $5/MTok output",
+                        "note": "Haiku 4.5 is fastest and most cost-efficient"
+                    }
+                )
+            else:
+                return KeyStatusResponse(
+                    key="claude",
+                    status="error",
+                    message=f"API returned status {response.status_code}"
+                )
+    except Exception as e:
+        return KeyStatusResponse(
+            key="claude",
+            status="error",
+            message=str(e)
+        )
+
+
+async def check_brave_key(api_key: str) -> KeyStatusResponse:
+    """Check Brave Search API key status - verified implementation"""
+    if not api_key:
+        return KeyStatusResponse(
+            key="brave",
+            status="unconfigured",
+            message="API key not configured"
+        )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Test with a simple query using verified endpoint
+            response = await client.get(
+                "https://api.search.brave.com/res/v1/web/search",
+                headers={
+                    "X-Subscription-Token": api_key,
+                    "Accept": "application/json"
+                },
+                params={"q": "test", "count": 1},
+                timeout=10.0
+            )
+            
+            if response.status_code == 401:
+                return KeyStatusResponse(
+                    key="brave",
+                    status="invalid",
+                    message="Invalid API key"
+                )
+            elif response.status_code == 200:
+                return KeyStatusResponse(
+                    key="brave",
+                    status="valid",
+                    message="API key is valid",
+                    balance="Free tier: 2,000 queries/month",
+                    quota={
+                        "tier": "Check Brave Dashboard for current usage",
+                        "base_pricing": "$5/1K searches",
+                        "pro_pricing": "$9/1K searches"
+                    }
+                )
+            elif response.status_code == 429:
+                return KeyStatusResponse(
+                    key="brave",
+                    status="valid",
+                    message="API key valid (rate limit reached during test)",
+                    balance="Check Brave Dashboard for usage"
+                )
+            else:
+                return KeyStatusResponse(
+                    key="brave",
+                    status="error",
+                    message=f"API returned status {response.status_code}"
+                )
+    except Exception as e:
+        return KeyStatusResponse(
+            key="brave",
             status="error",
             message=str(e)
         )
