@@ -106,10 +106,6 @@ export function GoogleConnect() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm("Are you sure you want to disconnect your Google account?")) {
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/disconnect`, {

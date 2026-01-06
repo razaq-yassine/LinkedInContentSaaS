@@ -14,8 +14,8 @@ from ..schemas.auth import (
     MockLoginRequest, LoginResponse, UserResponse,
     RegisterRequest, RegisterResponse, LoginRequest,
     ForgotPasswordRequest, ResetPasswordRequest, VerifyEmailRequest,
-    ResendVerificationRequest, MessageResponse, ChangePasswordRequest,
-    SetPasswordRequest
+    VerifyEmailCodeRequest, ResendVerificationRequest, MessageResponse, 
+    ChangePasswordRequest, SetPasswordRequest
 )
 from ..config import get_settings
 from ..services.linkedin_service import LinkedInService
@@ -257,7 +257,8 @@ async def register(
         password_hash=password_hash,
         name=request.name or request.email.split("@")[0].title(),
         email_verified=auto_verify,
-        account_type="person"
+        account_type="person",
+        registration_provider="email"
     )
     db.add(user)
     
@@ -279,14 +280,16 @@ async def register(
     
     db.commit()
     
-    # Only send verification email if not in dev mode
+    # Always send verification email for email/password registration
     if not auto_verify:
         token = EmailService.generate_token()
+        verification_code = EmailService.generate_verification_code()
         verification_token = UserToken(
             user_id=user_id,
             token=token,
+            verification_code=verification_code,
             token_type=TokenType.EMAIL_VERIFICATION,
-            expires_at=datetime.utcnow() + timedelta(hours=settings.email_verification_expire_hours)
+            expires_at=datetime.utcnow() + timedelta(minutes=15)
         )
         db.add(verification_token)
         db.commit()
@@ -295,7 +298,8 @@ async def register(
             EmailService.send_verification_email,
             request.email,
             user.name,
-            token
+            token,
+            verification_code
         )
         message = "Registration successful. Please check your email to verify your account."
     else:
@@ -333,15 +337,11 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     if not pwd_context.verify(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    # Check email verification required setting from database
-    require_verification_setting = db.query(AdminSetting).filter(AdminSetting.key == "require_email_verification").first()
-    require_verification = require_verification_setting and require_verification_setting.value.lower() == "true"
-    
-    # Skip email verification check in dev mode or if setting is disabled
-    if not user.email_verified and require_verification and not settings.dev_mode:
+    # Check email verification - required for email/password accounts
+    if not user.email_verified:
         raise HTTPException(
             status_code=403, 
-            detail="Please verify your email before logging in. Check your inbox for the verification link."
+            detail="Please verify your email before logging in. Check your inbox for the verification code or link."
         )
     
     # Get profile
@@ -373,7 +373,7 @@ async def verify_email(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """Verify email with token"""
+    """Verify email with token (link verification)"""
     token_record = db.query(UserToken).filter(
         UserToken.token == request.token,
         UserToken.token_type == TokenType.EMAIL_VERIFICATION,
@@ -384,7 +384,7 @@ async def verify_email(
         raise HTTPException(status_code=400, detail="Invalid or expired verification token")
     
     if datetime.utcnow() > token_record.expires_at:
-        raise HTTPException(status_code=400, detail="Verification token has expired")
+        raise HTTPException(status_code=400, detail="Verification token has expired. Please request a new one.")
     
     # Mark token as used
     token_record.used = True
@@ -405,6 +405,53 @@ async def verify_email(
         return MessageResponse(success=True, message="Email verified successfully. You can now log in.")
     
     raise HTTPException(status_code=404, detail="User not found")
+
+
+@router.post("/verify-email-code", response_model=MessageResponse)
+async def verify_email_code(
+    request: VerifyEmailCodeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Verify email with 6-digit code"""
+    # Find user by email
+    user = db.query(User).filter(User.email == request.email).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid email or verification code")
+    
+    if user.email_verified:
+        raise HTTPException(status_code=400, detail="Email is already verified")
+    
+    # Find valid token with matching code
+    token_record = db.query(UserToken).filter(
+        UserToken.user_id == user.id,
+        UserToken.verification_code == request.code,
+        UserToken.token_type == TokenType.EMAIL_VERIFICATION,
+        UserToken.used == False
+    ).first()
+    
+    if not token_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    
+    if datetime.utcnow() > token_record.expires_at:
+        raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
+    
+    # Mark token as used
+    token_record.used = True
+    
+    # Verify user email
+    user.email_verified = True
+    db.commit()
+    
+    # Send welcome email in background
+    background_tasks.add_task(
+        EmailService.send_welcome_email,
+        user.email,
+        user.name
+    )
+    
+    return MessageResponse(success=True, message="Email verified successfully. You can now log in.")
 
 
 @router.post("/resend-verification", response_model=MessageResponse)
@@ -430,13 +477,15 @@ async def resend_verification(
         UserToken.used == False
     ).update({"used": True})
     
-    # Create new verification token
+    # Create new verification token with code
     token = EmailService.generate_token()
+    verification_code = EmailService.generate_verification_code()
     verification_token = UserToken(
         user_id=user.id,
         token=token,
+        verification_code=verification_code,
         token_type=TokenType.EMAIL_VERIFICATION,
-        expires_at=datetime.utcnow() + timedelta(hours=settings.email_verification_expire_hours)
+        expires_at=datetime.utcnow() + timedelta(minutes=15)
     )
     db.add(verification_token)
     db.commit()
@@ -446,7 +495,8 @@ async def resend_verification(
         EmailService.send_verification_email,
         user.email,
         user.name,
-        token
+        token,
+        verification_code
     )
     
     return MessageResponse(success=True, message="If an account exists with this email, a verification link has been sent.")
@@ -733,7 +783,8 @@ async def google_callback(
                     email=google_email,
                     name=google_name,
                     account_type="person",
-                    email_verified=True  # Google emails are verified
+                    email_verified=True,  # Google emails are verified
+                    registration_provider="google"
                 )
                 db.add(user)
                 
@@ -879,6 +930,13 @@ async def google_disconnect(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Check if Google was the registration provider
+    if user.registration_provider == "google":
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot disconnect Google account. You created your account with Google and cannot unlink it. You can connect other login methods, but this one must remain."
+        )
+    
     # Check if user has another way to login (password or LinkedIn)
     if not user.password_hash and not user.linkedin_connected:
         raise HTTPException(
@@ -921,7 +979,8 @@ async def get_current_user(user_id: str = Depends(get_current_user_id), db: Sess
         has_password=user.password_hash is not None,
         account_type=user.account_type.value,
         onboarding_completed=profile.onboarding_completed if profile else False,
-        email_verified=user.email_verified if hasattr(user, 'email_verified') else True
+        email_verified=user.email_verified if hasattr(user, 'email_verified') else True,
+        registration_provider=user.registration_provider
     )
 
 @router.get("/linkedin/login")
@@ -1041,7 +1100,8 @@ async def linkedin_callback(
                     email=linkedin_email or f"{linkedin_id}@linkedin.user",
                     name=linkedin_name,
                     account_type="person",
-                    email_verified=True  # LinkedIn emails are verified
+                    email_verified=True,  # LinkedIn emails are verified
+                    registration_provider="linkedin"
                 )
                 db.add(user)
                 
@@ -1174,6 +1234,13 @@ async def linkedin_disconnect(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if LinkedIn was the registration provider
+    if user.registration_provider == "linkedin":
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot disconnect LinkedIn account. You created your account with LinkedIn and cannot unlink it. You can connect other login methods, but this one must remain."
+        )
     
     # Check if user has another way to login (password or Google)
     if not user.password_hash and not user.google_id:

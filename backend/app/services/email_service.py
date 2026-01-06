@@ -73,8 +73,13 @@ class EmailService:
         return secrets.token_urlsafe(32)
     
     @staticmethod
-    def send_verification_email(to_email: str, name: str, token: str):
-        """Send email verification email"""
+    def generate_verification_code() -> str:
+        """Generate a 6-digit verification code"""
+        return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+    
+    @staticmethod
+    def send_verification_email(to_email: str, name: str, token: str, verification_code: str):
+        """Send email verification email with code and link"""
         verification_url = f"{settings.frontend_url}/verify-email?token={token}"
         
         html_content = f"""
@@ -91,11 +96,18 @@ class EmailService:
             <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
                 <h2 style="color: #1f2937; margin-top: 0;">Verify Your Email Address</h2>
                 <p>Hi {name or 'there'},</p>
-                <p>Thank you for signing up for ContentAI! Please click the button below to verify your email address and activate your account.</p>
+                <p>Thank you for signing up for ContentAI! Use the verification code below to activate your account:</p>
                 <div style="text-align: center; margin: 30px 0;">
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; display: inline-block;">
+                        <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px; font-weight: 600;">VERIFICATION CODE</p>
+                        <p style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #1f2937; font-family: 'Courier New', monospace;">{verification_code}</p>
+                    </div>
+                </div>
+                <p style="color: #6b7280; font-size: 14px; text-align: center;">Or click the button below to verify automatically:</p>
+                <div style="text-align: center; margin: 20px 0;">
                     <a href="{verification_url}" style="background: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">Verify Email Address</a>
                 </div>
-                <p style="color: #6b7280; font-size: 14px;">This link will expire in {settings.email_verification_expire_hours} hours.</p>
+                <p style="color: #ef4444; font-size: 14px; font-weight: 600; text-align: center;">⏱️ This code will expire in 15 minutes</p>
                 <p style="color: #6b7280; font-size: 14px;">If you didn't create an account with ContentAI, you can safely ignore this email.</p>
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
                 <p style="color: #9ca3af; font-size: 12px; text-align: center;">
@@ -112,11 +124,14 @@ class EmailService:
         
         Hi {name or 'there'},
         
-        Thank you for signing up for ContentAI! Please click the link below to verify your email address:
+        Thank you for signing up for ContentAI! Your verification code is:
         
+        {verification_code}
+        
+        Or click this link to verify automatically:
         {verification_url}
         
-        This link will expire in {settings.email_verification_expire_hours} hours.
+        This code will expire in 15 minutes.
         
         If you didn't create an account with ContentAI, you can safely ignore this email.
         """

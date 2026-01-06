@@ -91,10 +91,6 @@ export function LinkedInConnect() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm("Are you sure you want to disconnect your LinkedIn account?")) {
-      return;
-    }
-
     setLoading(true);
     try {
       await api.auth.linkedInDisconnect();

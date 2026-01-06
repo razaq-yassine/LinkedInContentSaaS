@@ -84,7 +84,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await api.auth.register(email, password, name || undefined);
-      setSuccess(true);
+      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (error: any) {
       if (error.detail) {
         if (Array.isArray(error.detail)) {

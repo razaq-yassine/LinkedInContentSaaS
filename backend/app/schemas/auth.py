@@ -57,6 +57,11 @@ class VerifyEmailRequest(BaseModel):
     token: str
 
 
+class VerifyEmailCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
 
@@ -132,6 +137,7 @@ class UserResponse(BaseModel):
     account_type: str
     onboarding_completed: bool
     email_verified: bool = False
+    registration_provider: Optional[str] = None
     
     class Config:
         from_attributes = True

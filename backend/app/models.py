@@ -45,6 +45,7 @@ class User(Base):
     linkedin_profile_data = Column(JSON)
     linkedin_connected = Column(Boolean, default=False, index=True)
     linkedin_last_sync = Column(DateTime)
+    registration_provider = Column(String(50), nullable=True)  # "email", "google", "linkedin"
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -254,6 +255,7 @@ class UserToken(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token = Column(String(255), unique=True, nullable=False, index=True)
+    verification_code = Column(String(6), nullable=True, index=True)
     token_type = Column(SQLEnum(TokenType), nullable=False)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
