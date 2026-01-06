@@ -19,7 +19,8 @@ async def generate_completion(
     temperature: float = 0.7,
     use_search: bool = False,
     conversation_history: Optional[List[Dict[str, str]]] = None,
-    image_attachments: Optional[List[Dict[str, Any]]] = None
+    image_attachments: Optional[List[Dict[str, Any]]] = None,
+    use_onboarding_model: bool = False
 ) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using either OpenAI or Gemini based on AI_PROVIDER setting
@@ -32,6 +33,7 @@ async def generate_completion(
         use_search: Enable web search (only supported by Gemini)
         conversation_history: Optional list of previous messages in format [{"role": "user|assistant", "content": "..."}]
         image_attachments: Optional list of image attachments for vision analysis [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
+        use_onboarding_model: If True, uses the onboarding-specific model (for CV analysis)
     
     Returns:
         Tuple of (response_text, token_usage_dict) where token_usage_dict contains:
@@ -44,13 +46,18 @@ async def generate_completion(
     provider = settings.ai_provider.lower()
     
     if provider == "gemini":
-        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search, conversation_history, image_attachments)
+        return await _generate_with_gemini(system_prompt, user_message, temperature, use_search, conversation_history, image_attachments, use_onboarding_model)
     elif provider == "openai":
         if use_search:
             # OpenAI doesn't have built-in search, fall back to standard completion
             print("Warning: Web search not supported by OpenAI, using standard completion")
         # Use model from settings if not explicitly provided
-        openai_model = model or settings.openai_model
+        if model:
+            openai_model = model
+        elif use_onboarding_model and settings.openai_onboarding_model:
+            openai_model = settings.openai_onboarding_model
+        else:
+            openai_model = settings.openai_model
         return await _generate_with_openai(system_prompt, user_message, openai_model, temperature, conversation_history, image_attachments)
     else:
         raise Exception(f"Unknown AI provider: {provider}")
@@ -140,7 +147,8 @@ async def _generate_with_gemini(
     temperature: float = 0.7,
     use_search: bool = False,
     conversation_history: Optional[List[Dict[str, str]]] = None,
-    image_attachments: Optional[List[Dict[str, Any]]] = None
+    image_attachments: Optional[List[Dict[str, Any]]] = None,
+    use_onboarding_model: bool = False
 ) -> tuple[str, Dict[str, Any]]:
     """
     Generate a completion using Google Gemini API (new google-genai SDK) with optional vision support
@@ -152,6 +160,7 @@ async def _generate_with_gemini(
         use_search: Enable Google Search grounding for web searches
         conversation_history: Optional list of previous messages [{"role": "user|assistant", "content": "..."}]
         image_attachments: Optional list of image attachments for vision [{"type": "image/jpeg", "data": "base64...", "name": "file.jpg"}]
+        use_onboarding_model: If True, uses the onboarding-specific model (for CV analysis)
     
     Returns:
         Tuple of (response_text, token_usage_dict)
@@ -202,9 +211,15 @@ async def _generate_with_gemini(
         else:
             contents = combined_prompt
         
+        # Select the appropriate model
+        if use_onboarding_model and settings.gemini_onboarding_model:
+            model_to_use = settings.gemini_onboarding_model
+        else:
+            model_to_use = settings.gemini_model
+        
         # Generate content using new SDK
         response = gemini_client.models.generate_content(
-            model=settings.gemini_model,
+            model=model_to_use,
             contents=contents,
             config=config,
         )
@@ -216,7 +231,7 @@ async def _generate_with_gemini(
                 "input_tokens": getattr(usage_metadata, 'prompt_token_count', 0) or 0,
                 "output_tokens": getattr(usage_metadata, 'candidates_token_count', 0) or 0,
                 "total_tokens": getattr(usage_metadata, 'total_token_count', 0) or 0,
-                "model": settings.gemini_model,
+                "model": model_to_use,
                 "provider": "gemini"
             }
         else:
@@ -225,7 +240,7 @@ async def _generate_with_gemini(
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "total_tokens": 0,
-                "model": settings.gemini_model,
+                "model": model_to_use,
                 "provider": "gemini"
             }
         
@@ -235,7 +250,7 @@ async def _generate_with_gemini(
 
 async def generate_profile_from_cv(cv_text: str) -> tuple[str, Dict[str, Any]]:
     """
-    Generate profile.md from CV text
+    Generate profile.md from CV text (uses onboarding model)
     """
     system_prompt = """You are a profile analyzer. Extract key information from a CV and create a structured profile in markdown format.
 
@@ -274,12 +289,12 @@ Create a profile following this structure:
 
 Extract actual information from the CV. Be specific and use real data points."""
 
-    result, token_usage = await generate_completion(system_prompt, cv_text)
+    result, token_usage = await generate_completion(system_prompt, cv_text, use_onboarding_model=True)
     return result, token_usage
 
 async def analyze_writing_style(posts: List[str]) -> tuple[str, Dict[str, Any]]:
     """
-    Analyze writing style from sample posts
+    Analyze writing style from sample posts (uses onboarding model)
     """
     system_prompt = """You are a writing style analyst. Analyze these LinkedIn posts and create a detailed writing style guide.
 
@@ -315,12 +330,12 @@ Create a guide following this structure:
 Be specific and use examples from the posts provided."""
 
     posts_text = "\n\n---POST---\n\n".join(posts)
-    result, token_usage = await generate_completion(system_prompt, f"Analyze these posts:\n\n{posts_text}")
+    result, token_usage = await generate_completion(system_prompt, f"Analyze these posts:\n\n{posts_text}", use_onboarding_model=True)
     return result, token_usage
 
 async def generate_context_json(cv_text: str, profile_md: str) -> Dict:
     """
-    Generate context.json with structured metadata
+    Generate context.json with structured metadata (uses onboarding model)
     """
     system_prompt = """Extract structured information and output ONLY valid JSON (no markdown, no explanation).
 
@@ -347,7 +362,8 @@ Return a JSON object with this structure:
     result, _ = await generate_completion(
         system_prompt,
         f"CV:\n{cv_text}\n\nProfile:\n{profile_md}",
-        temperature=0.3
+        temperature=0.3,
+        use_onboarding_model=True
     )
     
     # Parse JSON
@@ -457,7 +473,8 @@ Output only TOON format, no explanations."""
     result, token_usage = await generate_completion(
         system_prompt=system_prompt,
         user_message=f"CV Content:\n\n{cv_text}\n\n{f'Industry Hint: {industry_hint}' if industry_hint else ''}",
-        temperature=0.5
+        temperature=0.5,
+        use_onboarding_model=True
     )
     
     # Parse metadata from the TOON result
@@ -548,7 +565,8 @@ Create 10-15 unique, specific ideas based on their actual experience."""
         result, token_usage = await generate_completion(
             system_prompt=system_prompt,
             user_message=user_message,
-            temperature=0.7
+            temperature=0.7,
+            use_onboarding_model=True
         )
         
         # Parse JSON array

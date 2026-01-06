@@ -29,7 +29,7 @@ const steps = [
     title: "AI Creates Magic",
     description: "Our AI generates engaging posts that sound like you, complete with hooks, stories, and calls-to-action proven to drive engagement.",
     gradient: "from-fuchsia-500 to-pink-500",
-    aiFeature: "GPT-4 Generation",
+    aiFeature: "GPT-5 + Claude",
   },
   {
     number: "04",

@@ -14,10 +14,12 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"  # Options: gpt-4o, gpt-4o-mini, gpt-3.5-turbo
+    openai_onboarding_model: str = ""  # Separate model for onboarding (CV analysis). If empty, uses openai_model
     
     # Gemini
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"  # Options: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash-exp, gemini-2.0-flash-lite-exp, gemini-1.5-flash, gemini-1.5-pro
+    gemini_onboarding_model: str = ""  # Separate model for onboarding (CV analysis). If empty, uses gemini_model
     
     # Cloudflare Workers AI
     cloudflare_account_id: str = ""

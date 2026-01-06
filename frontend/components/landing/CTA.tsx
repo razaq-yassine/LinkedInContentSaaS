@@ -8,7 +8,7 @@ import { ArrowRight, Sparkles, Check, Cpu, Zap } from "lucide-react";
 
 const benefits = [
   "No credit card required",
-  "14-day free trial",
+  "Free tier available",
   "Cancel anytime",
 ];
 

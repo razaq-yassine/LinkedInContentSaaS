@@ -1,34 +1,22 @@
 import Link from "next/link";
-import { Linkedin, Twitter, Instagram, Youtube, Mail, Brain, Sparkles } from "lucide-react";
+import { Linkedin, Twitter, Instagram, Youtube, Mail, Sparkles } from "lucide-react";
 
 const footerLinks = {
-  product: {
-    title: "Product",
+  features: {
+    title: "Features",
     links: [
       { name: "AI Content Writer", href: "/features/ai-writer" },
-      { name: "Analytics", href: "/features/analytics" },
       { name: "Content Calendar", href: "/features/calendar" },
       { name: "Voice Matching", href: "/features/voice" },
-      { name: "Integrations", href: "/integrations" },
-    ],
-  },
-  resources: {
-    title: "Resources",
-    links: [
-      { name: "Blog", href: "/blog" },
-      { name: "LinkedIn Tips", href: "/resources/tips" },
-      { name: "Success Stories", href: "/customers" },
-      { name: "Help Center", href: "/help" },
-      { name: "API Docs", href: "/docs" },
+      { name: "Smart Suggestions", href: "/features/suggestions" },
+      { name: "Carousel Generation", href: "/features/carousel" },
     ],
   },
   company: {
     title: "Company",
     links: [
       { name: "About Us", href: "/about" },
-      { name: "Careers", href: "/careers" },
-      { name: "Partners", href: "/partners" },
-      { name: "Press Kit", href: "/press" },
+      { name: "Customers", href: "/customers" },
       { name: "Contact", href: "/contact" },
     ],
   },
@@ -65,13 +53,10 @@ export function Footer() {
           {/* Brand Column */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">ContentAI</span>
+              <span className="text-xl font-bold text-white">PostInAi</span>
             </Link>
             <p className="text-slate-500 mb-6 max-w-xs">
-              Empowering professionals to share their stories and grow their personal brand on LinkedIn with AI.
+              AI-powered LinkedIn content creation. Generate posts, carousels, and images—then publish directly from one place.
             </p>
             
             {/* Social Links */}
@@ -109,43 +94,15 @@ export function Footer() {
             </div>
           ))}
         </div>
-
-        {/* Newsletter */}
-        <div className="mt-12 pt-8 border-t border-slate-800">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-500/10 border border-violet-500/20 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-violet-400" />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold">Stay updated</h3>
-                <p className="text-slate-500 text-sm">Get weekly LinkedIn tips and product updates.</p>
-              </div>
-            </div>
-            <div className="flex gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" />
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition-colors"
-                />
-              </div>
-              <button className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-medium rounded-lg hover:from-violet-500 hover:to-cyan-500 transition-all shadow-lg shadow-violet-500/20">
-                Subscribe
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Bottom Bar */}
       <div className="border-t border-slate-800/50">
         <div className="container mx-auto px-4 lg:px-8 py-6 relative z-10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-600">
-            <p>© {new Date().getFullYear()} ContentAI. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} PostInAi LLC. All rights reserved.</p>
             <p>
-              ContentAI is not endorsed by, affiliated with, or a partner of LinkedIn™ Corporation.
+              PostInAi LLC is a New Mexico company. Not endorsed by or affiliated with LinkedIn™ Corporation.
             </p>
           </div>
         </div>

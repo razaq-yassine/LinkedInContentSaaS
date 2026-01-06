@@ -13,11 +13,11 @@ const stats = [
 ];
 
 const avatars = [
-  { name: "Sarah", gradient: "from-pink-500 to-rose-500" },
-  { name: "Mike", gradient: "from-blue-500 to-cyan-500" },
-  { name: "Emma", gradient: "from-green-500 to-emerald-500" },
-  { name: "John", gradient: "from-violet-500 to-purple-500" },
-  { name: "Lisa", gradient: "from-orange-500 to-amber-500" },
+  { name: "Sarah", image: "/avatars/sarah.jpg" },
+  { name: "Mike", image: "/avatars/mike.jpg" },
+  { name: "Emma", image: "/avatars/emma.jpg" },
+  { name: "John", image: "/avatars/john.jpg" },
+  { name: "Lisa", image: "/avatars/lisa.jpg" },
 ];
 
 function GridBackground() {
@@ -77,7 +77,7 @@ export function Hero() {
             transition={{ duration: 0.5 }}
           >
             <Cpu className="w-4 h-4" />
-            <span>Powered by GPT-4 & Neural Voice Matching</span>
+            <span>Powered by GPT-5 & Claude AI</span>
             <span className="flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-cyan-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
@@ -91,11 +91,11 @@ export function Hero() {
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            Turn LinkedIn posts into{" "}
+            No inspiration?{" "}
             <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
-              revenue
+              We got you.
             </span>{" "}
-            without wondering what to write
+            Turn ideas into viral posts
           </motion.h1>
 
           {/* Subheadline */}
@@ -105,8 +105,8 @@ export function Hero() {
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            Our AI learns your unique voice and writing style, then generates authentic LinkedIn content 
-            that sounds like you—not a robot. Powered by neural networks trained on millions of high-performing posts.
+            Even when you're stuck, our AI generates engaging content tailored to your interests, audience, and domain. 
+            Powered by GPT-5 & Claude to create posts that sound authentically you.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -143,9 +143,13 @@ export function Hero() {
                     initial={{ opacity: 0, scale: 0 }}
                     animate={isInView ? { opacity: 1, scale: 1 } : {}}
                     transition={{ duration: 0.3, delay: 0.5 + i * 0.1 }}
-                    className={`w-10 h-10 bg-gradient-to-br ${avatar.gradient} rounded-full border-2 border-slate-900 flex items-center justify-center text-white font-semibold text-sm`}
+                    className="w-10 h-10 rounded-full border-2 border-slate-900 overflow-hidden"
                   >
-                    {avatar.name[0]}
+                    <img 
+                      src={avatar.image} 
+                      alt={avatar.name}
+                      className="w-full h-full object-cover"
+                    />
                   </motion.div>
                 ))}
               </div>
@@ -209,7 +213,7 @@ export function Hero() {
                 </div>
                 <div className="flex-1 flex justify-center">
                   <div className="px-4 py-1 bg-slate-900/50 rounded-md text-sm text-slate-400 border border-slate-700/50">
-                    app.contentai.com
+                    app.postinai.com
                   </div>
                 </div>
               </div>
@@ -225,7 +229,7 @@ export function Hero() {
                       </div>
                       <div>
                         <span className="font-semibold text-white">AI Content Engine</span>
-                        <span className="ml-2 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">GPT-4</span>
+                        <span className="ml-2 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">GPT-5 + Claude</span>
                       </div>
                     </div>
                     <div className="space-y-3">

@@ -9,63 +9,52 @@ const testimonials = [
     name: "Sarah Johnson",
     role: "Marketing Director",
     company: "TechStart Inc.",
-    avatar: "SJ",
-    avatarColor: "from-pink-500 to-rose-500",
-    content: "ContentAI transformed how our team creates LinkedIn content. We went from struggling to post once a week to publishing daily content that actually drives leads.",
+    image: "/avatars/sarah-johnson.jpg",
+    content: "PostInAi transformed how our team creates LinkedIn content. We went from struggling to post once a week to publishing daily content that actually drives leads.",
     stats: { label: "Lead increase", value: "340%" },
   },
   {
     name: "Michael Chen",
     role: "Founder & CEO",
     company: "GrowthLabs",
-    avatar: "MC",
-    avatarColor: "from-blue-500 to-cyan-500",
-    content: "I was skeptical about AI-generated content, but ContentAI nailed my voice from day one. My engagement tripled and I'm getting inbound leads I never expected.",
+    image: "/avatars/michael-chen.jpg",
+    content: "I was skeptical about AI-generated content, but PostInAi nailed my voice from day one. My engagement tripled and I'm getting inbound leads I never expected.",
     stats: { label: "Engagement boost", value: "3x" },
   },
   {
     name: "Emma Rodriguez",
     role: "Personal Brand Coach",
     company: "BrandYou",
-    avatar: "ER",
-    avatarColor: "from-violet-500 to-purple-500",
-    content: "As someone who teaches personal branding, I'm picky about authenticity. ContentAI is the only tool I recommend to my clients because it truly captures individual voices.",
+    image: "/avatars/emma-rodriguez.jpg",
+    content: "As someone who teaches personal branding, I'm picky about authenticity. PostInAi is the only tool I recommend to my clients because it truly captures individual voices.",
     stats: { label: "Time saved weekly", value: "8hrs" },
   },
   {
     name: "David Park",
     role: "VP of Sales",
     company: "Enterprise Solutions",
-    avatar: "DP",
-    avatarColor: "from-orange-500 to-amber-500",
-    content: "Our sales team uses ContentAI to build their personal brands. The result? More inbound leads and shorter sales cycles. This tool pays for itself 10x over.",
+    image: "/avatars/david-park.jpg",
+    content: "Our sales team uses PostInAi to build their personal brands. The result? More inbound leads and shorter sales cycles. This tool pays for itself 10x over.",
     stats: { label: "Sales cycle reduction", value: "40%" },
   },
   {
     name: "Lisa Thompson",
     role: "Content Strategist",
     company: "Digital First Agency",
-    avatar: "LT",
-    avatarColor: "from-green-500 to-emerald-500",
-    content: "I manage content for 15+ executives. ContentAI lets me maintain each person's unique voice while scaling our output. It's been a game-changer for our agency.",
+    image: "/avatars/lisa-thompson.jpg",
+    content: "I manage content for 15+ executives. PostInAi lets me maintain each person's unique voice while scaling our output. It's been a game-changer for our agency.",
     stats: { label: "Clients managed", value: "15+" },
   },
   {
     name: "James Wilson",
     role: "Startup Advisor",
     company: "AngelNetwork",
-    avatar: "JW",
-    avatarColor: "from-indigo-500 to-blue-500",
-    content: "Every founder I advise now uses ContentAI. Building thought leadership on LinkedIn is crucial for fundraising, and this tool makes it effortless.",
+    image: "/avatars/james-wilson.jpg",
+    content: "Every founder I advise now uses PostInAi. Building thought leadership on LinkedIn is crucial for fundraising, and this tool makes it effortless.",
     stats: { label: "Profile views up", value: "500%" },
   },
 ];
 
-const globalStats = [
-  { icon: Users, value: "10,000+", label: "Active creators" },
-  { icon: TrendingUp, value: "50M+", label: "Impressions generated" },
-  { icon: Target, value: "98%", label: "Customer satisfaction" },
-];
 
 export function Testimonials() {
   const ref = useRef(null);
@@ -101,37 +90,11 @@ export function Testimonials() {
             <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">
               top professionals
             </span>{" "}
-            choose ContentAI
+            choose PostInAi
           </h2>
           <p className="text-lg text-slate-400">
             Join thousands of creators, founders, and executives who are building their personal brands with AI.
           </p>
-        </motion.div>
-
-        {/* Stats Bar */}
-        <motion.div 
-          className="flex flex-wrap justify-center gap-8 lg:gap-16 mb-16 pb-16 border-b border-slate-800"
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          {globalStats.map((stat, i) => (
-            <motion.div 
-              key={i} 
-              className="flex items-center gap-4"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={isInView ? { opacity: 1, scale: 1 } : {}}
-              transition={{ duration: 0.4, delay: 0.3 + i * 0.1 }}
-            >
-              <div className="w-12 h-12 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center">
-                <stat.icon className="w-6 h-6 text-violet-400" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-white">{stat.value}</div>
-                <div className="text-sm text-slate-500">{stat.label}</div>
-              </div>
-            </motion.div>
-          ))}
         </motion.div>
 
         {/* Testimonials Grid */}
@@ -164,8 +127,12 @@ export function Testimonials() {
                 
                 {/* Author */}
                 <div className="flex items-center gap-3 pt-4 border-t border-slate-700/50">
-                  <div className={`w-12 h-12 bg-gradient-to-br ${testimonial.avatarColor} rounded-full flex items-center justify-center text-white font-bold shadow-lg`}>
-                    {testimonial.avatar}
+                  <div className="w-12 h-12 rounded-full overflow-hidden shadow-lg">
+                    <img 
+                      src={testimonial.image} 
+                      alt={testimonial.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div>
                     <div className="font-semibold text-white">{testimonial.name}</div>

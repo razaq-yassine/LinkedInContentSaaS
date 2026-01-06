@@ -7,16 +7,11 @@ import { Menu, X, ChevronDown, Sparkles, Brain, Zap, Wrench } from "lucide-react
 import axios from "axios";
 
 const navigation = {
-  product: [
+  features: [
     { name: "AI Content Writer", href: "/features/ai-writer", desc: "Generate authentic posts with AI" },
-    { name: "Analytics & Insights", href: "/features/analytics", desc: "Track and optimize performance" },
-    { name: "Content Calendar", href: "/features/calendar", desc: "Schedule and automate posting" },
+    { name: "Content Calendar", href: "/features/calendar", desc: "Schedule and manage your posts" },
     { name: "Voice Matching", href: "/features/voice", desc: "AI that writes like you" },
-  ],
-  resources: [
-    { name: "Blog", href: "/blog", desc: "Tips and insights" },
-    { name: "LinkedIn Tips", href: "/resources/tips", desc: "Actionable strategies" },
-    { name: "Help Center", href: "/help", desc: "Get support" },
+    { name: "Smart Suggestions", href: "/features/suggestions", desc: "Get content ideas when stuck" },
   ],
 };
 
@@ -56,7 +51,7 @@ export function Header() {
         <div className="bg-gradient-to-r from-cyan-600 via-teal-600 to-cyan-600 text-white py-2 px-4">
           <div className="container mx-auto flex items-center justify-center gap-2 text-sm">
             <Zap className="w-4 h-4" />
-            <span className="font-medium">ContentAI 2.0 is here!</span>
+            <span className="font-medium">PostInAi 2.0 is here!</span>
             <Link href="/changelog" className="underline hover:no-underline ml-1">
               See what&apos;s new →
             </Link>
@@ -70,55 +65,26 @@ export function Header() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-gradient-to-br from-cyan-600 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
               <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
-                ContentAI
+                PostInAi
               </span>
             </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-1">
-              {/* Product Dropdown */}
+              {/* Features Dropdown */}
               <div
                 className="relative"
-                onMouseEnter={() => setActiveDropdown("product")}
+                onMouseEnter={() => setActiveDropdown("features")}
                 onMouseLeave={() => setActiveDropdown(null)}
               >
                 <button className="flex items-center gap-1 px-4 py-2 text-slate-300 hover:text-white font-medium rounded-lg hover:bg-slate-800/50 transition-colors">
-                  Product
-                  <ChevronDown className={`w-4 h-4 transition-transform ${activeDropdown === "product" ? "rotate-180" : ""}`} />
+                  Features
+                  <ChevronDown className={`w-4 h-4 transition-transform ${activeDropdown === "features" ? "rotate-180" : ""}`} />
                 </button>
-                {activeDropdown === "product" && (
+                {activeDropdown === "features" && (
                   <div className="absolute top-full left-0 mt-1 w-72 bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-xl border border-slate-700/50 py-2 animate-fade-in">
-                    {navigation.product.map((item) => (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className="block px-4 py-3 hover:bg-cyan-500/10 transition-colors"
-                      >
-                        <div className="font-medium text-white">{item.name}</div>
-                        <div className="text-sm text-slate-500">{item.desc}</div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Resources Dropdown */}
-              <div
-                className="relative"
-                onMouseEnter={() => setActiveDropdown("resources")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="flex items-center gap-1 px-4 py-2 text-slate-300 hover:text-white font-medium rounded-lg hover:bg-slate-800/50 transition-colors">
-                  Resources
-                  <ChevronDown className={`w-4 h-4 transition-transform ${activeDropdown === "resources" ? "rotate-180" : ""}`} />
-                </button>
-                {activeDropdown === "resources" && (
-                  <div className="absolute top-full left-0 mt-1 w-64 bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-xl border border-slate-700/50 py-2 animate-fade-in">
-                    {navigation.resources.map((item) => (
+                    {navigation.features.map((item) => (
                       <Link
                         key={item.name}
                         href={item.href}
@@ -169,20 +135,8 @@ export function Header() {
           <div className="lg:hidden bg-slate-900/95 backdrop-blur-xl border-t border-slate-800/50 py-4 animate-fade-in">
             <div className="container mx-auto px-4 space-y-4">
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">Product</p>
-                {navigation.product.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className="block px-2 py-2 text-slate-300 hover:text-violet-400"
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">Resources</p>
-                {navigation.resources.map((item) => (
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">Features</p>
+                {navigation.features.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}

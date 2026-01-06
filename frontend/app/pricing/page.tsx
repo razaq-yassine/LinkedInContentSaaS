@@ -27,11 +27,11 @@ const faqs = [
     answer: "Our advanced neural network analyzes your past LinkedIn posts, writing patterns, vocabulary choices, and professional background. It learns your tone, style, and the topics you're passionate about to generate content that sounds authentically like you.",
   },
   {
-    question: "What AI models power ContentAI?",
+    question: "What AI models power PostInAi?",
     answer: "We use state-of-the-art large language models fine-tuned specifically for LinkedIn content. Our AI understands LinkedIn's algorithm, engagement patterns, and what makes posts go viral while maintaining your authentic voice.",
   },
   {
-    question: "Can I try ContentAI for free?",
+    question: "Can I try PostInAi for free?",
     answer: "Yes! Our Free plan lets you generate up to 5 AI-powered posts per month. No credit card required. Experience the power of AI-driven content creation risk-free.",
   },
   {

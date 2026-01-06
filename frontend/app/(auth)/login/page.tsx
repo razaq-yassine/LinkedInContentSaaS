@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [appName, setAppName] = useState("ContentAI");
+  const [appName, setAppName] = useState("PostInAi");
   const router = useRouter();
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function LoginPage() {
         const isMaintenanceMode = data.maintenance_mode === 'true' || data.maintenance_mode === true;
         setMaintenanceMode(isMaintenanceMode);
         setMaintenanceMessage(data.maintenance_message || '');
-        setAppName(data.app_name || 'ContentAI');
+        setAppName(data.app_name || 'PostInAi');
       } catch (error) {
         console.error('Failed to fetch settings:', error);
       }
@@ -163,7 +163,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <Brain className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent">ContentAI</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent">PostInAi</span>
           </Link>
           
           {/* Main content */}
@@ -171,7 +171,7 @@ export default function LoginPage() {
             <div>
               <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-4">
                 Welcome back to{" "}
-                <span className="bg-gradient-to-r from-cyan-300 via-teal-300 to-emerald-300 bg-clip-text text-transparent">ContentAI</span>
+                <span className="bg-gradient-to-r from-cyan-300 via-teal-300 to-emerald-300 bg-clip-text text-transparent">PostInAi</span>
               </h1>
               <p className="text-xl text-cyan-200/70">
                 Continue creating AI-powered content that sounds like you.
@@ -230,7 +230,7 @@ export default function LoginPage() {
                   <Brain className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-                  ContentAI
+                  PostInAi
                 </span>
               </Link>
             </div>

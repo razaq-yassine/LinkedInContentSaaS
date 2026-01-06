@@ -19,7 +19,7 @@ const values = [
 ];
 
 const milestones = [
-  { year: "2023", title: "Founded", description: "ContentAI was born from a simple idea: AI should help you sound more like yourself." },
+  { year: "2023", title: "Founded", description: "PostInAi was born from a simple idea: AI should help you sound more like yourself." },
   { year: "2024", title: "Launch", description: "Launched our beta with voice matching technology and reached 1,000 users." },
   { year: "2025", title: "Growth", description: "Expanded to 10,000+ users and introduced advanced analytics." },
   { year: "2026", title: "Today", description: "Serving 50,000+ creators worldwide with industry-leading AI." },
@@ -41,7 +41,7 @@ export default function AboutPage() {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Brain className="w-4 h-4" />
-                <span>About ContentAI</span>
+                <span>About PostInAi</span>
               </div>
               
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
@@ -69,7 +69,7 @@ export default function AboutPage() {
                     LinkedIn has become the world&apos;s most important professional platform, but creating consistent, engaging content takes time most professionals don&apos;t have.
                   </p>
                   <p className="text-slate-400 mb-4">
-                    We founded ContentAI to solve this problem—not by generating generic content, but by building AI that truly understands and replicates your unique voice.
+                    We founded PostInAi to solve this problem—not by generating generic content, but by building AI that truly understands and replicates your unique voice.
                   </p>
                   <p className="text-slate-400">
                     Our proprietary voice matching technology analyzes your writing patterns, tone, and style to generate content that sounds authentically like you.

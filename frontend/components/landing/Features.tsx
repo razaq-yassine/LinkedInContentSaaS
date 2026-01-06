@@ -4,7 +4,6 @@ import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { 
   Sparkles, 
-  BarChart3, 
   Calendar, 
   Mic, 
   FileText, 
@@ -16,7 +15,9 @@ import {
   MessageSquare,
   Cpu,
   Zap,
-  Activity
+  Activity,
+  Send,
+  Lightbulb
 } from "lucide-react";
 
 const mainFeatures = [
@@ -41,10 +42,10 @@ const mainFeatures = [
   {
     icon: Cpu,
     title: "10x Faster Creation",
-    description: "What used to take hours now takes minutes. Our GPT-4 powered engine generates, refines, and optimizes content instantly.",
+    description: "What used to take hours now takes minutes. Our GPT-5 & Claude powered engine generates, refines, and optimizes content instantly.",
     gradient: "from-orange-500 to-rose-500",
     glowColor: "orange",
-    badge: "GPT-4 Turbo",
+    badge: "GPT-5 + Claude",
     stats: "< 30 seconds",
   },
 ];
@@ -57,15 +58,15 @@ const detailFeatures = [
     color: "violet",
   },
   {
-    icon: BarChart3,
-    title: "Predictive Analytics",
-    description: "AI predicts post performance with 85% accuracy",
+    icon: Calendar,
+    title: "Calendar View",
+    description: "Schedule and manage all your posts in one place",
     color: "blue",
   },
   {
-    icon: Calendar,
-    title: "Smart Scheduling",
-    description: "ML finds your optimal posting times automatically",
+    icon: Send,
+    title: "Direct Publishing",
+    description: "Publish directly to LinkedIn without copy-pasting",
     color: "green",
   },
   {
@@ -76,20 +77,20 @@ const detailFeatures = [
   },
   {
     icon: FileText,
-    title: "Multi-Format AI",
-    description: "Generate text, carousels, and video scripts",
+    title: "Carousel Generation",
+    description: "Create stunning carousel posts automatically",
     color: "cyan",
   },
   {
-    icon: Target,
-    title: "Audience Intelligence",
-    description: "AI analyzes followers for targeted content",
+    icon: Lightbulb,
+    title: "Smart Suggestions",
+    description: "Get content ideas when you're stuck",
     color: "rose",
   },
   {
     icon: Palette,
     title: "AI Image Generation",
-    description: "Create visuals with DALL-E integration",
+    description: "Create stunning visuals for your posts",
     color: "amber",
   },
   {

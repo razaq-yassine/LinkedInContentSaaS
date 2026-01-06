@@ -5,20 +5,50 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 const pressReleases = [
-  { date: "Dec 15, 2025", title: "ContentAI Raises $15M Series A to Expand AI Voice Matching Technology", excerpt: "Funding led by Sequoia Capital will accelerate product development and global expansion." },
-  { date: "Oct 3, 2025", title: "ContentAI Surpasses 50,000 Users, Generates 2 Million LinkedIn Posts", excerpt: "Milestone highlights growing demand for AI-powered content creation tools." },
-  { date: "Jul 20, 2025", title: "ContentAI Launches Advanced Analytics Dashboard for Pro Users", excerpt: "New features help creators understand and optimize their LinkedIn performance." },
-  { date: "Mar 8, 2025", title: "ContentAI Introduces Voice Matching 2.0 with 95% Accuracy", excerpt: "Breakthrough in AI technology enables more authentic content generation." },
+  { date: "Dec 15, 2025", title: "PostInAi Raises $15M Series A to Expand AI Voice Matching Technology", excerpt: "Funding led by Sequoia Capital will accelerate product development and global expansion." },
+  { date: "Oct 3, 2025", title: "PostInAi Surpasses 50,000 Users, Generates 2 Million LinkedIn Posts", excerpt: "Milestone highlights growing demand for AI-powered content creation tools." },
+  { date: "Jul 20, 2025", title: "PostInAi Launches Advanced Analytics Dashboard for Pro Users", excerpt: "New features help creators understand and optimize their LinkedIn performance." },
+  { date: "Mar 8, 2025", title: "PostInAi Introduces Voice Matching 2.0 with 95% Accuracy", excerpt: "Breakthrough in AI technology enables more authentic content generation." },
 ];
 
 const mediaFeatures = [
-  { outlet: "TechCrunch", title: "ContentAI is changing how professionals create LinkedIn content", date: "Nov 2025" },
+  { outlet: "TechCrunch", title: "PostInAi is changing how professionals create LinkedIn content", date: "Nov 2025" },
   { outlet: "Forbes", title: "10 AI Tools Every Professional Should Know in 2025", date: "Oct 2025" },
   { outlet: "The Verge", title: "The rise of AI content tools that don't sound like AI", date: "Sep 2025" },
   { outlet: "Business Insider", title: "This startup wants to clone your writing voice", date: "Aug 2025" },
 ];
 
 export default function PressPage() {
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <Header />
+      
+      <main className="pt-32 pb-20 flex items-center justify-center min-h-[80vh]">
+        <div className="container mx-auto px-4 lg:px-8 text-center">
+          <div className="max-w-2xl mx-auto">
+            <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-8">
+              <Newspaper className="w-10 h-10 text-cyan-400" />
+            </div>
+            <h1 className="text-4xl font-bold text-white mb-4">Press Kit Coming Soon</h1>
+            <p className="text-xl text-slate-400 mb-8">
+              We&apos;re preparing our press resources. Please check back later or contact us directly for media inquiries.
+            </p>
+            <Link href="/contact?subject=Press Inquiry">
+              <Button size="lg" className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-full px-8">
+                <Mail className="w-5 h-5 mr-2" />
+                Contact Us
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </main>
+      
+      <Footer />
+    </div>
+  );
+}
+
+export function PressPageDisabled() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
@@ -41,7 +71,7 @@ export default function PressPage() {
               </h1>
               
               <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-                Resources for journalists and media professionals covering ContentAI.
+                Resources for journalists and media professionals covering PostInAi.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -66,13 +96,13 @@ export default function PressPage() {
             <div className="max-w-5xl mx-auto">
               <div className="grid lg:grid-cols-2 gap-12">
                 <div>
-                  <h2 className="text-2xl font-bold text-white mb-6">About ContentAI</h2>
+                  <h2 className="text-2xl font-bold text-white mb-6">About PostInAi</h2>
                   <div className="space-y-4 text-slate-400">
                     <p>
-                      ContentAI is a San Francisco-based technology company that develops AI-powered content creation tools for LinkedIn professionals.
+                      PostInAi is a New Mexico-based technology company that develops AI-powered content creation tools for LinkedIn professionals.
                     </p>
                     <p>
-                      Founded in 2023, ContentAI&apos;s proprietary voice matching technology helps users create authentic content that matches their unique writing style. The platform serves over 50,000 users across 50+ countries.
+                      PostInAi&apos;s proprietary voice matching technology helps users create authentic content that matches their unique writing style.
                     </p>
                     <p>
                       The company has raised $18M in funding from leading investors including Sequoia Capital, Andreessen Horowitz, and Y Combinator.
@@ -88,7 +118,7 @@ export default function PressPage() {
                     </div>
                     <div className="flex justify-between border-b border-slate-800 pb-3">
                       <span className="text-slate-500">Headquarters</span>
-                      <span className="text-white">San Francisco, CA</span>
+                      <span className="text-white">New Mexico, USA</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-800 pb-3">
                       <span className="text-slate-500">Employees</span>

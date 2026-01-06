@@ -197,7 +197,7 @@ export default function ContactPage() {
                         <div>
                           <h3 className="text-white font-semibold mb-1">Headquarters</h3>
                           <p className="text-slate-400 text-sm">
-                            ContentAI Inc.<br />
+                            PostInAi Inc.<br />
                             548 Market St #82756<br />
                             San Francisco, CA 94104<br />
                             United States

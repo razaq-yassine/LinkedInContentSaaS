@@ -492,3 +492,21 @@
   background: linear-gradient(to right, #11998e, #38ef7d);
   color: white;
 }
+
+/* Horizontal scrolling animation for brand logos */
+@keyframes scroll-x {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.33%);
+  }
+}
+
+.animate-scroll-x {
+  animation: scroll-x 20s linear infinite;
+}
+
+.animate-scroll-x:hover {
+  animation-play-state: paused;
+}

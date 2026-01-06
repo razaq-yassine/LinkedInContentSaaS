@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [appName, setAppName] = useState("ContentAI");
+  const [appName, setAppName] = useState("PostInAi");
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const router = useRouter();
 
@@ -43,7 +43,7 @@ export default function RegisterPage() {
         const isMaintenanceMode = data.maintenance_mode === 'true' || data.maintenance_mode === true;
         setMaintenanceMode(isMaintenanceMode);
         setMaintenanceMessage(data.maintenance_message || '');
-        setAppName(data.app_name || 'ContentAI');
+        setAppName(data.app_name || 'PostInAi');
         setRegistrationEnabled(data.registration_enabled !== 'false' && data.registration_enabled !== false);
       } catch (error) {
         console.error('Failed to fetch settings:', error);
@@ -188,7 +188,7 @@ export default function RegisterPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <Brain className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent">ContentAI</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent">PostInAi</span>
           </Link>
           
           {/* Main content */}
@@ -260,7 +260,7 @@ export default function RegisterPage() {
                   <Brain className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
-                  ContentAI
+                  PostInAi
                 </span>
               </Link>
             </div>

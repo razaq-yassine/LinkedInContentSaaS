@@ -1,5 +1,7 @@
+"use client";
+
 import { Header, Footer } from "@/components/landing";
-import { Star, TrendingUp, Users, Target, ArrowRight, Quote } from "lucide-react";
+import { Star, TrendingUp, ArrowRight, Quote } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -9,7 +11,7 @@ const featuredStories = [
     logo: "TS",
     logoColor: "from-blue-500 to-cyan-500",
     industry: "SaaS",
-    quote: "ContentAI helped us build a consistent LinkedIn presence across our entire leadership team. Our inbound leads increased by 340% in just 3 months.",
+    quote: "PostInAi helped us build a consistent LinkedIn presence across our entire leadership team. Our inbound leads increased by 340% in just 3 months.",
     author: "Sarah Johnson",
     role: "Marketing Director",
     avatar: "SJ",
@@ -25,7 +27,7 @@ const featuredStories = [
     logo: "GL",
     logoColor: "from-violet-500 to-purple-500",
     industry: "Consulting",
-    quote: "As a founder, I never had time for content. ContentAI changed that. Now I post daily without the stress, and my thought leadership is driving real business results.",
+    quote: "As a founder, I never had time for content. PostInAi changed that. Now I post daily without the stress, and my thought leadership is driving real business results.",
     author: "Michael Chen",
     role: "Founder & CEO",
     avatar: "MC",
@@ -41,7 +43,7 @@ const featuredStories = [
     logo: "ES",
     logoColor: "from-green-500 to-emerald-500",
     industry: "Enterprise Software",
-    quote: "We rolled out ContentAI to our entire sales team. The combination of personal branding and social selling has transformed our pipeline generation.",
+    quote: "We rolled out PostInAi to our entire sales team. The combination of personal branding and social selling has transformed our pipeline generation.",
     author: "David Park",
     role: "VP of Sales",
     avatar: "DP",
@@ -65,11 +67,6 @@ const companies = [
   { name: "Company 8", initial: "H" },
 ];
 
-const globalStats = [
-  { icon: Users, value: "10,000+", label: "Active users" },
-  { icon: TrendingUp, value: "50M+", label: "Impressions generated" },
-  { icon: Target, value: "$50M+", label: "Revenue influenced" },
-];
 
 export default function CustomersPage() {
   return (
@@ -91,41 +88,27 @@ export default function CustomersPage() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
               See how teams{" "}
               <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
-                grow with ContentAI
+                grow with PostInAi
               </span>
             </h1>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              Join thousands of professionals and teams who are building their LinkedIn presence and driving real business results.
+              Join professionals and teams who are building their LinkedIn presence and driving real business results.
             </p>
           </div>
         </section>
 
-        {/* Global Stats */}
-        <section className="pb-20 relative">
-          <div className="container mx-auto px-4 lg:px-8">
-            <div className="flex flex-wrap justify-center gap-8 lg:gap-16">
-              {globalStats.map((stat, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center">
-                    <stat.icon className="w-7 h-7 text-violet-400" />
-                  </div>
-                  <div>
-                    <div className="text-3xl font-bold text-white">{stat.value}</div>
-                    <div className="text-slate-500">{stat.label}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Trusted By */}
-        <section className="py-12 border-y border-slate-800 bg-slate-900/50">
+        {/* Trusted By - Horizontal Scrolling */}
+        <section className="py-12 border-y border-slate-800 bg-slate-900/50 overflow-hidden">
           <div className="container mx-auto px-4 lg:px-8">
             <p className="text-center text-slate-500 mb-8">Trusted by teams at leading companies</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12">
-              {companies.map((company, i) => (
-                <div key={i} className="w-16 h-16 bg-slate-800/50 rounded-xl border border-slate-700/50 flex items-center justify-center text-2xl font-bold text-slate-600">
+          </div>
+          <div className="relative">
+            <div className="flex animate-scroll-x">
+              {[...companies, ...companies, ...companies].map((company, i) => (
+                <div 
+                  key={i} 
+                  className="flex-shrink-0 w-16 h-16 mx-4 bg-slate-800/50 rounded-xl border border-slate-700/50 flex items-center justify-center text-2xl font-bold text-slate-600 hover:border-cyan-500/50 hover:text-cyan-400 transition-colors"
+                >
                   {company.initial}
                 </div>
               ))}
@@ -212,7 +195,7 @@ export default function CustomersPage() {
               Ready to write your success story?
             </h2>
             <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-              Join thousands of professionals already growing their LinkedIn presence with ContentAI.
+              Join professionals already growing their LinkedIn presence with PostInAi.
             </p>
             <Link href="/login">
               <Button size="lg" className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-full px-10 py-7 text-lg font-bold shadow-lg shadow-cyan-500/25">

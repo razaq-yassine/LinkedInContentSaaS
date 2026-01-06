@@ -13,14 +13,7 @@ const benefits = [
   { icon: Clock, title: "401(k) Match", description: "4% company match to help you save for the future." },
 ];
 
-const openings = [
-  { title: "Senior AI/ML Engineer", department: "Engineering", location: "Remote (US)", type: "Full-time", description: "Build and improve our voice matching AI models." },
-  { title: "Full Stack Engineer", department: "Engineering", location: "Remote (US/EU)", type: "Full-time", description: "Work on our Next.js frontend and Python backend." },
-  { title: "Product Designer", department: "Design", location: "Remote (US)", type: "Full-time", description: "Design delightful experiences for our users." },
-  { title: "Growth Marketing Manager", department: "Marketing", location: "Remote (US)", type: "Full-time", description: "Drive user acquisition and engagement." },
-  { title: "Customer Success Manager", department: "Support", location: "Remote (US/EU)", type: "Full-time", description: "Help our customers succeed with ContentAI." },
-  { title: "Technical Writer", department: "Product", location: "Remote", type: "Contract", description: "Create documentation and educational content." },
-];
+const openings: Array<{ title: string; department: string; location: string; type: string; description: string }> = [];
 
 export default function CareersPage() {
   return (
@@ -38,7 +31,7 @@ export default function CareersPage() {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Briefcase className="w-4 h-4" />
-                <span>Careers at ContentAI</span>
+                <span>Careers at PostInAi</span>
               </div>
               
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
@@ -49,7 +42,7 @@ export default function CareersPage() {
               </h1>
               
               <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-                Join a team of passionate builders creating tools that help millions of professionals share their voice on LinkedIn.
+                Join a team of passionate builders creating tools that help professionals share their voice on LinkedIn.
               </p>
               
               <Link href="#openings">
@@ -67,7 +60,7 @@ export default function CareersPage() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-5xl mx-auto">
               <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-white mb-4">Why Join ContentAI?</h2>
+                <h2 className="text-3xl font-bold text-white mb-4">Why Join PostInAi?</h2>
                 <p className="text-slate-400">We take care of our team so they can focus on doing their best work.</p>
               </div>
               
@@ -141,40 +134,52 @@ export default function CareersPage() {
             <div className="max-w-4xl mx-auto">
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold text-white mb-4">Open Positions</h2>
-                <p className="text-slate-400">Find your next opportunity at ContentAI.</p>
+                <p className="text-slate-400">Find your next opportunity at PostInAi.</p>
               </div>
               
-              <div className="space-y-4">
-                {openings.map((job, i) => (
-                  <div key={i} className="bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 rounded-xl p-6 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-white font-semibold text-lg mb-1">{job.title}</h3>
-                        <p className="text-slate-500 text-sm mb-3">{job.description}</p>
-                        <div className="flex flex-wrap gap-3 text-sm">
-                          <span className="inline-flex items-center gap-1 text-slate-400">
-                            <Briefcase className="w-4 h-4" />
-                            {job.department}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-slate-400">
-                            <MapPin className="w-4 h-4" />
-                            {job.location}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-slate-400">
-                            <Clock className="w-4 h-4" />
-                            {job.type}
-                          </span>
-                        </div>
-                      </div>
-                      <Link href={`/contact?subject=Job Application: ${job.title}`}>
-                        <Button className="bg-cyan-600 hover:bg-cyan-500 text-white whitespace-nowrap">
-                          Apply Now
-                        </Button>
-                      </Link>
-                    </div>
+              {openings.length === 0 ? (
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-12 text-center">
+                  <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Briefcase className="w-8 h-8 text-cyan-400" />
                   </div>
-                ))}
-              </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">No open positions right now</h3>
+                  <p className="text-slate-400 max-w-md mx-auto">
+                    We don&apos;t have any open positions at the moment, but we&apos;re always looking for talented people. Send us your resume!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {openings.map((job, i) => (
+                    <div key={i} className="bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 rounded-xl p-6 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-white font-semibold text-lg mb-1">{job.title}</h3>
+                          <p className="text-slate-500 text-sm mb-3">{job.description}</p>
+                          <div className="flex flex-wrap gap-3 text-sm">
+                            <span className="inline-flex items-center gap-1 text-slate-400">
+                              <Briefcase className="w-4 h-4" />
+                              {job.department}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-slate-400">
+                              <MapPin className="w-4 h-4" />
+                              {job.location}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-slate-400">
+                              <Clock className="w-4 h-4" />
+                              {job.type}
+                            </span>
+                          </div>
+                        </div>
+                        <Link href={`/contact?subject=Job Application: ${job.title}`}>
+                          <Button className="bg-cyan-600 hover:bg-cyan-500 text-white whitespace-nowrap">
+                            Apply Now
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
