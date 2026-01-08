@@ -65,10 +65,21 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_from_name: str = "ContentAI"
     smtp_use_tls: bool = True
+    admin_email: str = ""  # Email address to send critical alerts
     
     # Token expiration
     email_verification_expire_hours: int = 24
     password_reset_expire_hours: int = 1
+    
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
+    stripe_webhook_secret: str = ""
+    
+    # Company/Product Info (for Stripe branding)
+    company_name: str = "PostInAi"
+    company_website: str = "http://localhost:3000"
+    support_email: str = "support@postinai.com"
     
     class Config:
         env_file = ".env"

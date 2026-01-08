@@ -4,6 +4,31 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Search, Eye, Trash2, RefreshCw, Mail, Calendar, CheckCircle, XCircle } from 'lucide-react';
 
+// Helper function to get API URL with fallback
+// In Next.js, NEXT_PUBLIC_* env vars are embedded at build time for client components
+const getApiUrl = () => {
+  // Check if we're in browser
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  }
+  
+  // In browser, process.env.NEXT_PUBLIC_API_URL should be available
+  // But if it's not, use the fallback
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  
+  // Ensure URL doesn't have trailing slash and is a valid URL
+  const cleanUrl = apiUrl.replace(/\/$/, '');
+  
+  // Validate URL format
+  try {
+    new URL(cleanUrl);
+    return cleanUrl;
+  } catch {
+    // If invalid, return default
+    return 'http://localhost:8000';
+  }
+};
+
 interface UserDetail {
   id: string;
   email: string;
@@ -22,11 +47,11 @@ interface UserDetail {
   } | null;
   subscription: {
     plan: string;
-    posts_this_month: number;
-    posts_limit: number;
+    credits_used_this_month: number;
+    credits_limit: number;
     stripe_customer_id: string | null;
     stripe_subscription_id: string | null;
-    period_end: string | null;
+    current_period_end: string | null;
   } | null;
   stats: {
     total_posts: number;
@@ -49,17 +74,44 @@ export default function UsersPage() {
   }, []);
 
   const fetchUsers = async () => {
+    const token = localStorage.getItem('admin_token');
+    const apiUrl = getApiUrl();
+    const fullUrl = `${apiUrl}/api/admin/users`;
+    
     try {
-      const token = localStorage.getItem('admin_token');
+      console.log('=== Fetch Users Debug ===');
+      console.log('API URL:', apiUrl);
+      console.log('Full URL:', fullUrl);
+      console.log('Token present:', !!token);
+      
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
+        fullUrl,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: 10000,
         }
       );
+      console.log('Success! Users fetched:', response.data?.length || 0);
       setUsers(response.data);
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
+    } catch (error: any) {
+      console.error('=== Error Details ===');
+      console.error('Error:', error);
+      console.error('Full URL attempted:', fullUrl);
+      console.error('API URL:', apiUrl);
+      
+      if (axios.isAxiosError(error)) {
+        console.error('Error message:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Has response:', !!error.response);
+        console.error('Response status:', error.response?.status);
+        console.error('Response data:', error.response?.data);
+        
+        if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+          console.error('⚠️ CORS or Network Error - Backend may need restart');
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -68,8 +120,9 @@ export default function UsersPage() {
   const handleViewUser = async (userId: string) => {
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}`,
+        `${apiUrl}/api/admin/users/${userId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -88,8 +141,9 @@ export default function UsersPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}`,
+        `${apiUrl}/api/admin/users/${userId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -109,8 +163,9 @@ export default function UsersPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/reset-onboarding`,
+        `${apiUrl}/api/admin/users/${userId}/reset-onboarding`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -127,8 +182,9 @@ export default function UsersPage() {
   const handleUpdateSubscription = async (userId: string, plan: string) => {
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/subscription?plan=${plan}`,
+        `${apiUrl}/api/admin/users/${userId}/subscription?plan=${plan}`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -233,7 +289,7 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.subscription?.posts_this_month || 0} / {user.subscription?.posts_limit || 5}
+                    {Math.round((user.subscription?.credits_used_this_month || 0) * 100) / 100} / {user.subscription?.credits_limit || 5} credits
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
@@ -331,7 +387,7 @@ export default function UsersPage() {
                     <div>
                       <p className="text-sm text-gray-500">Usage This Month</p>
                       <p className="text-lg font-bold text-gray-900">
-                        {selectedUser.subscription?.posts_this_month || 0} / {selectedUser.subscription?.posts_limit || 5}
+                        {Math.round((selectedUser.subscription?.credits_used_this_month || 0) * 100) / 100} / {selectedUser.subscription?.credits_limit || 5} credits
                       </p>
                     </div>
                   </div>

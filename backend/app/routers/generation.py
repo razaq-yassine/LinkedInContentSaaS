@@ -22,6 +22,7 @@ from ..services.ai_service import generate_completion, generate_conversation_tit
 from ..services.linkedin_service import LinkedInService
 from ..services.post_publishing_service import publish_post_to_linkedin
 from ..services.usage_tracking_service import log_text_generation, log_search_usage
+from ..services import credit_service
 from ..models import User
 from ..prompts.system_prompts import build_post_generation_prompt
 from ..prompts.templates import get_format_specific_instructions
@@ -134,6 +135,27 @@ async def generate_post(
             raise HTTPException(
                 status_code=503,
                 detail=f"Service unavailable: {maintenance_msg}"
+            )
+        
+        # Determine credit cost based on post type
+        post_type = request.options.get("post_type", "auto") if request.options else "auto"
+        
+        # Calculate credits needed
+        if post_type == "carousel":
+            credits_needed = 2.5
+        elif post_type == "image":
+            credits_needed = 1.0
+        elif post_type == "video_script":
+            credits_needed = 0.5
+        else:  # text or auto
+            credits_needed = 0.5
+        
+        # Check if user has sufficient credits
+        if not credit_service.check_sufficient_credits(db, user_id, credits_needed):
+            credits_info = credit_service.get_user_credits(db, user_id)
+            raise HTTPException(
+                status_code=403,
+                detail=f"Insufficient credits. You have {credits_info['credits_remaining']} credits but need {credits_needed} for this post type."
             )
         
         # Get user profile
@@ -1104,6 +1126,27 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         db.add(post)
         db.commit()
         db.refresh(post)
+        
+        # Deduct credits for post generation
+        try:
+            action_type_map = {
+                "text": "text_post",
+                "image": "image_post",
+                "carousel": "carousel_post",
+                "video_script": "video_script_post"
+            }
+            action_type = action_type_map.get(format_enum.value, "text_post")
+            
+            credit_service.deduct_credits(
+                db=db,
+                user_id=user_id,
+                amount=credits_needed,
+                action_type=action_type,
+                description=f"Generated {format_enum.value} post",
+                post_id=post.id
+            )
+        except Exception as e:
+            print(f"Warning: Failed to deduct credits: {str(e)}")
         
         # Log usage tracking
         try:

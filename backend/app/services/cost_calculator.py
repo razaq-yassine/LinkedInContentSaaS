@@ -20,12 +20,20 @@ PRICING_TABLE = {
     "o1-mini": {"input": 3.00, "output": 12.00},
     
     # Gemini Models
+    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},  # Latest as of Jan 2025
+    "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
+    "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
     "gemini-2.0-flash-exp": {"input": 0.00, "output": 0.00},  # Free during preview
     "gemini-1.5-pro": {"input": 1.25, "output": 5.00},
     "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
     "gemini-1.0-pro": {"input": 0.50, "output": 1.50},
     
-    # Claude Models
+    # Claude Models (Anthropic)
+    # Claude 4.5 models (latest as of Jan 2025)
+    "claude-opus-4-5": {"input": 15.00, "output": 75.00},
+    "claude-sonnet-4-5": {"input": 3.00, "output": 15.00},
+    "claude-haiku-4-5": {"input": 0.80, "output": 4.00},
+    # Claude 3.x models (legacy)
     "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
     "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.00},
     "claude-3-opus-20240229": {"input": 15.00, "output": 75.00},
@@ -180,26 +188,33 @@ def calculate_total_cost(
 
 def cost_to_cents(cost_usd: float) -> int:
     """
-    Convert USD cost to cents (for storage as integer)
+    Convert USD cost to tenth-cents (for storage as integer with better precision)
+    
+    Stores as tenth-cents (0.1 cent = $0.001) to handle small AI costs.
+    This gives us precision down to $0.0001 which is sufficient for per-request costs.
     
     Args:
         cost_usd: Cost in USD
     
     Returns:
-        Cost in cents (integer)
+        Cost in tenth-cents (integer) - multiply by 1000 instead of 100
+    
+    Examples:
+        $0.002722 → 27 tenth-cents (displays as $0.0027)
+        $1.50 → 15000 tenth-cents (displays as $1.50)
     """
-    return int(round(cost_usd * 100))
+    return int(round(cost_usd * 1000))
 
 
 def cents_to_cost(cents: int) -> float:
     """
-    Convert cents to USD cost
+    Convert tenth-cents to USD cost
     
     Args:
-        cents: Cost in cents
+        cents: Cost in tenth-cents (integer, stored as value × 1000)
     
     Returns:
-        Cost in USD
+        Cost in USD (float)
     """
-    return round(cents / 100, 2)
+    return cents / 1000
 

@@ -183,7 +183,7 @@ async def mock_login(request: MockLoginRequest, db: Session = Depends(get_db)):
         subscription = Subscription(
             user_id=user_id,
             plan="free",
-            posts_limit=5
+            credits_limit=5
         )
         db.add(subscription)
         

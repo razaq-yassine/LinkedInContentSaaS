@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 
+// Helper function to get API URL with fallback
+const getApiUrl = () => {
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  }
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  return apiUrl.replace(/\/$/, '');
+};
+
 interface SubscriptionPlan {
   id: string;
   plan_name: string;
@@ -12,7 +21,7 @@ interface SubscriptionPlan {
   description: string | null;
   price_monthly: number;
   price_yearly: number;
-  posts_limit: number;
+  credits_limit: number;
   features: string[];
   is_active: boolean;
   sort_order: number;
@@ -33,7 +42,7 @@ export default function SubscriptionPlansPage() {
     description: '',
     price_monthly: 0,
     price_yearly: 0,
-    posts_limit: 5,
+    credits_limit: 5,
     features: [''],
     is_active: true,
     sort_order: 0,
@@ -56,8 +65,9 @@ export default function SubscriptionPlansPage() {
         router.push('/admin/login');
         return;
       }
+      const apiUrl = getApiUrl();
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/subscription-plans`,
+        `${apiUrl}/api/admin/subscription-plans`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -78,8 +88,9 @@ export default function SubscriptionPlansPage() {
   const handleCreatePlan = async () => {
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/subscription-plans`,
+        `${apiUrl}/api/admin/subscription-plans`,
         {
           ...formData,
           features: formData.features.filter(f => f.trim() !== ''),
@@ -103,14 +114,15 @@ export default function SubscriptionPlansPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/subscription-plans/${planId}`,
+        `${apiUrl}/api/admin/subscription-plans/${planId}`,
         {
           display_name: editingPlan.display_name,
           description: editingPlan.description,
           price_monthly: editingPlan.price_monthly,
           price_yearly: editingPlan.price_yearly,
-          posts_limit: editingPlan.posts_limit,
+          credits_limit: editingPlan.credits_limit,
           features: editingPlan.features,
           is_active: editingPlan.is_active,
           sort_order: editingPlan.sort_order,
@@ -135,8 +147,9 @@ export default function SubscriptionPlansPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
+      const apiUrl = getApiUrl();
       await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/subscription-plans/${planId}`,
+        `${apiUrl}/api/admin/subscription-plans/${planId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -156,7 +169,7 @@ export default function SubscriptionPlansPage() {
       description: '',
       price_monthly: 0,
       price_yearly: 0,
-      posts_limit: 5,
+      credits_limit: 5,
       features: [''],
       is_active: true,
       sort_order: 0,
@@ -248,7 +261,7 @@ export default function SubscriptionPlansPage() {
 
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-700 mb-2">
-                {plan.posts_limit} posts per month
+                {plan.credits_limit} credits per month
               </p>
             </div>
 
@@ -363,12 +376,12 @@ export default function SubscriptionPlansPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Posts Limit
+                  Credits Limit
                 </label>
                 <input
                   type="number"
-                  value={formData.posts_limit}
-                  onChange={(e) => setFormData({ ...formData, posts_limit: parseInt(e.target.value) })}
+                  value={formData.credits_limit}
+                  onChange={(e) => setFormData({ ...formData, credits_limit: parseInt(e.target.value) })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -502,12 +515,12 @@ export default function SubscriptionPlansPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Posts Limit
+                  Credits Limit
                 </label>
                 <input
                   type="number"
-                  value={editingPlan.posts_limit}
-                  onChange={(e) => setEditingPlan({ ...editingPlan, posts_limit: parseInt(e.target.value) })}
+                  value={editingPlan.credits_limit}
+                  onChange={(e) => setEditingPlan({ ...editingPlan, credits_limit: parseInt(e.target.value) })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>

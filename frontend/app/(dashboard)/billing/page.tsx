@@ -16,7 +16,12 @@ interface SubscriptionPlan {
   description: string | null;
   price_monthly: number;
   price_yearly: number;
-  posts_limit: number;
+  credits_limit: number;
+  estimated_posts: {
+    min: number;
+    max: number;
+    display: string;
+  };
   features: string[];
   is_active: boolean;
   sort_order: number;
@@ -24,9 +29,12 @@ interface SubscriptionPlan {
 
 interface UserSubscription {
   plan: string;
-  posts_this_month: number;
-  posts_limit: number;
-  period_end: string | null;
+  credits_used: number;
+  credits_limit: number;
+  credits_remaining: number;
+  billing_cycle: string;
+  subscription_status: string;
+  current_period_end: string | null;
 }
 
 export default function BillingPage() {
@@ -34,9 +42,10 @@ export default function BillingPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('usage');
+  const [testMode, setTestMode] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -44,8 +53,42 @@ export default function BillingPage() {
       router.push('/login');
       return;
     }
+    
+    // Check if URL has tab parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'plans') {
+      setActiveTab('plans');
+    }
+    
+    // Check if test mode is available (backend dev mode)
+    checkTestMode();
+    
     fetchPlansAndSubscription();
   }, [router]);
+
+  const checkTestMode = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      // Try to access the test endpoint to see if it's available
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/test/simulate-subscription`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      // If we get here without 404, test mode is available
+      setTestMode(true);
+    } catch (error: any) {
+      // 404 or 405 means endpoint doesn't exist (dev mode off)
+      // 401/403 means it exists but we're not authorized (dev mode on)
+      if (error.response?.status === 405 || error.response?.status === 422) {
+        setTestMode(true);
+      } else {
+        setTestMode(false);
+      }
+    }
+  };
 
   const fetchPlansAndSubscription = async () => {
     try {
@@ -60,7 +103,7 @@ export default function BillingPage() {
       const activePlans = plansResponse.data
         .filter((plan: SubscriptionPlan) => plan.is_active)
         .sort((a: SubscriptionPlan, b: SubscriptionPlan) => a.sort_order - b.sort_order)
-        .slice(0, 3);
+        .slice(0, 4);
 
       setPlans(activePlans);
       setCurrentSubscription(subscriptionResponse.data);
@@ -96,6 +139,34 @@ export default function BillingPage() {
       setProcessingPlan(null);
     }
   };
+
+  const handleTestSubscribe = async (planName: string) => {
+    setProcessingPlan(planName);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/test/simulate-subscription`,
+        {
+          plan_name: planName,
+          billing_cycle: billingCycle,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        alert(`✅ ${response.data.message}\n\nYou now have ${response.data.current.credits_limit === -1 ? 'unlimited' : response.data.current.credits_limit} credits!`);
+        await fetchPlansAndSubscription();
+      }
+    } catch (error: any) {
+      console.error('Test subscription error:', error);
+      alert(error.response?.data?.detail || 'Failed to simulate subscription');
+    } finally {
+      setProcessingPlan(null);
+    }
+  };
+
 
   const getPlanIcon = (index: number) => {
     const icons = [Sparkles, Zap, Crown];
@@ -146,6 +217,15 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {/* Test Mode Indicator */}
+        {testMode && (
+          <div className="mb-4 text-center">
+            <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-xs font-semibold border border-green-200 shadow-sm">
+              🧪 <span>Developer Mode Active - Test buttons enabled</span>
+            </div>
+          </div>
+        )}
+        
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top duration-700">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-xs font-semibold mb-4 border border-blue-100">
             <Star className="w-3.5 h-3.5 fill-blue-600" />
@@ -173,15 +253,17 @@ export default function BillingPage() {
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-semibold text-gray-600 flex items-center">
                         <TrendingUp className="w-4 h-4 mr-2" />
-                        Posts Remaining
+                        Credits Remaining
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-4xl font-bold text-blue-600">
-                        {currentSubscription.posts_limit === -1 ? '∞' : currentSubscription.posts_limit - currentSubscription.posts_this_month}
+                        {currentSubscription.credits_limit === -1 ? '∞' : Math.round(currentSubscription.credits_remaining * 100) / 100}
                       </div>
                       <p className="text-sm text-gray-600 mt-2">
-                        of {currentSubscription.posts_limit === -1 ? 'unlimited' : currentSubscription.posts_limit} posts this month
+                        {currentSubscription.credits_limit === -1 
+                          ? 'Unlimited credits' 
+                          : `of ${currentSubscription.credits_limit} credits this month`}
                       </p>
                     </CardContent>
                   </Card>
@@ -212,7 +294,7 @@ export default function BillingPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-gray-900">
-                        {currentSubscription.period_end ? new Date(currentSubscription.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
+                        {currentSubscription.current_period_end ? new Date(currentSubscription.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
                       </div>
                       <p className="text-sm text-gray-600 mt-2">
                         Renewal date
@@ -257,29 +339,35 @@ export default function BillingPage() {
 
                 <Card className="bg-blue-50 border-blue-200 shadow-md">
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-xl font-bold text-blue-900">Usage Progress</CardTitle>
+                    <CardTitle className="text-xl font-bold text-blue-900">Credit Usage</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-700 font-semibold text-base">Posts this month:</span>
+                        <span className="text-gray-700 font-semibold text-base">Credits this month:</span>
                         <span className="text-3xl font-bold text-blue-600">
-                          {currentSubscription.posts_this_month} / {currentSubscription.posts_limit === -1 ? '∞' : currentSubscription.posts_limit}
+                          {currentSubscription.credits_limit === -1 
+                            ? '∞ Unlimited' 
+                            : `${Math.round(currentSubscription.credits_used * 100) / 100} / ${currentSubscription.credits_limit}`}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                        <div
-                          className="bg-blue-600 h-full rounded-full transition-all duration-500 relative overflow-hidden"
-                          style={{
-                            width: currentSubscription.posts_limit === -1 
-                              ? '100%' 
-                              : `${Math.min((currentSubscription.posts_this_month / currentSubscription.posts_limit) * 100, 100)}%`
-                          }}
-                        />
-                      </div>
-                      {currentSubscription.period_end && (
+                      {currentSubscription.credits_limit === -1 ? (
+                        <div className="w-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full h-4"></div>
+                      ) : (
+                        <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                          <div
+                            className="bg-blue-600 h-full rounded-full transition-all duration-500 relative overflow-hidden"
+                            style={{
+                              width: `${Math.min((currentSubscription.credits_used / currentSubscription.credits_limit) * 100, 100)}%`
+                            }}
+                          />
+                        </div>
+                      )}
+                      {currentSubscription.current_period_end && (
                         <p className="text-sm text-gray-600 text-center font-medium">
-                          Resets on {new Date(currentSubscription.period_end).toLocaleDateString()}
+                          {currentSubscription.credits_limit === -1 
+                            ? 'Unlimited credits - no reset needed' 
+                            : `Resets on ${new Date(currentSubscription.current_period_end).toLocaleDateString()}`}
                         </p>
                       )}
                     </div>
@@ -312,13 +400,13 @@ export default function BillingPage() {
                 >
                   Yearly
                   <span className="ml-2 text-xs bg-green-50 text-green-700 px-2.5 py-0.5 rounded-full font-bold border border-green-200">
-                    Save 20%
+                    Save 16.7%
                   </span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
               {plans.map((plan, index) => {
             const Icon = getPlanIcon(index);
             const gradient = getPlanGradient(index);
@@ -388,11 +476,18 @@ export default function BillingPage() {
                   </div>
 
                   <div className="space-y-4 text-left px-2">
-                    <div className="flex items-center justify-center pb-4 mb-4 border-b border-gray-200">
-                      <TrendingUp className="w-4 h-4 text-blue-600 mr-2" />
-                      <span className="text-base font-bold text-gray-900">
-                        {plan.posts_limit === -1 ? 'Unlimited' : plan.posts_limit} posts/month
-                      </span>
+                    <div className="flex flex-col items-center justify-center pb-4 mb-4 border-b border-gray-200">
+                      <div className="flex items-center mb-1">
+                        <TrendingUp className="w-4 h-4 text-blue-600 mr-2" />
+                        <span className="text-base font-bold text-gray-900">
+                          {plan.credits_limit === -1 ? 'Unlimited' : `${plan.credits_limit} credits`}/month
+                        </span>
+                      </div>
+                      {plan.credits_limit !== -1 && (
+                        <span className="text-xs text-gray-500">
+                          {plan.estimated_posts.display}
+                        </span>
+                      )}
                     </div>
 
                     <ul className="space-y-2.5">
@@ -408,7 +503,7 @@ export default function BillingPage() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="pt-2 pb-8 px-6">
+                <CardFooter className="pt-2 pb-8 px-6 flex flex-col gap-2">
                   <Button
                     onClick={() => handleSubscribe(plan.plan_name)}
                     disabled={isCurrent || processingPlan !== null}
@@ -427,9 +522,29 @@ export default function BillingPage() {
                     ) : isCurrent ? (
                       'Current Plan'
                     ) : (
-                      'Get Started'
+                      'Upgrade'
                     )}
                   </Button>
+                  
+                  {/* Test Mode Button - Only visible when backend DEV_MODE is true */}
+                  {testMode && !isCurrent && plan.plan_name !== 'free' && (
+                    <Button
+                      onClick={() => handleTestSubscribe(plan.plan_name)}
+                      disabled={processingPlan !== null}
+                      className="w-full py-3 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-sm"
+                    >
+                      {processingPlan === plan.plan_name ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          🧪 Test Subscribe (Dev Mode)
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </CardFooter>
               </Card>
             );

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Integer, Boolean, DateTime, ForeignKey, LargeBinary, JSON, Enum as SQLEnum
+from sqlalchemy import Column, String, Text, Integer, Boolean, DateTime, ForeignKey, LargeBinary, JSON, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -21,8 +21,10 @@ class PostFormat(str, enum.Enum):
 
 class SubscriptionPlan(str, enum.Enum):
     FREE = "free"
+    STARTER = "starter"
     PRO = "pro"
-    AGENCY = "agency"
+    UNLIMITED = "unlimited"
+    AGENCY = "agency"  # Legacy, keeping for backwards compatibility
 
 class MessageRole(str, enum.Enum):
     USER = "user"
@@ -216,19 +218,35 @@ class GeneratedComment(Base):
     # Relationships
     user = relationship("User", back_populates="comments")
 
+class BillingCycle(str, enum.Enum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
+class SubscriptionStatus(str, enum.Enum):
+    ACTIVE = "active"
+    CANCELED = "canceled"
+    PAST_DUE = "past_due"
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
     
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     
     plan = Column(SQLEnum(SubscriptionPlan), default=SubscriptionPlan.FREE)
-    posts_this_month = Column(Integer, default=0)
-    posts_limit = Column(Integer, default=5)
+    credits_used_this_month = Column(Float, default=0.0)
+    credits_limit = Column(Float, default=5.0)
     
-    # Stripe integration (for future)
-    stripe_customer_id = Column(String(255))
-    stripe_subscription_id = Column(String(255))
-    period_end = Column(DateTime)
+    # Billing
+    billing_cycle = Column(SQLEnum(BillingCycle), default=BillingCycle.MONTHLY, nullable=True)
+    subscription_status = Column(SQLEnum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE)
+    
+    # Stripe integration
+    stripe_customer_id = Column(String(255), nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True, index=True)
+    current_period_start = Column(DateTime, nullable=True)
+    current_period_end = Column(DateTime, nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="subscription")
@@ -295,12 +313,37 @@ class SubscriptionPlanConfig(Base):
     description = Column(Text)
     price_monthly = Column(Integer, default=0)
     price_yearly = Column(Integer, default=0)
-    posts_limit = Column(Integer, default=5)
+    credits_limit = Column(Float, default=5.0)
     features = Column(JSON)
     is_active = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
+    stripe_product_id = Column(String(255), nullable=True)
+    stripe_price_id_monthly = Column(String(255), nullable=True)
+    stripe_price_id_yearly = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CreditTransaction(Base):
+    """Track all credit usage for transparency"""
+    __tablename__ = "credit_transactions"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id = Column(String(36), ForeignKey("generated_posts.id", ondelete="CASCADE"), nullable=True)
+    admin_id = Column(String(36), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    
+    action_type = Column(String(100), nullable=False)  # 'text_post', 'image_generation', 'admin_grant', etc.
+    credits_used = Column(Float, nullable=False)  # Negative for deductions, positive for grants
+    credits_before = Column(Integer, nullable=False)
+    credits_after = Column(Integer, nullable=False)
+    description = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = relationship("User")
+    admin = relationship("Admin")
 
 
 class ServiceType(str, enum.Enum):
@@ -346,4 +389,45 @@ class UsageTracking(Base):
     # Relationships
     user = relationship("User")
     post = relationship("GeneratedPost")
+
+
+class LogLevel(str, enum.Enum):
+    """Log levels for system logs"""
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+class SystemLog(Base):
+    """System logs for admin monitoring and debugging"""
+    __tablename__ = "system_logs"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    
+    # Log metadata
+    level = Column(SQLEnum(LogLevel), nullable=False, index=True)
+    logger_name = Column(String(255), index=True)
+    message = Column(Text, nullable=False)
+    
+    # Context
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    admin_id = Column(String(36), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # Request context
+    endpoint = Column(String(500), index=True)
+    method = Column(String(10))
+    ip_address = Column(String(45))
+    user_agent = Column(Text)
+    
+    # Additional metadata
+    extra_data = Column(JSON)
+    stack_trace = Column(Text)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = relationship("User")
+    admin = relationship("Admin")
 

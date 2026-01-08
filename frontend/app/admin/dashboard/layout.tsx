@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   BarChart3,
-  FileText
+  FileText,
+  ScrollText
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
@@ -49,6 +50,7 @@ export default function AdminDashboardLayout({
     { name: 'Users', href: '/admin/dashboard/users', icon: Users },
     { name: 'Posts', href: '/admin/dashboard/posts', icon: FileText },
     { name: 'Subscription Plans', href: '/admin/dashboard/plans', icon: CreditCard },
+    { name: 'System Logs', href: '/admin/dashboard/logs', icon: ScrollText },
     { name: 'Global Settings', href: '/admin/dashboard/settings', icon: Settings },
   ];
 

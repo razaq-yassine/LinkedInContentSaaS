@@ -76,11 +76,11 @@ class UserProfileDetail(BaseModel):
 
 class UserSubscriptionDetail(BaseModel):
     plan: str
-    posts_this_month: int
-    posts_limit: int
+    credits_used_this_month: float  # Changed from int to float to handle decimal values
+    credits_limit: int
     stripe_customer_id: Optional[str]
     stripe_subscription_id: Optional[str]
-    period_end: Optional[datetime]
+    current_period_end: Optional[datetime]
 
     class Config:
         from_attributes = True

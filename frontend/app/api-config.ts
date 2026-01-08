@@ -18,7 +18,12 @@ export interface Plan {
   description: string;
   price_monthly: number;
   price_yearly: number;
-  posts_limit: number;
+  credits_limit: number;
+  estimated_posts?: {
+    min: number;
+    max: number;
+    display: string;
+  };
   features: string[];
   is_active: boolean;
   sort_order: number;

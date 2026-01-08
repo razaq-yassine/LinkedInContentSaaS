@@ -14,11 +14,11 @@ interface PostTypeMenuProps {
 }
 
 const postTypes = [
-  { value: "auto", label: "Choose for me" },
-  { value: "image", label: "Text + Image" },
-  { value: "text", label: "Text Only" },
-  { value: "carousel", label: "Carousel" },
-  { value: "video_script", label: "Video script" },
+  { value: "auto", label: "Choose for me", credits: null },
+  { value: "image", label: "Text + Image", credits: 1.0 },
+  { value: "text", label: "Text Only", credits: 0.5 },
+  { value: "carousel", label: "Carousel", credits: 2.5 },
+  { value: "video_script", label: "Video script", credits: 0.5 },
 ];
 
 export function PostTypeMenu({
@@ -114,6 +114,11 @@ export function PostTypeMenu({
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 <span>{type.label}</span>
+                {type.credits !== null && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-600">
+                    x{type.credits}
+                  </span>
+                )}
               </div>
               {postType === type.value && (
                 <Check className="w-4 h-4 text-blue-600" />

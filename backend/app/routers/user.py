@@ -258,11 +258,14 @@ async def get_user_subscription(
     
     return {
         "plan": subscription.plan.value if hasattr(subscription.plan, 'value') else subscription.plan,
-        "posts_this_month": subscription.posts_this_month,
-        "posts_limit": subscription.posts_limit,
+        "credits_used": subscription.credits_used_this_month,
+        "credits_limit": subscription.credits_limit,
+        "credits_remaining": subscription.credits_limit - subscription.credits_used_this_month,
+        "billing_cycle": subscription.billing_cycle.value if subscription.billing_cycle else "monthly",
+        "subscription_status": subscription.subscription_status.value if subscription.subscription_status else "active",
+        "current_period_end": subscription.current_period_end,
         "stripe_customer_id": subscription.stripe_customer_id,
-        "stripe_subscription_id": subscription.stripe_subscription_id,
-        "period_end": subscription.period_end
+        "stripe_subscription_id": subscription.stripe_subscription_id
     }
 
 

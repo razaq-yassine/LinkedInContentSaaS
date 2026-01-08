@@ -819,6 +819,9 @@ export default function GeneratePage() {
 
       // Load image history
       await loadImageHistory(postId);
+
+      // Trigger subscription refresh to update credit progress bar
+      window.dispatchEvent(new CustomEvent("creditsUpdated"));
     } catch (error: any) {
       console.error("Auto image generation failed:", error);
       // Don't show error alert for auto-generation, just log it
@@ -893,6 +896,9 @@ export default function GeneratePage() {
 
       // Load PDF history
       await loadPdfHistory(postId);
+
+      // Trigger subscription refresh to update credit progress bar
+      window.dispatchEvent(new CustomEvent("creditsUpdated"));
     } catch (error: any) {
       clearInterval(progressInterval);
       console.error("Auto PDF generation failed:", error);
@@ -1253,6 +1259,9 @@ export default function GeneratePage() {
         router.push(`/generate?conversation=${data.conversation_id}`);
         window.dispatchEvent(new CustomEvent("conversationCreated"));
       }
+
+      // Trigger subscription refresh to update credit progress bar
+      window.dispatchEvent(new CustomEvent("creditsUpdated"));
     } catch (error: any) {
       console.error("Generation failed:", error);
 
@@ -1323,6 +1332,9 @@ export default function GeneratePage() {
         updated[messageIndex] = newMessage;
         return updated;
       });
+
+      // Trigger subscription refresh to update credit progress bar
+      window.dispatchEvent(new CustomEvent("creditsUpdated"));
     } catch (error) {
       console.error("Regeneration failed:", error);
     } finally {
@@ -1521,11 +1533,11 @@ export default function GeneratePage() {
                     <p className="text-xs sm:text-sm text-[#666666] mb-3 sm:mb-4 text-center">Content type:</p>
                     <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
                       {[
-                        { value: "auto", label: "Choose for me", icon: Zap },
-                        { value: "image", label: "Text + Image", icon: Image },
-                        { value: "text", label: "Text Only", icon: FileText },
-                        { value: "carousel", label: "Carousel", icon: Layers },
-                        { value: "video_script", label: "Video script", icon: Video },
+                        { value: "auto", label: "Choose for me", icon: Zap, credits: null },
+                        { value: "image", label: "Text + Image", icon: Image, credits: 1.0 },
+                        { value: "text", label: "Text Only", icon: FileText, credits: 0.5 },
+                        { value: "carousel", label: "Carousel", icon: Layers, credits: 2.5 },
+                        { value: "video_script", label: "Video script", icon: Video, credits: 0.5 },
                       ].map((type) => {
                         const IconComponent = type.icon;
                         const isSelected = postType === type.value;
@@ -1552,6 +1564,11 @@ export default function GeneratePage() {
                             >
                               {type.label}
                             </span>
+                            {type.credits !== null && (
+                              <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-purple-600 text-white" : "bg-blue-100 text-blue-600"}`}>
+                                x{type.credits}
+                              </span>
+                            )}
                             {isSelected && (
                               <div className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5">
                                 <div className="w-4 h-4 sm:w-5 sm:h-5 bg-purple-600 rounded-full flex items-center justify-center">
@@ -1749,6 +1766,9 @@ export default function GeneratePage() {
 
                                 // Reload image history
                                 await loadImageHistory(postId);
+
+                                // Trigger subscription refresh to update credit progress bar
+                                window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 console.error("Image regeneration failed:", error);
                                 alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
@@ -1763,7 +1783,7 @@ export default function GeneratePage() {
                               setGeneratingImages(prev => ({ ...prev, [postId]: true }));
 
                               try {
-                                const response = await api.images.generateWithPrompt(postId, customPrompt);
+                                const response = await api.images.generateFromPost(postId, customPrompt);
                                 const imageData = response.data.image;
 
                                 // Store the current image
@@ -1790,6 +1810,9 @@ export default function GeneratePage() {
 
                                 // Reload image history
                                 await loadImageHistory(postId);
+
+                                // Trigger subscription refresh to update credit progress bar
+                                window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 console.error("Image generation with custom prompt failed:", error);
                                 alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
@@ -1825,6 +1848,9 @@ export default function GeneratePage() {
                                   }
                                   return m;
                                 }));
+
+                                // Trigger subscription refresh to update credit progress bar
+                                window.dispatchEvent(new CustomEvent("creditsUpdated"));
 
                                 return newPrompt;
                               } catch (error: any) {
@@ -1911,6 +1937,9 @@ export default function GeneratePage() {
 
                                 // Load PDF history
                                 await loadPdfHistory(postId);
+
+                                // Trigger subscription refresh to update credit progress bar
+                                window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 clearInterval(progressInterval);
                                 console.error("PDF regeneration failed:", error);
@@ -1964,6 +1993,9 @@ export default function GeneratePage() {
 
                                 // Reload PDF history
                                 await loadPdfHistory(postId);
+
+                                // Trigger subscription refresh to update credit progress bar
+                                window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 console.error("Slide regeneration failed:", error);
                                 alert(`Slide regeneration failed: ${error.response?.data?.detail || error.message}`);

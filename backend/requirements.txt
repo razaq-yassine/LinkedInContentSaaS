@@ -21,3 +21,4 @@ bcrypt==4.2.0
 aiosmtplib==3.0.1
 alembic==1.14.0
 apscheduler==3.10.4
+stripe>=14.0.0

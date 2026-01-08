@@ -5,10 +5,15 @@ import os
 import sqlalchemy as sa
 from .config import get_settings
 from .database import engine, Base
-from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription, env_config, ai_config
+from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription, env_config, ai_config, test_subscription
 from .services.scheduler_service import start_scheduler, stop_scheduler
+from .logging_config import setup_logging, get_logger
 
 settings = get_settings()
+
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -67,6 +72,10 @@ app.include_router(pdfs.router, prefix="/api/pdfs", tags=["pdfs"])
 app.include_router(subscription.router, prefix="/api/subscription", tags=["subscription"])
 app.include_router(env_config.router, prefix="/api/admin", tags=["env-config"])
 app.include_router(ai_config.router, prefix="/api/admin", tags=["ai-config"])
+
+# Test endpoints (only in development mode)
+if settings.dev_mode:
+    app.include_router(test_subscription.router, tags=["test"])
 
 @app.on_event("startup")
 async def startup_event():

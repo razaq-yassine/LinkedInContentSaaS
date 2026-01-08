@@ -42,8 +42,8 @@ interface UserDetail {
   created_at: string;
   subscription?: {
     plan: string;
-    posts_this_month: number;
-    posts_limit: number;
+    credits_used_this_month: number;
+    credits_limit: number;
   };
   stats?: {
     total_posts: number;
@@ -237,9 +237,9 @@ export default function UserDetailPage() {
           subtitle={`${usage.total_requests} API requests`}
         />
         <MetricCard
-          title="Usage This Month"
-          value={user.subscription?.posts_this_month || 0}
-          subtitle={`of ${user.subscription?.posts_limit || 0} limit`}
+          title="Credits This Month"
+          value={`${Math.round((user.subscription?.credits_used_this_month || 0) * 100) / 100} / ${user.subscription?.credits_limit === -1 ? '∞' : user.subscription?.credits_limit || 0}`}
+          subtitle={user.subscription?.credits_limit === -1 ? 'Unlimited credits' : `${Math.round(((user.subscription?.credits_limit || 0) - (user.subscription?.credits_used_this_month || 0)) * 100) / 100} remaining`}
         />
       </div>
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import List, Optional
@@ -6,11 +6,15 @@ from datetime import datetime, timedelta
 import os
 import uuid
 import shutil
+import csv
+import io
+import json
 
 from ..database import get_db
 from ..models import (
     User, UserProfile, AdminSetting, GeneratedPost, GeneratedComment,
-    Subscription, SubscriptionPlanConfig, Conversation, Admin, UsageTracking
+    Subscription, SubscriptionPlan, SubscriptionPlanConfig, Conversation, Admin, UsageTracking,
+    SystemLog, LogLevel
 )
 from ..routers.admin_auth import get_current_admin
 from ..schemas.admin_schemas import (
@@ -28,6 +32,7 @@ from ..services.usage_tracking_service import (
     get_usage_summary, get_user_usage, get_top_users_by_usage,
     get_usage_timeline, get_revenue_summary
 )
+from ..services import credit_service
 from ..services.cost_calculator import cents_to_cost
 
 router = APIRouter()
@@ -128,11 +133,11 @@ async def get_all_users(
         if subscription:
             subscription_detail = UserSubscriptionDetail(
                 plan=subscription.plan.value,
-                posts_this_month=subscription.posts_this_month,
-                posts_limit=subscription.posts_limit,
+                credits_used_this_month=subscription.credits_used_this_month,
+                credits_limit=subscription.credits_limit,
                 stripe_customer_id=subscription.stripe_customer_id,
                 stripe_subscription_id=subscription.stripe_subscription_id,
-                period_end=subscription.period_end
+                current_period_end=subscription.current_period_end
             )
         
         stats = UserStatsDetail(
@@ -199,11 +204,11 @@ async def get_user_detail(
     if subscription:
         subscription_detail = UserSubscriptionDetail(
             plan=subscription.plan.value,
-            posts_this_month=subscription.posts_this_month,
-            posts_limit=subscription.posts_limit,
+            credits_used_this_month=subscription.credits_used_this_month,
+            credits_limit=subscription.credits_limit,
             stripe_customer_id=subscription.stripe_customer_id,
             stripe_subscription_id=subscription.stripe_subscription_id,
-            period_end=subscription.period_end
+            current_period_end=subscription.current_period_end
         )
     
     stats = UserStatsDetail(
@@ -249,8 +254,13 @@ async def update_user_subscription(
     if not plan_config:
         raise HTTPException(status_code=400, detail="Invalid plan")
     
-    subscription.plan = plan
-    subscription.posts_limit = plan_config.posts_limit
+    # Convert string to SubscriptionPlan enum
+    try:
+        subscription.plan = SubscriptionPlan(plan)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid plan: {plan}")
+    
+    subscription.credits_limit = plan_config.credits_limit
     db.commit()
     
     return {"success": True, "message": "Subscription updated successfully"}
@@ -518,6 +528,63 @@ async def reset_user_onboarding(
     db.commit()
     
     return {"success": True, "message": "User onboarding reset successfully"}
+
+
+@router.post("/users/{user_id}/credits/grant")
+async def grant_user_credits(
+    user_id: str,
+    credits: float,
+    reason: str,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Admin grants credits to a user manually"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Grant credits and log transaction
+    result = credit_service.admin_grant_credits(
+        db=db,
+        user_id=user_id,
+        amount=credits,
+        admin_id=admin.id,
+        reason=reason
+    )
+    
+    return {
+        "success": True,
+        "message": f"Granted {credits} credits to user",
+        "result": result
+    }
+
+
+@router.get("/users/{user_id}/credit-transactions")
+async def get_user_credit_transactions(
+    user_id: str,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get credit transaction history for a user"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    transactions = credit_service.get_credit_transactions(db, user_id, limit=50)
+    
+    return [
+        {
+            "id": t.id,
+            "action_type": t.action_type,
+            "credits_used": t.credits_used,
+            "credits_before": t.credits_before,
+            "credits_after": t.credits_after,
+            "description": t.description,
+            "created_at": t.created_at
+        }
+        for t in transactions
+    ]
+
 
 @router.delete("/users/{user_id}")
 async def delete_user(
@@ -921,4 +988,430 @@ async def get_post_usage_detail(
         total_cost=total_cost,
         total_tokens=total_tokens,
         generation_options=post.generation_options if isinstance(post.generation_options, dict) else None
+    )
+
+
+@router.get("/logs")
+async def get_system_logs(
+    level: Optional[str] = None,
+    user_id: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get system logs with optional filters
+    
+    Query Parameters:
+    - level: Filter by log level (debug, info, warning, error, critical)
+    - user_id: Filter by user ID
+    - endpoint: Filter by API endpoint
+    - limit: Number of logs to return (default: 100, max: 500)
+    - offset: Pagination offset (default: 0)
+    """
+    # Limit max to 500
+    limit = min(limit, 500)
+    
+    # Build query
+    query = db.query(SystemLog)
+    
+    # Apply filters
+    if level:
+        try:
+            log_level = LogLevel(level.lower())
+            query = query.filter(SystemLog.level == log_level)
+        except ValueError:
+            pass  # Invalid level, ignore filter
+    
+    if user_id:
+        query = query.filter(SystemLog.user_id == user_id)
+    
+    if endpoint:
+        query = query.filter(SystemLog.endpoint.like(f"%{endpoint}%"))
+    
+    # Get total count
+    total = query.count()
+    
+    # Get logs ordered by most recent first
+    logs = query.order_by(SystemLog.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "level": log.level.value,
+                "logger_name": log.logger_name,
+                "message": log.message,
+                "user_id": log.user_id,
+                "admin_id": log.admin_id,
+                "endpoint": log.endpoint,
+                "method": log.method,
+                "ip_address": log.ip_address,
+                "extra_data": log.extra_data,
+                "stack_trace": log.stack_trace,
+                "created_at": log.created_at
+            }
+            for log in logs
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@router.get("/logs/file")
+async def get_log_file(
+    file_type: str = "app",
+    lines: int = 100,
+    admin: Admin = Depends(get_current_admin)
+):
+    """
+    Get recent lines from log files
+    
+    Query Parameters:
+    - file_type: Type of log file (app, error, credits, access)
+    - lines: Number of recent lines to return (default: 100, max: 1000)
+    """
+    import os
+    from pathlib import Path
+    
+    # Limit max lines
+    lines = min(lines, 1000)
+    
+    # Map file type to file path
+    logs_dir = Path(__file__).parent.parent.parent / "logs"
+    file_map = {
+        "app": logs_dir / "app.log",
+        "error": logs_dir / "error.log",
+        "credits": logs_dir / "credits.log",
+        "access": logs_dir / "access.log"
+    }
+    
+    if file_type not in file_map:
+        raise HTTPException(status_code=400, detail=f"Invalid file_type. Must be one of: {', '.join(file_map.keys())}")
+    
+    log_file = file_map[file_type]
+    
+    if not log_file.exists():
+        return {
+            "file": file_type,
+            "lines": [],
+            "message": "Log file does not exist yet"
+        }
+    
+    try:
+        # Read last N lines efficiently
+        with open(log_file, 'r') as f:
+            # For small files, read all
+            all_lines = f.readlines()
+            recent_lines = all_lines[-lines:]
+        
+        return {
+            "file": file_type,
+            "lines": [line.strip() for line in recent_lines],
+            "total_lines": len(all_lines)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read log file: {str(e)}")
+
+
+@router.get("/logs/analytics")
+async def get_log_analytics(
+    days: int = 7,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get log analytics for the specified time period
+    
+    Query Parameters:
+    - days: Number of days to analyze (default: 7, max: 90)
+    """
+    days = min(days, 90)
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Error rate by level over time (daily buckets)
+    error_timeline = db.query(
+        func.date(SystemLog.created_at).label('date'),
+        SystemLog.level,
+        func.count(SystemLog.id).label('count')
+    ).filter(
+        SystemLog.created_at >= start_date
+    ).group_by(
+        func.date(SystemLog.created_at),
+        SystemLog.level
+    ).order_by(func.date(SystemLog.created_at)).all()
+    
+    # Format timeline data
+    timeline_data = {}
+    for date, level, count in error_timeline:
+        date_str = str(date)
+        if date_str not in timeline_data:
+            timeline_data[date_str] = {
+                "debug": 0,
+                "info": 0,
+                "warning": 0,
+                "error": 0,
+                "critical": 0
+            }
+        timeline_data[date_str][level.value] = count
+    
+    # Total counts by level
+    level_counts = db.query(
+        SystemLog.level,
+        func.count(SystemLog.id).label('count')
+    ).filter(
+        SystemLog.created_at >= start_date
+    ).group_by(SystemLog.level).all()
+    
+    total_by_level = {
+        "debug": 0,
+        "info": 0,
+        "warning": 0,
+        "error": 0,
+        "critical": 0
+    }
+    for level, count in level_counts:
+        total_by_level[level.value] = count
+    
+    # Top error endpoints
+    top_error_endpoints = db.query(
+        SystemLog.endpoint,
+        func.count(SystemLog.id).label('count')
+    ).filter(
+        and_(
+            SystemLog.created_at >= start_date,
+            SystemLog.level.in_([LogLevel.ERROR, LogLevel.CRITICAL]),
+            SystemLog.endpoint.isnot(None)
+        )
+    ).group_by(SystemLog.endpoint).order_by(func.count(SystemLog.id).desc()).limit(10).all()
+    
+    # Users with most errors
+    top_error_users = db.query(
+        SystemLog.user_id,
+        func.count(SystemLog.id).label('count')
+    ).filter(
+        and_(
+            SystemLog.created_at >= start_date,
+            SystemLog.level.in_([LogLevel.ERROR, LogLevel.CRITICAL]),
+            SystemLog.user_id.isnot(None)
+        )
+    ).group_by(SystemLog.user_id).order_by(func.count(SystemLog.id).desc()).limit(10).all()
+    
+    # Get user emails for top error users
+    user_error_details = []
+    for user_id, count in top_error_users:
+        user = db.query(User).filter(User.id == user_id).first()
+        user_error_details.append({
+            "user_id": user_id,
+            "email": user.email if user else "Unknown",
+            "name": user.name if user else None,
+            "error_count": count
+        })
+    
+    # Credit transaction statistics
+    from ..models import CreditTransaction
+    credit_stats = db.query(
+        func.date(CreditTransaction.created_at).label('date'),
+        func.sum(func.abs(CreditTransaction.credits_used)).label('total_credits')
+    ).filter(
+        CreditTransaction.created_at >= start_date
+    ).group_by(
+        func.date(CreditTransaction.created_at)
+    ).order_by(func.date(CreditTransaction.created_at)).all()
+    
+    credit_timeline = {str(date): float(total) for date, total in credit_stats}
+    
+    # Most common actions
+    common_actions = db.query(
+        CreditTransaction.action_type,
+        func.count(CreditTransaction.id).label('count'),
+        func.sum(func.abs(CreditTransaction.credits_used)).label('total_credits')
+    ).filter(
+        CreditTransaction.created_at >= start_date
+    ).group_by(
+        CreditTransaction.action_type
+    ).order_by(func.count(CreditTransaction.id).desc()).limit(10).all()
+    
+    return {
+        "period_days": days,
+        "start_date": start_date.isoformat(),
+        "end_date": datetime.utcnow().isoformat(),
+        "total_logs": sum(total_by_level.values()),
+        "logs_by_level": total_by_level,
+        "timeline": [
+            {
+                "date": date,
+                **data
+            }
+            for date, data in sorted(timeline_data.items())
+        ],
+        "top_error_endpoints": [
+            {"endpoint": endpoint or "Unknown", "count": count}
+            for endpoint, count in top_error_endpoints
+        ],
+        "top_error_users": user_error_details,
+        "credit_usage": {
+            "timeline": [
+                {"date": date, "credits": credits}
+                for date, credits in sorted(credit_timeline.items())
+            ],
+            "total_credits_used": sum(credit_timeline.values()),
+            "common_actions": [
+                {
+                    "action": action,
+                    "count": count,
+                    "total_credits": float(total_credits) if total_credits else 0
+                }
+                for action, count, total_credits in common_actions
+            ]
+        }
+    }
+
+
+@router.get("/logs/export/csv")
+async def export_logs_csv(
+    level: Optional[str] = None,
+    user_id: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    days: int = 7,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Export logs as CSV
+    
+    Query Parameters:
+    - level: Filter by log level
+    - user_id: Filter by user ID
+    - endpoint: Filter by endpoint
+    - days: Number of days to export (default: 7, max: 90)
+    """
+    days = min(days, 90)
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Build query
+    query = db.query(SystemLog).filter(SystemLog.created_at >= start_date)
+    
+    if level:
+        try:
+            log_level = LogLevel(level.lower())
+            query = query.filter(SystemLog.level == log_level)
+        except ValueError:
+            pass
+    
+    if user_id:
+        query = query.filter(SystemLog.user_id == user_id)
+    
+    if endpoint:
+        query = query.filter(SystemLog.endpoint.like(f"%{endpoint}%"))
+    
+    logs = query.order_by(SystemLog.created_at.desc()).limit(10000).all()
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'Timestamp', 'Level', 'Logger', 'Message', 'User ID', 
+        'Endpoint', 'Method', 'IP Address', 'Stack Trace'
+    ])
+    
+    # Write data
+    for log in logs:
+        writer.writerow([
+            log.created_at.isoformat(),
+            log.level.value,
+            log.logger_name or '',
+            log.message,
+            log.user_id or '',
+            log.endpoint or '',
+            log.method or '',
+            log.ip_address or '',
+            log.stack_trace or ''
+        ])
+    
+    # Return CSV file
+    output.seek(0)
+    filename = f"logs_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
+@router.get("/logs/export/json")
+async def export_logs_json(
+    level: Optional[str] = None,
+    user_id: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    days: int = 7,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Export logs as JSON
+    
+    Query Parameters:
+    - level: Filter by log level
+    - user_id: Filter by user ID
+    - endpoint: Filter by endpoint
+    - days: Number of days to export (default: 7, max: 90)
+    """
+    days = min(days, 90)
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Build query
+    query = db.query(SystemLog).filter(SystemLog.created_at >= start_date)
+    
+    if level:
+        try:
+            log_level = LogLevel(level.lower())
+            query = query.filter(SystemLog.level == log_level)
+        except ValueError:
+            pass
+    
+    if user_id:
+        query = query.filter(SystemLog.user_id == user_id)
+    
+    if endpoint:
+        query = query.filter(SystemLog.endpoint.like(f"%{endpoint}%"))
+    
+    logs = query.order_by(SystemLog.created_at.desc()).limit(10000).all()
+    
+    # Format logs
+    logs_data = [
+        {
+            "id": log.id,
+            "timestamp": log.created_at.isoformat(),
+            "level": log.level.value,
+            "logger_name": log.logger_name,
+            "message": log.message,
+            "user_id": log.user_id,
+            "admin_id": log.admin_id,
+            "endpoint": log.endpoint,
+            "method": log.method,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "extra_data": log.extra_data,
+            "stack_trace": log.stack_trace
+        }
+        for log in logs
+    ]
+    
+    filename = f"logs_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    
+    return Response(
+        content=json.dumps(logs_data, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
     )

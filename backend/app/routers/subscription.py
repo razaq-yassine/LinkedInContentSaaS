@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+import stripe
 
 from ..database import get_db
 from ..models import User, Subscription, SubscriptionPlanConfig
 from ..routers.auth import get_current_user
+from ..services import stripe_service, credit_service
+from ..config import get_settings
+
+settings = get_settings()
+stripe.api_key = settings.stripe_secret_key
 
 router = APIRouter()
 
@@ -29,7 +35,8 @@ async def get_public_subscription_plans(db: Session = Depends(get_db)):
             "description": plan.description,
             "price_monthly": plan.price_monthly,
             "price_yearly": plan.price_yearly,
-            "posts_limit": plan.posts_limit,
+            "credits_limit": plan.credits_limit,
+            "estimated_posts": credit_service.calculate_post_estimates(plan.credits_limit),
             "features": plan.features,
             "is_active": plan.is_active,
             "sort_order": plan.sort_order,
@@ -64,18 +71,62 @@ async def create_checkout_session(
     if subscription.plan == request.plan:
         raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
     
-    price = plan_config.price_monthly if request.billing_cycle == "monthly" else plan_config.price_yearly
-    
-    checkout_url = f"https://checkout.stripe.com/demo?plan={request.plan}&cycle={request.billing_cycle}&price={price}"
+    # Create Stripe Checkout Session
+    checkout_session = stripe_service.create_checkout_session(
+        db=db,
+        user=current_user,
+        plan_name=request.plan,
+        billing_cycle=request.billing_cycle
+    )
     
     return {
-        "checkout_url": checkout_url,
+        "checkout_url": checkout_session["checkout_url"],
+        "session_id": checkout_session.get("session_id"),
         "plan": request.plan,
-        "billing_cycle": request.billing_cycle,
-        "price": price
+        "billing_cycle": request.billing_cycle
     }
 
 @router.post("/webhook")
-async def stripe_webhook(db: Session = Depends(get_db)):
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhook events"""
-    return {"status": "webhook received"}
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    
+    if not settings.stripe_webhook_secret:
+        # If webhook secret not configured, skip verification (dev mode)
+        event = stripe.Event.construct_from(
+            await request.json(), stripe.api_key
+        )
+    else:
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, settings.stripe_webhook_secret
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError as e:
+            raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    # Handle different event types
+    if event.type == "checkout.session.completed":
+        session = event.data.object
+        result = stripe_service.handle_checkout_completed(db, session)
+        return {"status": "success", "event": "checkout.session.completed", "result": result}
+    
+    elif event.type == "invoice.payment_succeeded":
+        invoice = event.data.object
+        result = stripe_service.handle_invoice_paid(db, invoice)
+        return {"status": "success", "event": "invoice.payment_succeeded", "result": result}
+    
+    elif event.type == "invoice.payment_failed":
+        invoice = event.data.object
+        result = stripe_service.handle_invoice_failed(db, invoice)
+        return {"status": "success", "event": "invoice.payment_failed", "result": result}
+    
+    elif event.type == "customer.subscription.deleted":
+        subscription = event.data.object
+        result = stripe_service.handle_subscription_deleted(db, subscription)
+        return {"status": "success", "event": "customer.subscription.deleted", "result": result}
+    
+    else:
+        return {"status": "ignored", "event_type": event.type}

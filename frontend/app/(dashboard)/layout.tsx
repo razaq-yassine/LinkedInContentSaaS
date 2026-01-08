@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
 import { ConversationList } from "@/components/ConversationList";
 import { ToasterProvider } from "@/components/ui/toaster";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { 
   PenSquare, 
   MessageSquare, 
@@ -40,12 +42,14 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [checkingMaintenance, setCheckingMaintenance] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     // Check maintenance mode first
@@ -84,18 +88,25 @@ export default function DashboardLayout({
       setUser(JSON.parse(userData));
     }
 
-    // Load conversations
+    // Load conversations and subscription
     loadConversations();
+    loadSubscription();
 
     // Listen for new conversations being created
     const handleConversationCreated = () => {
       loadConversations();
     };
 
+    const handleCreditsUpdated = () => {
+      loadSubscription();
+    };
+
     window.addEventListener("conversationCreated", handleConversationCreated);
+    window.addEventListener("creditsUpdated", handleCreditsUpdated);
 
     return () => {
       window.removeEventListener("conversationCreated", handleConversationCreated);
+      window.removeEventListener("creditsUpdated", handleCreditsUpdated);
     };
   }, [router]);
 
@@ -109,6 +120,26 @@ export default function DashboardLayout({
         console.error("Failed to load conversations:", error);
       }
       // Silently fail for network errors - backend might not be running
+    }
+  };
+
+  const loadSubscription = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/user/subscription`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setSubscription(response.data);
+      
+      // Show upgrade modal for free users on login
+      if (response.data.plan === 'free') {
+        setShowUpgradeModal(true);
+      }
+    } catch (error: any) {
+      console.error("Failed to load subscription:", error);
     }
   };
 
@@ -255,6 +286,40 @@ export default function DashboardLayout({
 
           {/* User Profile */}
           <div className="border-t border-[#E0DFDC] dark:border-slate-700 p-4 sidebar-expanded-content">
+            {/* Credit Progress Bar */}
+            {subscription && (
+              <div className="mb-3 px-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-semibold text-gray-700">
+                    {subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)} Plan
+                  </span>
+                  <span className="text-xs text-gray-600">
+                    {subscription.credits_limit === -1 ? 'Unlimited' : `${Math.round(subscription.credits_remaining * 100) / 100} left`}
+                  </span>
+                </div>
+                {subscription.credits_limit !== -1 && (
+                  <Progress 
+                    value={(subscription.credits_remaining / subscription.credits_limit) * 100}
+                    className="h-1.5"
+                  />
+                )}
+                {subscription.credits_limit === -1 && (
+                  <div className="h-1.5 bg-blue-500 rounded-full"></div>
+                )}
+                
+                {/* Upgrade Button for Free Users or Low Credits */}
+                {subscription.credits_limit !== -1 && (subscription.plan === 'free' || subscription.credits_remaining <= 2) && (
+                  <button
+                    onClick={() => router.push('/billing?tab=plans')}
+                    className="w-full mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1 shadow-sm hover:shadow-md hover:scale-105 animate-pulse hover:animate-none"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Upgrade Plan
+                  </button>
+                )}
+              </div>
+            )}
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 w-full hover:bg-[#F3F2F0] rounded-lg p-2 transition-colors">
@@ -364,6 +429,16 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className="main-content flex-1 lg:ml-[280px] pt-14 sm:pt-16 lg:pt-0 dark:bg-slate-900">{children}</main>
+      
+      {/* Upgrade Modal for Free Users */}
+      {subscription && (
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          userPlan={subscription.plan}
+          creditsRemaining={subscription.credits_remaining || 0}
+        />
+      )}
     </div>
     </ToasterProvider>
   );

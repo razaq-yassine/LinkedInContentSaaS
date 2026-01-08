@@ -9,6 +9,7 @@ from ..database import get_db
 from ..routers.auth import get_current_user_id
 from ..services.cloudflare_ai import generate_image, generate_image_from_post
 from ..services.usage_tracking_service import log_image_generation
+from ..services import credit_service
 from ..models import GeneratedPost, GeneratedImage
 
 router = APIRouter()
@@ -148,6 +149,15 @@ async def generate_image_for_post(
             detail="Post not found"
         )
     
+    # Check if user has sufficient credits for image regeneration (0.2 credits)
+    credits_needed = 0.2
+    if not credit_service.check_sufficient_credits(db, user_id, credits_needed):
+        credits_info = credit_service.get_user_credits(db, user_id)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient credits. You have {credits_info['credits_remaining']} credits but need {credits_needed} for image regeneration."
+        )
+    
     try:
         # Get image prompt from post options
         image_prompt = None
@@ -238,6 +248,19 @@ async def generate_image_for_post(
         )
         db.add(generated_image)
         db.commit()
+        
+        # Deduct credits for image regeneration
+        try:
+            credit_service.deduct_credits(
+                db=db,
+                user_id=user_id,
+                amount=credits_needed,
+                action_type="image_regeneration",
+                description="Regenerated image for post",
+                post_id=post_id
+            )
+        except Exception as e:
+            print(f"Warning: Failed to deduct credits: {str(e)}")
         
         # Log image generation usage
         try:
