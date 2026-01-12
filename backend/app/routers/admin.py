@@ -384,7 +384,7 @@ async def get_subscription_plans(
             description=plan.description,
             price_monthly=plan.price_monthly,
             price_yearly=plan.price_yearly,
-            posts_limit=plan.posts_limit,
+            credits_limit=plan.credits_limit,
             features=plan.features or [],
             is_active=plan.is_active,
             sort_order=plan.sort_order,
@@ -414,7 +414,7 @@ async def create_subscription_plan(
         description=request.description,
         price_monthly=request.price_monthly,
         price_yearly=request.price_yearly,
-        posts_limit=request.posts_limit,
+        credits_limit=request.credits_limit,
         features=request.features,
         is_active=request.is_active,
         sort_order=request.sort_order
@@ -431,7 +431,7 @@ async def create_subscription_plan(
         description=new_plan.description,
         price_monthly=new_plan.price_monthly,
         price_yearly=new_plan.price_yearly,
-        posts_limit=new_plan.posts_limit,
+        credits_limit=new_plan.credits_limit,
         features=new_plan.features or [],
         is_active=new_plan.is_active,
         sort_order=new_plan.sort_order,
@@ -459,8 +459,8 @@ async def update_subscription_plan(
         plan.price_monthly = request.price_monthly
     if request.price_yearly is not None:
         plan.price_yearly = request.price_yearly
-    if request.posts_limit is not None:
-        plan.posts_limit = request.posts_limit
+    if request.credits_limit is not None:
+        plan.credits_limit = request.credits_limit
     if request.features is not None:
         plan.features = request.features
     if request.is_active is not None:
@@ -479,7 +479,7 @@ async def update_subscription_plan(
         description=plan.description,
         price_monthly=plan.price_monthly,
         price_yearly=plan.price_yearly,
-        posts_limit=plan.posts_limit,
+        credits_limit=plan.credits_limit,
         features=plan.features or [],
         is_active=plan.is_active,
         sort_order=plan.sort_order,

@@ -27,9 +27,9 @@ try:
             "description": "Perfect for getting started with LinkedIn content generation",
             "price_monthly": 0,
             "price_yearly": 0,
-            "posts_limit": 5,
+            "credits_limit": 5.0,
             "features": [
-                "5 posts per month",
+                "5 credits per month",
                 "Basic AI generation",
                 "Text-only posts",
                 "Email support"
@@ -44,9 +44,9 @@ try:
             "description": "For professionals who want to scale their LinkedIn presence",
             "price_monthly": 2900,  # $29.00
             "price_yearly": 29000,  # $290.00 (save $58)
-            "posts_limit": 50,
+            "credits_limit": 50.0,
             "features": [
-                "50 posts per month",
+                "50 credits per month",
                 "Advanced AI generation",
                 "All post formats (text, image, carousel, video)",
                 "Priority support",
@@ -63,9 +63,9 @@ try:
             "description": "For agencies managing multiple clients",
             "price_monthly": 9900,  # $99.00
             "price_yearly": 99000,  # $990.00 (save $198)
-            "posts_limit": 500,
+            "credits_limit": 500.0,
             "features": [
-                "500 posts per month",
+                "500 credits per month",
                 "Premium AI generation",
                 "All post formats",
                 "Dedicated support",

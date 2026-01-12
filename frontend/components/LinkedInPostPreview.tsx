@@ -274,7 +274,7 @@ export function LinkedInPostPreview({
     const parts = content.split(/(#[\w]+)/g);
     return parts.map((part, index) => {
       if (part.startsWith('#') && part.length > 1) {
-        return <strong key={index} className="font-semibold text-black">{part}</strong>;
+        return <strong key={index} className="font-semibold text-black dark:text-white">{part}</strong>;
       }
       return <span key={index}>{part}</span>;
     });
@@ -362,7 +362,7 @@ export function LinkedInPostPreview({
   };
 
   return (
-    <Card className={`w-full max-w-lg bg-white border border-[#E0DFDC] shadow-linkedin-sm overflow-hidden ${className}`}>
+    <Card className={`w-full max-w-lg bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-linkedin-sm overflow-hidden ${className}`}>
       {/* Post Header */}
       <div className="px-3 pt-2 pb-1.5">
         <div className="flex items-start gap-2.5">
@@ -376,18 +376,18 @@ export function LinkedInPostPreview({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-xs text-black hover:text-[#0A66C2] hover:underline cursor-pointer truncate">
+                <h3 className="font-semibold text-xs text-black dark:text-white hover:text-[#0A66C2] hover:underline cursor-pointer truncate">
                   {userProfile.name}
                 </h3>
-                <p className="text-[10px] text-[#666666] line-clamp-1 truncate">
+                <p className="text-[10px] text-[#666666] dark:text-slate-400 line-clamp-1 truncate">
                   {userProfile.headline}
                 </p>
-                <p className="text-[10px] text-[#666666] mt-0.5">
+                <p className="text-[10px] text-[#666666] dark:text-slate-400 mt-0.5">
                   Now • <span className="inline-block">🌐</span>
                 </p>
               </div>
               
-              <button className="text-[#666666] hover:bg-[#F3F2F0] rounded-full p-1 transition-colors flex-shrink-0">
+              <button className="text-[#666666] dark:text-slate-400 hover:bg-[#F3F2F0] dark:hover:bg-slate-700 rounded-full p-1 transition-colors flex-shrink-0">
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             </div>
@@ -397,7 +397,7 @@ export function LinkedInPostPreview({
 
       {/* Post Content */}
       <div className="px-3 pb-2">
-        <div className="text-xs text-black whitespace-pre-wrap leading-relaxed">
+        <div className="text-xs text-black dark:text-white whitespace-pre-wrap leading-relaxed">
           {formatPostContent(postContent)}
         </div>
       </div>
@@ -541,8 +541,8 @@ export function LinkedInPostPreview({
       )}
 
       {/* Engagement Stats */}
-      <div className="px-3 py-1.5 border-t border-[#E0DFDC]">
-        <div className="flex items-center justify-between text-[10px] text-[#666666]">
+      <div className="px-3 py-1.5 border-t border-[#E0DFDC] dark:border-slate-700">
+        <div className="flex items-center justify-between text-[10px] text-[#666666] dark:text-slate-400">
           <div className="flex items-center gap-1">
             <div className="flex -space-x-0.5">
               <div className="w-3 h-3 rounded-full bg-[#0A66C2] flex items-center justify-center">
@@ -559,21 +559,21 @@ export function LinkedInPostPreview({
       </div>
 
       {/* Action Buttons */}
-      <div className="px-1 py-0.5 border-t border-[#E0DFDC]">
+      <div className="px-1 py-0.5 border-t border-[#E0DFDC] dark:border-slate-700">
         <div className="flex items-center justify-around">
-          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] transition-colors text-[#666666] flex-1 justify-center">
+          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] dark:hover:bg-slate-700 transition-colors text-[#666666] dark:text-slate-400 flex-1 justify-center">
             <ThumbsUp className="w-4 h-4" />
             <span className="text-xs font-semibold">Like</span>
           </button>
-          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] transition-colors text-[#666666] flex-1 justify-center">
+          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] dark:hover:bg-slate-700 transition-colors text-[#666666] dark:text-slate-400 flex-1 justify-center">
             <MessageCircle className="w-4 h-4" />
             <span className="text-xs font-semibold">Comment</span>
           </button>
-          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] transition-colors text-[#666666] flex-1 justify-center">
+          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] dark:hover:bg-slate-700 transition-colors text-[#666666] dark:text-slate-400 flex-1 justify-center">
             <Repeat2 className="w-4 h-4" />
             <span className="text-xs font-semibold">Repost</span>
           </button>
-          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] transition-colors text-[#666666] flex-1 justify-center">
+          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[#F3F2F0] dark:hover:bg-slate-700 transition-colors text-[#666666] dark:text-slate-400 flex-1 justify-center">
             <Send className="w-4 h-4" />
             <span className="text-xs font-semibold">Send</span>
           </button>
@@ -581,7 +581,7 @@ export function LinkedInPostPreview({
       </div>
 
       {/* Action Buttons for User */}
-      <div className="px-3 pt-1.5 pb-2 bg-[#F9F9F9] border-t border-[#E0DFDC]">
+      <div className="px-3 pt-1.5 pb-2 bg-[#F9F9F9] dark:bg-slate-700/50 border-t border-[#E0DFDC] dark:border-slate-700">
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Copy Text Content */}
           {onCopyText && (

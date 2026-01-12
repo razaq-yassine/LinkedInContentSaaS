@@ -8,6 +8,7 @@ from ..models import UserProfile
 from ..routers.auth import get_current_user_id
 from ..services.file_processor import extract_text_from_pdf
 from ..services.profile_builder import build_user_profile, update_user_profile_in_db
+from ..services.ai_service import validate_cv_content
 
 router = APIRouter()
 
@@ -106,27 +107,35 @@ async def upload_cv(
     db: Session = Depends(get_db)
 ):
     """
-    Upload and process CV file
+    Upload and process CV file (PDF only)
     Step 2 of onboarding wizard
     """
-    # Validate file type
-    valid_extensions = ('.pdf', '.jpg', '.jpeg', '.png', '.webp')
-    if not file.filename.lower().endswith(valid_extensions):
-        raise HTTPException(status_code=400, detail="Only PDF and image files (JPG, PNG, WebP) are supported")
+    # Validate file type - PDF only
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported. Please upload your CV as a PDF.")
     
     # Read file data
     cv_data = await file.read()
     
-    # Extract text based on file type
+    # Extract text from PDF
     try:
-        if file.filename.lower().endswith('.pdf'):
-            cv_text = await extract_text_from_pdf(cv_data)
-        else:
-            # For images, we'd use OCR here (placeholder for now)
-            # In production, use pytesseract or similar
-            cv_text = "[CV uploaded as image - OCR processing would extract text here]\n\nPlease provide manual context about your professional background in the custom instructions section."
+        cv_text = await extract_text_from_pdf(cv_data)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to process PDF file: {str(e)}")
+    
+    # Validate that the document is actually a CV using AI
+    try:
+        is_valid_cv, validation_message, _ = await validate_cv_content(cv_text)
+        if not is_valid_cv:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"The uploaded file doesn't appear to be a CV/Resume. {validation_message} Please upload your actual CV or Resume."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"CV validation warning: {str(e)}")
+        # Continue if validation service fails - don't block user
     
     # Update profile with CV data (don't process yet, wait for writing samples)
     profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
@@ -145,7 +154,7 @@ async def upload_cv(
         "success": True,
         "filename": file.filename,
         "text_length": len(cv_text),
-        "message": "CV uploaded and processed successfully"
+        "message": "CV uploaded and validated successfully"
     }
 
 @router.post("/import-posts")

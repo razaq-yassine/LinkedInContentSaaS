@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PostHistoryItem } from "@/components/PostHistoryItem";
-import { Calendar, Plus, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Plus, Clock, ChevronLeft, ChevronRight, ChevronDown, Filter } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toaster";
 import {
@@ -40,6 +40,7 @@ export default function HistoryPage() {
   // Calendar view state
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showMobileFilterMenu, setShowMobileFilterMenu] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -207,15 +208,17 @@ export default function HistoryPage() {
     const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
     const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const weekDaysShort = ["S", "M", "T", "W", "T", "F", "S"];
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-2 sm:space-y-4">
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">
-          {/* Week day headers */}
-          {weekDays.map((day) => (
-            <div key={day} className="text-center text-sm font-semibold text-[#666666] py-2">
-              {day}
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {/* Week day headers - short on mobile */}
+          {weekDays.map((day, idx) => (
+            <div key={day} className="text-center text-xs sm:text-sm font-semibold text-[#666666] dark:text-slate-400 py-1 sm:py-2">
+              <span className="hidden sm:inline">{day}</span>
+              <span className="sm:hidden">{weekDaysShort[idx]}</span>
             </div>
           ))}
 
@@ -228,13 +231,13 @@ export default function HistoryPage() {
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[80px] border rounded-lg p-2 cursor-pointer transition-colors ${
-                  isCurrentMonth ? "bg-white" : "bg-[#F9F9F9]"
+                className={`min-h-[50px] sm:min-h-[80px] border rounded-md sm:rounded-lg p-1 sm:p-2 cursor-pointer transition-colors ${
+                  isCurrentMonth ? "bg-white dark:bg-slate-800" : "bg-[#F9F9F9] dark:bg-slate-700"
                 } ${
                   isCurrentDay
                     ? "border-[#0A66C2] border-2"
-                    : "border-[#E0DFDC]"
-                } hover:bg-[#F3F2F0]`}
+                    : "border-[#E0DFDC] dark:border-slate-600"
+                } hover:bg-[#F3F2F0] dark:hover:bg-slate-700`}
                 onClick={() => {
                   if (dayPosts.length > 0) {
                     setSelectedPost(dayPosts[0]);
@@ -242,39 +245,58 @@ export default function HistoryPage() {
                 }}
               >
                 <div
-                  className={`text-sm mb-1 ${
-                    isCurrentMonth ? "text-black" : "text-[#666666]"
+                  className={`text-xs sm:text-sm mb-0.5 sm:mb-1 ${
+                    isCurrentMonth ? "text-black dark:text-white" : "text-[#666666] dark:text-slate-400"
                   } ${isCurrentDay ? "font-bold text-[#0A66C2]" : ""}`}
                 >
                   {format(day, "d")}
                 </div>
+                {/* Desktop: show time labels */}
                 {dayPosts.length > 0 && (
-                  <div className="space-y-1">
-                    {dayPosts.slice(0, 2).map((post) => {
-                      const displayDate = post.scheduled_at ? new Date(post.scheduled_at) : new Date(post.created_at);
-                      return (
+                  <>
+                    <div className="hidden sm:block space-y-1">
+                      {dayPosts.slice(0, 2).map((post) => {
+                        const displayDate = post.scheduled_at ? new Date(post.scheduled_at) : new Date(post.created_at);
+                        return (
+                          <div
+                            key={post.id}
+                            className={`text-xs px-2 py-1 rounded truncate ${
+                              post.published_to_linkedin
+                                ? "bg-green-100 text-green-700"
+                                : "bg-[#E7F3FF] text-[#0A66C2]"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPost(post);
+                            }}
+                          >
+                            {format(displayDate, "h:mm a")}
+                          </div>
+                        );
+                      })}
+                      {dayPosts.length > 2 && (
+                        <div className="text-xs text-[#666666] dark:text-slate-400 px-2">
+                          +{dayPosts.length - 2} more
+                        </div>
+                      )}
+                    </div>
+                    {/* Mobile: show dot indicators */}
+                    <div className="sm:hidden flex justify-center gap-0.5 mt-1">
+                      {dayPosts.slice(0, 3).map((post, idx) => (
                         <div
                           key={post.id}
-                          className={`text-xs px-2 py-1 rounded truncate ${
+                          className={`w-1.5 h-1.5 rounded-full ${
                             post.published_to_linkedin
-                              ? "bg-green-100 text-green-700"
-                              : "bg-[#E7F3FF] text-[#0A66C2]"
+                              ? "bg-green-500"
+                              : "bg-[#0A66C2]"
                           }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPost(post);
-                          }}
-                        >
-                          {format(displayDate, "h:mm a")}
-                        </div>
-                      );
-                    })}
-                    {dayPosts.length > 2 && (
-                      <div className="text-xs text-[#666666] px-2">
-                        +{dayPosts.length - 2} more
-                      </div>
-                    )}
-                  </div>
+                        />
+                      ))}
+                      {dayPosts.length > 3 && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             );
@@ -302,37 +324,37 @@ export default function HistoryPage() {
                 key={day.toISOString()}
                 className={`border rounded-lg p-3 min-h-[200px] ${
                   isCurrentDay
-                    ? "border-[#0A66C2] border-2 bg-[#E7F3FF]"
-                    : "border-[#E0DFDC] bg-white"
+                    ? "border-[#0A66C2] border-2 bg-[#E7F3FF] dark:bg-slate-700"
+                    : "border-[#E0DFDC] dark:border-slate-600 bg-white dark:bg-slate-800"
                 }`}
               >
                 <div
                   className={`text-sm font-semibold mb-2 ${
-                    isCurrentDay ? "text-[#0A66C2]" : "text-black"
+                    isCurrentDay ? "text-[#0A66C2]" : "text-black dark:text-white"
                   }`}
                 >
                   {format(day, "EEE d")}
                 </div>
                 <div className="space-y-2">
                   {dayPosts.length === 0 ? (
-                    <p className="text-xs text-[#666666]">No posts</p>
+                    <p className="text-xs text-[#666666] dark:text-slate-400">No posts</p>
                   ) : (
                     dayPosts.map((post) => {
                       const displayDate = post.scheduled_at ? new Date(post.scheduled_at) : new Date(post.created_at);
                       return (
                         <div
                           key={post.id}
-                          className={`p-2 border rounded cursor-pointer hover:bg-[#F9F9F9] ${
+                          className={`p-2 border rounded cursor-pointer hover:bg-[#F9F9F9] dark:hover:bg-slate-700 ${
                             post.published_to_linkedin
-                              ? "bg-green-50 border-green-200"
-                              : "bg-white border-[#E0DFDC]"
+                              ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
+                              : "bg-white dark:bg-slate-800 border-[#E0DFDC] dark:border-slate-600"
                           }`}
                           onClick={() => setSelectedPost(post)}
                         >
-                          <div className="text-xs text-[#666666] mb-1">
+                          <div className="text-xs text-[#666666] dark:text-slate-400 mb-1">
                             {format(displayDate, "h:mm a")}
                           </div>
-                          <div className="text-sm text-black truncate">
+                          <div className="text-sm text-black dark:text-white truncate">
                             {post.content.substring(0, 50)}...
                           </div>
                         </div>
@@ -350,10 +372,10 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F3F2F0] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F3F2F0] dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#0A66C2] mx-auto mb-4"></div>
-          <p className="text-[#666666]">Loading your content...</p>
+          <p className="text-[#666666] dark:text-slate-400">Loading your content...</p>
         </div>
       </div>
     );
@@ -380,30 +402,48 @@ export default function HistoryPage() {
     avatar: user?.linkedin_profile_picture,
   };
 
+  // Get current filter label
+  const getFilterLabel = () => {
+    const labels: Record<string, string> = {
+      "scheduled-published": "Scheduled & Published",
+      "drafts": "Drafts",
+      "all": "All Posts",
+    };
+    return labels[filterTab] || "Filter";
+  };
+
+  const getFilterCount = () => {
+    if (filterTab === "scheduled-published") return scheduledAndPublishedCount;
+    if (filterTab === "drafts") return draftCount;
+    return posts.length;
+  };
+
   return (
-    <div className="min-h-screen bg-[#F3F2F0] py-8">
-      <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen bg-[#F3F2F0] dark:bg-slate-900 py-4 sm:py-8">
+      <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
+        {/* Header - responsive */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-8 gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-black">Posts Planning</h1>
-            <p className="text-[#666666] mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-black dark:text-white">Posts Planning</h1>
+            <p className="text-sm sm:text-base text-[#666666] dark:text-slate-400 mt-1">
               Manage your content calendar and track your posts
             </p>
           </div>
           <div className="flex gap-3">
             <Button 
               onClick={() => router.push("/generate")}
-              className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full"
+              className="bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full text-sm sm:text-base"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Post
+              <Plus className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Create New Post</span>
+              <span className="sm:hidden">New Post</span>
             </Button>
           </div>
         </div>
 
-        <div className="space-y-6">
-          {/* Filter Tabs with counts */}
-          <div className="bg-white rounded-lg shadow-linkedin-sm border border-[#E0DFDC] p-2 flex gap-2 flex-wrap">
+        <div className="space-y-4 sm:space-y-6">
+          {/* Desktop Filter Tabs - hidden on mobile */}
+          <div className="hidden sm:flex bg-white dark:bg-slate-800 rounded-lg shadow-linkedin-sm border border-[#E0DFDC] dark:border-slate-700 p-2 gap-2 flex-wrap">
             {[
               { key: "scheduled-published", label: "Scheduled and Published", count: scheduledAndPublishedCount },
               { key: "drafts", label: "Drafts", count: draftCount },
@@ -415,7 +455,7 @@ export default function HistoryPage() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                   filterTab === tab.key
                     ? "bg-[#0A66C2] text-white"
-                    : "text-[#666666] hover:bg-[#F3F2F0]"
+                    : "text-[#666666] dark:text-slate-300 hover:bg-[#F3F2F0] dark:hover:bg-slate-700"
                 }`}
               >
                 {tab.label}
@@ -432,24 +472,79 @@ export default function HistoryPage() {
             ))}
           </div>
 
+          {/* Mobile Filter Dropdown */}
+          <div className="sm:hidden relative">
+            <button
+              onClick={() => setShowMobileFilterMenu(!showMobileFilterMenu)}
+              className="w-full bg-white dark:bg-slate-800 rounded-lg shadow-linkedin-sm border border-[#E0DFDC] dark:border-slate-700 p-3 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-[#0A66C2]" />
+                <span className="font-medium text-black dark:text-white">{getFilterLabel()}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[#0A66C2] text-white">
+                  {getFilterCount()}
+                </span>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-[#666666] transition-transform ${showMobileFilterMenu ? "rotate-180" : ""}`} />
+            </button>
+
+            {/* Mobile Filter Menu */}
+            {showMobileFilterMenu && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-[#E0DFDC] dark:border-slate-700 z-50 overflow-hidden">
+                {[
+                  { key: "scheduled-published", label: "Scheduled & Published", count: scheduledAndPublishedCount },
+                  { key: "drafts", label: "Drafts", count: draftCount },
+                  { key: "all", label: "All Posts", count: posts.length },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setFilterTab(tab.key as typeof filterTab);
+                      setShowMobileFilterMenu(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors ${
+                      filterTab === tab.key
+                        ? "bg-[#E7F3FF] dark:bg-slate-700 text-[#0A66C2] dark:text-blue-400"
+                        : "text-[#666666] dark:text-slate-300 hover:bg-[#F3F2F0] dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <span className="font-medium">{tab.label}</span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        filterTab === tab.key
+                          ? "bg-[#0A66C2] text-white"
+                          : "bg-[#E0DFDC] text-[#666666]"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Content based on selected tab */}
           {filterTab === "scheduled-published" ? (
             // Calendar View for Scheduled and Published
             <div className="space-y-4">
-              {/* Calendar Controls */}
-              <Card className="p-4 bg-white border border-[#E0DFDC] shadow-linkedin-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
+              {/* Calendar Controls - Responsive */}
+              <Card className="p-3 sm:p-4 bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-linkedin-sm">
+                {/* Mobile: stacked layout */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  {/* Navigation row */}
+                  <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() =>
                         viewMode === "month" ? navigateMonth("prev") : navigateWeek("prev")
                       }
+                      className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <h2 className="text-xl font-semibold text-black min-w-[200px] text-center">
+                    <h2 className="text-base sm:text-xl font-semibold text-black dark:text-white min-w-[120px] sm:min-w-[200px] text-center">
                       {viewMode === "month"
                         ? format(currentDate, "MMMM yyyy")
                         : `Week of ${format(startOfWeek(currentDate), "MMM d")}`}
@@ -460,6 +555,7 @@ export default function HistoryPage() {
                       onClick={() =>
                         viewMode === "month" ? navigateMonth("next") : navigateWeek("next")
                       }
+                      className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </Button>
@@ -467,11 +563,13 @@ export default function HistoryPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setCurrentDate(new Date())}
+                      className="text-xs sm:text-sm px-2 sm:px-3"
                     >
                       Today
                     </Button>
                   </div>
-                  <div className="flex items-center gap-2">
+                  {/* View toggle - hidden on mobile (month only on mobile) */}
+                  <div className="hidden sm:flex items-center gap-2">
                     <Button
                       variant={viewMode === "month" ? "default" : "outline"}
                       onClick={() => setViewMode("month")}
@@ -493,16 +591,16 @@ export default function HistoryPage() {
               </Card>
 
               {/* Calendar View */}
-              <Card className="p-6 bg-white border border-[#E0DFDC] shadow-linkedin-sm">
+              <Card className="p-3 sm:p-6 bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-linkedin-sm">
                 {viewMode === "month" ? renderMonthView() : renderWeekView()}
               </Card>
 
               {/* Empty State */}
               {filteredPosts.length === 0 && (
-                <Card className="p-12 text-center bg-white border border-[#E0DFDC] shadow-linkedin-sm">
+                <Card className="p-12 text-center bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-linkedin-sm">
                   <Calendar className="w-16 h-16 text-[#666666] mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-black mb-2">No scheduled or published posts</h3>
-                  <p className="text-[#666666] mb-4">
+                  <h3 className="text-xl font-bold text-black dark:text-white mb-2">No scheduled or published posts</h3>
+                  <p className="text-[#666666] dark:text-slate-400 mb-4">
                     Schedule or publish posts to see them in the calendar
                   </p>
                   <Button
@@ -519,10 +617,10 @@ export default function HistoryPage() {
             // List View for Drafts and All
             <div className="space-y-4">
               {filteredPosts.length === 0 ? (
-                <Card className="p-12 text-center bg-white border border-[#E0DFDC] shadow-linkedin-sm">
+                <Card className="p-12 text-center bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-linkedin-sm">
                   <Calendar className="w-16 h-16 text-[#666666] mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-black mb-2">No posts yet</h3>
-                  <p className="text-[#666666] mb-4">
+                  <h3 className="text-xl font-bold text-black dark:text-white mb-2">No posts yet</h3>
+                  <p className="text-[#666666] dark:text-slate-400 mb-4">
                     {filterTab === "drafts" 
                       ? "Start creating content in the Copilot to see your drafts here"
                       : "Start creating content in the Copilot to see your posts here"}

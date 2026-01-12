@@ -203,8 +203,8 @@ export default function Step5Preview({ profileData, tokenUsage, onComplete, onBa
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold mb-2">Review Your Profile Context</h2>
+      <div className="text-center mb-4">
+        <h2 className="text-2xl font-bold mb-1">Review Your Profile Context</h2>
         <p className="text-slate-600">
           Review and edit the AI-generated profile. Fields marked with{" "}
           <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
@@ -214,7 +214,7 @@ export default function Step5Preview({ profileData, tokenUsage, onComplete, onBa
         </p>
       </div>
 
-      <div className="space-y-4 mb-8">
+      <div className="space-y-3 mb-4">
         {/* Personal Information */}
         <CollapsibleSection
           title="Personal Information"

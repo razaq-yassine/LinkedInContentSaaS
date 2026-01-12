@@ -101,7 +101,7 @@ class SubscriptionPlanResponse(BaseModel):
     description: Optional[str]
     price_monthly: int
     price_yearly: int
-    posts_limit: int
+    credits_limit: float
     features: List[str]
     is_active: bool
     sort_order: int
@@ -118,7 +118,7 @@ class CreateSubscriptionPlanRequest(BaseModel):
     description: Optional[str] = None
     price_monthly: int = 0
     price_yearly: int = 0
-    posts_limit: int = 5
+    credits_limit: float = 5.0
     features: List[str] = []
     is_active: bool = True
     sort_order: int = 0
@@ -129,7 +129,7 @@ class UpdateSubscriptionPlanRequest(BaseModel):
     description: Optional[str] = None
     price_monthly: Optional[int] = None
     price_yearly: Optional[int] = None
-    posts_limit: Optional[int] = None
+    credits_limit: Optional[float] = None
     features: Optional[List[str]] = None
     is_active: Optional[bool] = None
     sort_order: Optional[int] = None

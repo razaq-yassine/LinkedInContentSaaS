@@ -105,7 +105,7 @@ export function ConversationList({
     return (
       <div
         className={`group relative rounded-lg mb-1 transition-colors ${
-          isActive ? 'bg-[#E7F3FF]' : 'hover:bg-[#F3F2F0]'
+          isActive ? 'bg-[#E7F3FF] dark:bg-slate-800' : 'hover:bg-[#F3F2F0] dark:hover:bg-slate-800'
         }`}
         onMouseEnter={() => setHoveredId(conversation.id)}
         onMouseLeave={() => setHoveredId(null)}
@@ -116,7 +116,7 @@ export function ConversationList({
         >
           <MessageSquare
             className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-              isActive ? 'text-[#0A66C2]' : 'text-[#666666]'
+              isActive ? 'text-[#0A66C2]' : 'text-[#666666] dark:text-slate-400'
             }`}
           />
           <div className="flex-1 min-w-0">
@@ -137,7 +137,7 @@ export function ConversationList({
             ) : (
               <div
                 className={`text-sm font-medium truncate ${
-                  isActive ? 'text-[#0A66C2]' : 'text-black'
+                  isActive ? 'text-[#0A66C2] dark:text-blue-400' : 'text-black dark:text-white'
                 }`}
               >
                 {conversation.title}
@@ -148,16 +148,16 @@ export function ConversationList({
 
         {/* Action buttons */}
         {isHovered && !isEditing && (
-          <div className="absolute right-2 top-2 flex gap-1 bg-white rounded shadow-sm border border-[#E0DFDC]">
+          <div className="absolute right-2 top-2 flex gap-1 bg-white dark:bg-slate-700 rounded shadow-sm border border-[#E0DFDC] dark:border-slate-600">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleStartEdit(conversation);
               }}
-              className="p-1.5 hover:bg-[#F3F2F0] rounded transition-colors"
+              className="p-1.5 hover:bg-[#F3F2F0] dark:hover:bg-slate-600 rounded transition-colors"
               title="Rename"
             >
-              <Edit2 className="w-3.5 h-3.5 text-[#666666]" />
+              <Edit2 className="w-3.5 h-3.5 text-[#666666] dark:text-slate-300" />
             </button>
             <button
               onClick={(e) => {
@@ -166,7 +166,7 @@ export function ConversationList({
                   onDeleteConversation(conversation.id);
                 }
               }}
-              className="p-1.5 hover:bg-[#F3F2F0] rounded transition-colors"
+              className="p-1.5 hover:bg-[#F3F2F0] dark:hover:bg-slate-600 rounded transition-colors"
               title="Delete"
             >
               <Trash2 className="w-3.5 h-3.5 text-[#CC1016]" />
@@ -184,7 +184,7 @@ export function ConversationList({
     return (
       <button
         onClick={() => toggleGroup(groupKey)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-[#666666] hover:bg-[#F3F2F0] rounded transition-colors mb-1"
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-[#666666] dark:text-slate-400 hover:bg-[#F3F2F0] dark:hover:bg-slate-800 rounded transition-colors mb-1"
       >
         <span className="uppercase tracking-wide">{title}</span>
         <div className="flex items-center gap-2">

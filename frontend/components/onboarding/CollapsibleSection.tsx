@@ -41,43 +41,57 @@ export default function CollapsibleSection({
   const aiGeneratedCount = fields.filter((f) => f.aiGenerated).length;
 
   return (
-    <Card className="border border-[#E0DFDC] shadow-linkedin-sm overflow-hidden">
-      {/* Header */}
+    <Card className="border border-[#E0DFDC] dark:border-slate-700 shadow-linkedin-sm overflow-hidden rounded-xl md:rounded-lg w-full max-w-full bg-white dark:bg-slate-800">
+      {/* Header - Mobile optimized with larger touch target (min 56px height) */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#F3F2F0] transition-colors"
+        className="w-full min-h-[56px] md:min-h-0 px-3 py-3 md:px-6 md:py-4 flex items-center justify-between hover:bg-[#F3F2F0] dark:hover:bg-slate-700 transition-colors active:bg-[#E8E7E5] dark:active:bg-slate-600 touch-manipulation overflow-hidden"
       >
-        <div className="flex items-center gap-3">
-          {icon && <div className="text-[#0A66C2]">{icon}</div>}
-          <div className="text-left">
-            <h3 className="font-semibold text-lg text-black">{title}</h3>
+        <div className="flex items-center gap-2.5 md:gap-3 flex-1 min-w-0 overflow-hidden">
+          {icon && (
+            <div className="flex-shrink-0 w-9 h-9 md:w-auto md:h-auto rounded-full md:rounded-none bg-[#EEF3F8] dark:bg-slate-700 md:bg-transparent md:dark:bg-transparent flex items-center justify-center">
+              <div className="text-[#0A66C2] [&>svg]:h-4 [&>svg]:w-4 md:[&>svg]:h-5 md:[&>svg]:w-5">
+                {icon}
+              </div>
+            </div>
+          )}
+          <div className="text-left min-w-0 flex-1 overflow-hidden">
+            <h3 className="font-semibold text-sm md:text-lg text-black dark:text-white leading-tight truncate">{title}</h3>
+            {/* Description: compact on mobile, full on desktop */}
             {description && (
-              <p className="text-sm text-[#666666] mt-1">{description}</p>
+              <p className="text-[11px] md:text-sm text-[#666666] dark:text-slate-400 mt-0.5 md:mt-1 truncate md:whitespace-normal">{description}</p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 md:gap-3 flex-shrink-0 ml-1.5">
           {aiGeneratedCount > 0 && (
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+            <span className="hidden md:inline-flex text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
               {aiGeneratedCount} AI-suggested
             </span>
           )}
-          {isExpanded ? (
-            <ChevronDown className="h-5 w-5 text-[#666666]" />
-          ) : (
-            <ChevronRight className="h-5 w-5 text-[#666666]" />
+          {/* Mobile: show compact AI indicator */}
+          {aiGeneratedCount > 0 && (
+            <span className="md:hidden text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">
+              AI
+            </span>
           )}
+          <div className="w-7 h-7 md:w-auto md:h-auto flex items-center justify-center rounded-full md:rounded-none bg-[#F3F2F0] dark:bg-slate-700 md:bg-transparent md:dark:bg-transparent flex-shrink-0">
+            <ChevronDown className={cn(
+              "h-4 w-4 md:h-5 md:w-5 text-[#666666] dark:text-slate-400 transition-transform duration-200",
+              isExpanded ? "rotate-180" : "rotate-0"
+            )} />
+          </div>
         </div>
       </button>
 
-      {/* Content */}
+      {/* Content - Optimized for mobile touch and readability */}
       <div
         className={cn(
           "transition-all duration-300 ease-in-out overflow-hidden",
           isExpanded ? "max-h-[4000px] opacity-100" : "max-h-0 opacity-0"
         )}
       >
-        <div className="px-6 py-4 border-t border-[#E0DFDC] bg-white space-y-4">
+        <div className="px-3 py-3 md:px-6 md:py-4 border-t border-[#E0DFDC] dark:border-slate-700 bg-white dark:bg-slate-800 space-y-2 md:space-y-4 overflow-hidden">
           {children || (
             // Fallback: render fields as simple text if no children provided
             fields.map((field) => (

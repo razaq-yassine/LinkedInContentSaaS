@@ -274,7 +274,7 @@ async def register(
     subscription = Subscription(
         user_id=user_id,
         plan="free",
-        posts_limit=5
+        credits_limit=5
     )
     db.add(subscription)
     
@@ -800,7 +800,7 @@ async def google_callback(
                 subscription = Subscription(
                     user_id=user_id,
                     plan="free",
-                    posts_limit=5
+                    credits_limit=5
                 )
                 db.add(subscription)
             
@@ -1117,7 +1117,7 @@ async def linkedin_callback(
                 subscription = Subscription(
                     user_id=new_user_id,
                     plan="free",
-                    posts_limit=5
+                    credits_limit=5
                 )
                 db.add(subscription)
             

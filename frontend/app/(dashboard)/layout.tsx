@@ -29,16 +29,15 @@ import {
   Sparkles,
   MoreVertical,
   CreditCard,
-  User
+  User,
+  Moon,
+  Sun
 } from "lucide-react";
+import { ThemeProvider, useTheme } from "@/components/ThemeProvider";
 import { api } from "@/lib/api-client";
 import axios from "axios";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
@@ -284,16 +283,21 @@ export default function DashboardLayout({
             })}
           </div>
 
+          {/* Dark Mode Toggle */}
+          <div className="border-t border-[#E0DFDC] dark:border-slate-700 px-2 py-2">
+            <DarkModeToggle />
+          </div>
+
           {/* User Profile */}
           <div className="border-t border-[#E0DFDC] dark:border-slate-700 p-4 sidebar-expanded-content">
             {/* Credit Progress Bar */}
             {subscription && (
               <div className="mb-3 px-2">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-semibold text-gray-700">
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                     {subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)} Plan
                   </span>
-                  <span className="text-xs text-gray-600">
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
                     {subscription.credits_limit === -1 ? 'Unlimited' : `${Math.round(subscription.credits_remaining * 100) / 100} left`}
                   </span>
                 </div>
@@ -322,7 +326,7 @@ export default function DashboardLayout({
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 w-full hover:bg-[#F3F2F0] rounded-lg p-2 transition-colors">
+                <button className="flex items-center gap-3 w-full hover:bg-[#F3F2F0] dark:hover:bg-slate-800 rounded-lg p-2 transition-colors">
                   <Avatar className="w-10 h-10">
                     {user.linkedin_profile_picture && (
                       <AvatarImage src={user.linkedin_profile_picture} alt={user.name || "User"} />
@@ -332,24 +336,24 @@ export default function DashboardLayout({
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-semibold text-black truncate">
+                    <p className="text-sm font-semibold text-black dark:text-white truncate">
                       {user.name || "User"}
                     </p>
-                    <p className="text-xs text-[#666666] truncate">
+                    <p className="text-xs text-[#666666] dark:text-slate-400 truncate">
                       {user.email}
                     </p>
                   </div>
-                  <MoreVertical className="w-5 h-5 text-[#666666] flex-shrink-0" />
+                  <MoreVertical className="w-5 h-5 text-[#666666] dark:text-slate-400 flex-shrink-0" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 align="end" 
                 side="top"
-                className="w-64 bg-white border border-[#E0DFDC] shadow-lg"
+                className="w-64 bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-lg"
                 sideOffset={8}
               >
                 {/* Profile Header */}
-                <div className="px-3 py-3 bg-[#E7F3FF]">
+                <div className="px-3 py-3 bg-[#E7F3FF] dark:bg-slate-700">
                   <div className="flex items-center gap-3">
                     <Avatar className="w-12 h-12">
                       {user.linkedin_profile_picture && (
@@ -360,41 +364,41 @@ export default function DashboardLayout({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-base font-semibold text-black truncate">
+                      <p className="text-base font-semibold text-black dark:text-white truncate">
                         {user.name || "User"}
                       </p>
                     </div>
                   </div>
                 </div>
                 
-                <DropdownMenuSeparator className="bg-[#E0DFDC]" />
+                <DropdownMenuSeparator className="bg-[#E0DFDC] dark:bg-slate-600" />
                 
                 {/* Menu Items */}
                 <div className="py-1">
                   <DropdownMenuItem 
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] focus:bg-[#F3F2F0]"
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] dark:hover:bg-slate-700 focus:bg-[#F3F2F0] dark:focus:bg-slate-700"
                     onClick={() => router.push('/billing')}
                   >
-                    <CreditCard className="w-5 h-5 text-black" />
-                    <span className="text-base font-medium text-black">Billing</span>
+                    <CreditCard className="w-5 h-5 text-black dark:text-white" />
+                    <span className="text-base font-medium text-black dark:text-white">Billing</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] focus:bg-[#F3F2F0]"
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] dark:hover:bg-slate-700 focus:bg-[#F3F2F0] dark:focus:bg-slate-700"
                     onClick={() => router.push('/settings')}
                   >
-                    <Settings className="w-5 h-5 text-black" />
-                    <span className="text-base font-medium text-black">Settings</span>
+                    <Settings className="w-5 h-5 text-black dark:text-white" />
+                    <span className="text-base font-medium text-black dark:text-white">Settings</span>
                   </DropdownMenuItem>
                   
-                  <DropdownMenuSeparator className="bg-[#E0DFDC] my-1" />
+                  <DropdownMenuSeparator className="bg-[#E0DFDC] dark:bg-slate-600 my-1" />
                   
                   <DropdownMenuItem 
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] focus:bg-[#F3F2F0]"
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F3F2F0] dark:hover:bg-slate-700 focus:bg-[#F3F2F0] dark:focus:bg-slate-700"
                     onClick={handleLogout}
                   >
-                    <LogOut className="w-5 h-5 text-black" />
-                    <span className="text-base font-medium text-black">Logout</span>
+                    <LogOut className="w-5 h-5 text-black dark:text-white" />
+                    <span className="text-base font-medium text-black dark:text-white">Logout</span>
                   </DropdownMenuItem>
                 </div>
               </DropdownMenuContent>
@@ -412,10 +416,10 @@ export default function DashboardLayout({
       )}
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-[#E0DFDC] px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-b border-[#E0DFDC] dark:border-slate-700 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between">
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-1.5 sm:p-2 hover:bg-[#F3F2F0] rounded-lg transition-colors"
+          className="p-1.5 sm:p-2 hover:bg-[#F3F2F0] dark:hover:bg-slate-800 rounded-lg transition-colors text-black dark:text-white"
         >
           {isSidebarOpen ? (
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -423,7 +427,7 @@ export default function DashboardLayout({
             <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           )}
         </button>
-        <span className="text-base sm:text-lg font-bold text-black">ContentAI</span>
+        <span className="text-base sm:text-lg font-bold text-black dark:text-white">ContentAI</span>
         <div className="w-8 sm:w-10" />
       </div>
 
@@ -444,4 +448,35 @@ export default function DashboardLayout({
   );
 }
 
+function DarkModeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  
+  return (
+    <button
+      onClick={toggleTheme}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-1 w-full text-[#666666] dark:text-slate-400 hover:bg-[#F3F2F0] dark:hover:bg-slate-800"
+      title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {theme === "dark" ? (
+        <Sun className="w-5 h-5" />
+      ) : (
+        <Moon className="w-5 h-5" />
+      )}
+      <span className="text-sm sidebar-label">
+        {theme === "dark" ? "Light Mode" : "Dark Mode"}
+      </span>
+    </button>
+  );
+}
 
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ThemeProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </ThemeProvider>
+  );
+}

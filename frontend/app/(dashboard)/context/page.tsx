@@ -152,7 +152,7 @@ export default function ContextPage() {
       <div className="max-w-4xl mx-auto py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A66C2] mx-auto"></div>
-          <p className="mt-4 text-[#666666]">Loading your profile context...</p>
+          <p className="mt-4 text-[#666666] dark:text-slate-400">Loading your profile context...</p>
         </div>
       </div>
     );
@@ -162,7 +162,7 @@ export default function ContextPage() {
     return (
       <div className="max-w-4xl mx-auto py-12">
         <div className="text-center">
-          <p className="text-[#666666]">No profile context found. Please complete onboarding first.</p>
+          <p className="text-[#666666] dark:text-slate-400">No profile context found. Please complete onboarding first.</p>
         </div>
       </div>
     );
@@ -259,25 +259,25 @@ export default function ContextPage() {
   const trendingIdeas = context.content_ideas_trending || [];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Profile Context</h1>
-            <p className="text-slate-600">
-              Manage your profile context used for generating LinkedIn posts
+    <div className="w-full max-w-4xl mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8 overflow-x-hidden">
+      {/* Header - Mobile optimized with sticky save status */}
+      <div className="mb-4 md:mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg md:text-3xl font-bold mb-1 md:mb-2 text-gray-900 dark:text-white">Profile Context</h1>
+            <p className="text-xs md:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
+              Manage your profile context for generating posts
             </p>
           </div>
           {saveStatus !== "idle" && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 self-start md:self-auto text-xs md:text-sm px-2.5 py-1">
               {saveStatus === "saving" ? "Saving..." : "✓ Saved"}
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="space-y-4 mb-8">
+      <div className="space-y-2.5 md:space-y-4 mb-6 md:mb-8 w-full overflow-hidden">
         {/* Personal Information */}
         <CollapsibleSection
           title="Personal Information"
@@ -311,24 +311,46 @@ export default function ContextPage() {
           onFieldUpdate={(key, value) => handleFieldUpdate("expertise", key, value)}
           icon={<Briefcase className="h-5 w-5" />}
         >
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-4 overflow-hidden">
             {(context.expertise || []).map((skill: any, index: number) => (
-              <div key={index} className="bg-[#F3F2F0] p-4 rounded-md">
-                <div className="grid grid-cols-2 gap-4">
+              <div key={index} className="bg-[#F3F2F0] dark:bg-slate-700 p-3 md:p-4 rounded-lg overflow-hidden">
+                {/* Mobile: Stacked card layout for better touch and readability */}
+                <div className="md:hidden space-y-1.5 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-[#333] dark:text-white truncate flex-1">{skill.skill}</p>
+                    {skill.ai_generated && (
+                      <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                        AI
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-[#666666] dark:text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-[#333] dark:text-slate-300">Level:</span>
+                      <span className="truncate">{skill.level}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-[#333] dark:text-slate-300">Yrs:</span>
+                      <span>{skill.years}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Desktop: Grid layout */}
+                <div className="hidden md:grid grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm font-medium">Skill</p>
-                    <p className="text-sm text-[#666666]">{skill.skill}</p>
+                    <p className="text-sm font-medium text-[#333] dark:text-slate-300">Skill</p>
+                    <p className="text-sm text-[#666666] dark:text-slate-400 truncate">{skill.skill}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Level</p>
-                    <p className="text-sm text-[#666666]">{skill.level}</p>
+                    <p className="text-sm font-medium text-[#333] dark:text-slate-300">Level</p>
+                    <p className="text-sm text-[#666666] dark:text-slate-400">{skill.level}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Years</p>
-                    <p className="text-sm text-[#666666]">{skill.years}</p>
+                    <p className="text-sm font-medium text-[#333] dark:text-slate-300">Years</p>
+                    <p className="text-sm text-[#666666] dark:text-slate-400">{skill.years}</p>
                   </div>
                   {skill.ai_generated && (
-                    <div className="col-span-2">
+                    <div>
                       <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
                         AI Suggested
                       </span>
@@ -348,11 +370,11 @@ export default function ContextPage() {
           onFieldUpdate={(key, value) => handleFieldUpdate("target_audience", key, value)}
           icon={<Users className="h-5 w-5" />}
         >
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3 overflow-hidden">
             {(context.target_audience || []).map((audience: any, index: number) => (
-              <div key={index} className="bg-[#F3F2F0] p-4 rounded-md">
-                <p className="font-medium text-sm">{audience.persona}</p>
-                <p className="text-sm text-[#666666] mt-1">{audience.description}</p>
+              <div key={index} className="bg-[#F3F2F0] dark:bg-slate-700 p-3 md:p-4 rounded-lg overflow-hidden">
+                <p className="font-semibold text-sm md:text-base text-[#333] dark:text-white truncate">{audience.persona}</p>
+                <p className="text-[11px] md:text-sm text-[#666666] dark:text-slate-400 mt-1 leading-relaxed line-clamp-2 md:line-clamp-none">{audience.description}</p>
               </div>
             ))}
           </div>
@@ -390,16 +412,16 @@ export default function ContextPage() {
           onFieldUpdate={(key, value) => handleFieldUpdate("content_mix", key, value)}
           icon={<Target className="h-5 w-5" />}
         >
-          <div className="space-y-2">
+          <div className="space-y-1.5 overflow-hidden">
             {Array.isArray(context.content_mix) && context.content_mix.length > 0 ? (
               context.content_mix.map((mix: any, index: number) => (
-                <div key={index} className="flex justify-between items-center bg-[#F3F2F0] p-3 rounded-md">
-                  <span className="text-sm font-medium">{mix.category}</span>
-                  <span className="text-sm text-[#0A66C2] font-semibold">{mix.percentage}%</span>
+                <div key={index} className="flex justify-between items-center bg-[#F3F2F0] dark:bg-slate-700 p-2.5 md:p-3 rounded-lg min-h-[40px] overflow-hidden">
+                  <span className="text-xs md:text-sm font-medium truncate mr-2 flex-1 text-black dark:text-white">{mix.category}</span>
+                  <span className="text-xs md:text-sm text-[#0A66C2] font-bold flex-shrink-0 bg-white px-2 py-0.5 rounded-full">{mix.percentage}%</span>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-[#666666]">No content mix configured</p>
+              <p className="text-xs text-[#666666] dark:text-slate-400">No content mix configured</p>
             )}
           </div>
         </CollapsibleSection>
@@ -412,19 +434,18 @@ export default function ContextPage() {
           onFieldUpdate={() => {}}
           icon={<Lightbulb className="h-5 w-5" />}
         >
-          <div className="space-y-6">
-            {/* Action Buttons */}
-            <div className="flex gap-3">
+          <div className="space-y-4 md:space-y-6 overflow-hidden">
+            {/* Action Buttons - Mobile optimized with full-width touch targets */}
+            <div className="flex flex-col md:flex-row gap-2 md:gap-3">
               <Button
                 onClick={handleGenerateMoreIdeas}
                 disabled={generatingIdeas}
                 variant="outline"
-                size="sm"
-                className="border-[#0A66C2] text-[#0A66C2] hover:bg-[#EEF3F8]"
+                className="w-full md:w-auto min-h-[44px] border-[#0A66C2] text-[#0A66C2] hover:bg-[#EEF3F8] active:bg-[#D4E5F7] text-sm font-medium touch-manipulation"
               >
                 {generatingIdeas ? (
                   <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#0A66C2] mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#0A66C2] mr-2"></div>
                     Generating...
                   </>
                 ) : (
@@ -438,18 +459,18 @@ export default function ContextPage() {
                 onClick={handleRefreshTrending}
                 disabled={refreshingTrending}
                 variant="outline"
-                size="sm"
-                className="border-purple-600 text-purple-700 hover:bg-purple-50"
+                className="w-full md:w-auto min-h-[44px] border-purple-600 text-purple-700 hover:bg-purple-50 active:bg-purple-100 text-sm font-medium touch-manipulation"
               >
                 {refreshingTrending ? (
                   <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600 mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 mr-2"></div>
                     Refreshing...
                   </>
                 ) : (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Trending Topics
+                    <span className="hidden md:inline">Refresh Trending Topics</span>
+                    <span className="md:hidden">Refresh Trending</span>
                   </>
                 )}
               </Button>
@@ -459,21 +480,21 @@ export default function ContextPage() {
             {evergreenIdeas.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <h4 className="font-semibold text-sm text-[#0A66C2]">TOPIC IDEAS</h4>
-                  <Badge variant="outline" className="text-xs">
+                  <h4 className="font-semibold text-xs md:text-sm text-[#0A66C2] tracking-wide">TOPIC IDEAS</h4>
+                  <Badge variant="outline" className="text-[10px] md:text-xs px-2 py-0.5">
                     {evergreenIdeas.length} ideas
                   </Badge>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 overflow-hidden">
                   {evergreenIdeas.map((idea: any, index: number) => (
                     <div
                       key={`evergreen-${index}`}
-                      className="flex items-center gap-3 p-3 bg-[#F3F2F0] rounded-md hover:bg-[#E8E7E5] transition-colors"
+                      className="flex items-start gap-2.5 p-2.5 md:p-3 bg-[#F3F2F0] rounded-lg hover:bg-[#E8E7E5] active:bg-[#DDDCDA] transition-colors min-h-[40px] overflow-hidden"
                     >
-                      <div className="flex-shrink-0">
-                        <Lightbulb className="h-4 w-4 text-[#0A66C2]" />
+                      <div className="flex-shrink-0 mt-0.5">
+                        <Lightbulb className="h-3.5 w-3.5 md:h-4 md:w-4 text-[#0A66C2]" />
                       </div>
-                      <p className="text-sm font-medium text-black flex-1">{idea.title}</p>
+                      <p className="text-xs md:text-sm font-medium text-black flex-1 leading-relaxed line-clamp-2">{idea.title}</p>
                     </div>
                   ))}
                 </div>
@@ -484,20 +505,20 @@ export default function ContextPage() {
             {trendingIdeas.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <h4 className="font-semibold text-sm text-purple-700">TRENDING TOPICS</h4>
-                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                  <h4 className="font-semibold text-xs md:text-sm text-purple-700 tracking-wide">TRENDING TOPICS</h4>
+                  <Badge variant="outline" className="text-[10px] md:text-xs px-2 py-0.5 bg-purple-50 text-purple-700 border-purple-200">
                     {trendingIdeas.length} topics
                   </Badge>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 overflow-hidden">
                   {trendingIdeas.map((idea: any, index: number) => (
                     <div
                       key={`trending-${index}`}
-                      className="flex items-center gap-3 p-3 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors border border-purple-100"
+                      className="flex items-start gap-2.5 p-2.5 md:p-3 bg-purple-50 rounded-lg hover:bg-purple-100 active:bg-purple-150 transition-colors border border-purple-100 min-h-[40px] overflow-hidden"
                     >
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 mt-0.5">
                         <svg
-                          className="h-4 w-4 text-purple-600"
+                          className="h-3.5 w-3.5 md:h-4 md:w-4 text-purple-600"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -510,7 +531,7 @@ export default function ContextPage() {
                           />
                         </svg>
                       </div>
-                      <p className="text-sm font-medium text-purple-900 flex-1">{idea.title}</p>
+                      <p className="text-xs md:text-sm font-medium text-purple-900 flex-1 leading-relaxed line-clamp-2">{idea.title}</p>
                     </div>
                   ))}
                 </div>
@@ -519,30 +540,30 @@ export default function ContextPage() {
           </div>
         </CollapsibleSection>
 
-        {/* Additional Context and Rules */}
-        <div className="bg-white rounded-xl shadow-linkedin-md border border-[#E0DFDC] p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-purple-600" />
+        {/* Additional Context and Rules - Mobile optimized */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-linkedin-md border border-[#E0DFDC] dark:border-slate-700 p-3 md:p-6 overflow-hidden">
+          <div className="flex items-start gap-2.5 mb-3 overflow-hidden">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-purple-600" />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-black">Additional Context and Rules</h3>
-              <p className="text-sm text-[#666666]">Specify tone, style, format preferences, content guidelines, brand voice, topics to avoid, or any specific rules for content generation</p>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <h3 className="text-sm md:text-lg font-semibold text-black dark:text-white leading-tight truncate">Additional Context</h3>
+              <p className="text-[11px] md:text-sm text-[#666666] dark:text-slate-400 mt-0.5 truncate md:whitespace-normal">Customize tone and content guidelines</p>
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             <div>
-              <Label className="text-sm font-medium text-black mb-2 block">
-                Additional Context and Rules (Optional)
+              <Label className="text-xs md:text-sm font-medium text-black dark:text-white mb-2 block">
+                Custom Instructions (Optional)
               </Label>
               <Textarea
-                placeholder="Specify tone, style, format preferences, content guidelines, brand voice, topics to avoid, or any specific rules for content generation..."
+                placeholder="Add your preferences for tone, style, topics to focus on or avoid..."
                 value={context.additional_context || ""}
                 onChange={(e) => handleFieldUpdate("additional_context", "additional_context", e.target.value)}
-                rows={6}
-                className="resize-none"
+                rows={4}
+                className="resize-none text-sm md:text-base min-h-[120px] md:min-h-[140px] touch-manipulation"
               />
-              <p className="text-xs text-[#666666] mt-2">
+              <p className="text-[11px] md:text-xs text-[#666666] dark:text-slate-400 mt-2">
                 {(context.additional_context || "").length}/500 characters
               </p>
             </div>

@@ -1,6 +1,5 @@
 from openai import OpenAI
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from anthropic import Anthropic
 from typing import Dict, List, Optional, Any
 from ..config import get_settings
@@ -11,8 +10,9 @@ settings = get_settings()
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
-# Initialize Gemini client (new SDK)
-gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+# Initialize Gemini client
+if settings.gemini_api_key:
+    genai.configure(api_key=settings.gemini_api_key)
 
 # Initialize Claude client (Anthropic SDK v0.39.0+)
 claude_client = Anthropic(api_key=settings.claude_api_key) if settings.claude_api_key else None
@@ -181,11 +181,20 @@ async def _generate_with_gemini(
     Returns:
         Tuple of (response_text, token_usage_dict)
     """
-    if not gemini_client:
+    if not settings.gemini_api_key:
         raise Exception("Gemini API key not configured")
     
     try:
         import base64
+        
+        # Select the appropriate model
+        if use_onboarding_model and settings.gemini_onboarding_model:
+            model_to_use = settings.gemini_onboarding_model
+        else:
+            model_to_use = settings.gemini_model
+        
+        # Create model instance
+        model = genai.GenerativeModel(model_to_use)
         
         # Build conversation history string if provided
         history_text = ""
@@ -204,36 +213,27 @@ async def _generate_with_gemini(
         # Combine system prompt, conversation history, and current user message
         combined_prompt = f"{system_prompt}\n\n{history_text}User: {user_message}"
         
-        # Prepare configuration (NO GOOGLE SEARCH TOOL - using Brave instead)
-        config_params = {
-            "temperature": temperature,
-        }
-        
-        config = types.GenerateContentConfig(**config_params)
-        
         # Build contents with optional images for vision
         if image_attachments and len(image_attachments) > 0:
             # Use multimodal content format for vision
             contents = [combined_prompt]
             for img in image_attachments:
-                # Decode base64 and create Part with inline_data
+                # Decode base64 and add image part
                 image_bytes = base64.b64decode(img['data'])
-                contents.append(types.Part.from_bytes(data=image_bytes, mime_type=img['type']))
+                contents.append({
+                    'mime_type': img['type'],
+                    'data': image_bytes
+                })
             print(f"Gemini: Processing {len(image_attachments)} image(s) for vision analysis")
         else:
             contents = combined_prompt
         
-        # Select the appropriate model
-        if use_onboarding_model and settings.gemini_onboarding_model:
-            model_to_use = settings.gemini_onboarding_model
-        else:
-            model_to_use = settings.gemini_model
-        
-        # Generate content using new SDK
-        response = gemini_client.models.generate_content(
-            model=model_to_use,
-            contents=contents,
-            config=config,
+        # Generate content
+        response = model.generate_content(
+            contents,
+            generation_config=genai.types.GenerationConfig(
+                temperature=temperature,
+            )
         )
         
         # Extract token usage from usage_metadata
@@ -357,6 +357,75 @@ async def _generate_with_claude(
         
     except Exception as e:
         raise Exception(f"Claude API error: {str(e)}")
+
+async def validate_cv_content(cv_text: str) -> tuple[bool, str, Dict[str, Any]]:
+    """
+    Validate if the uploaded document is actually a CV/Resume.
+    
+    Args:
+        cv_text: Extracted text from the uploaded file
+        
+    Returns:
+        Tuple of (is_valid_cv: bool, message: str, token_usage: Dict)
+    """
+    system_prompt = """You are a document validator. Your task is to determine if the provided text is from an actual CV/Resume or if it's a different type of document.
+
+A valid CV/Resume typically contains:
+- Personal information (name, contact details)
+- Work experience or employment history
+- Education background
+- Skills or competencies
+- Professional summary or objective
+
+Analyze the text and respond with ONLY a JSON object in this exact format:
+{
+    "is_cv": true or false,
+    "confidence": "high" or "medium" or "low",
+    "reason": "Brief explanation of why this is or isn't a CV",
+    "detected_type": "CV/Resume" or "Cover Letter" or "Academic Paper" or "Article" or "Unknown Document" or other detected type
+}
+
+Be strict but fair. If the document has most CV elements, consider it valid even if imperfectly formatted."""
+
+    try:
+        result, token_usage = await generate_completion(
+            system_prompt=system_prompt,
+            user_message=f"Analyze this document and determine if it's a CV/Resume:\n\n{cv_text[:3000]}",
+            temperature=0.2,
+            use_onboarding_model=True
+        )
+        
+        import json
+        result = result.strip()
+        if result.startswith("```"):
+            result = result.split("```")[1]
+            if result.startswith("json"):
+                result = result[4:]
+        
+        validation = json.loads(result.strip())
+        
+        is_valid = validation.get("is_cv", False)
+        detected_type = validation.get("detected_type", "Unknown Document")
+        reason = validation.get("reason", "Unable to determine document type")
+        
+        if is_valid:
+            message = f"Document validated as a CV/Resume. {reason}"
+        else:
+            message = f"This doesn't appear to be a CV/Resume. Detected: {detected_type}. {reason}"
+        
+        return is_valid, message, token_usage
+        
+    except Exception as e:
+        print(f"CV validation error: {str(e)}")
+        # Default to accepting if validation fails (don't block user)
+        return True, "Document accepted (validation skipped)", {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "model": "unknown",
+            "provider": "unknown"
+        }
+
 
 async def generate_profile_from_cv(cv_text: str) -> tuple[str, Dict[str, Any]]:
     """

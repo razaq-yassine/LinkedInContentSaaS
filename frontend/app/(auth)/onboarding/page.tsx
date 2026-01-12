@@ -5,10 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, AlertCircle, FileX } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Step1AccountType from "@/components/wizard/Step1AccountType";
 import Step2StyleChoice from "@/components/wizard/Step2StyleChoice";
-import Step3ImportPosts from "@/components/wizard/Step3ImportPosts";
 import Step4UploadCV from "@/components/wizard/Step4UploadCV";
 import Step5Preview from "@/components/wizard/Step5Preview";
 import FeatureSlider from "@/components/onboarding/FeatureSlider";
@@ -25,11 +32,16 @@ function OnboardingContent() {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [tokenUsage, setTokenUsage] = useState<any>(null);
+  const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({ 
+    open: false, 
+    title: "", 
+    message: "" 
+  });
 
   useEffect(() => {
-    // Restore profile data from localStorage if on step 5
+    // Restore profile data from localStorage if on step 4 (preview)
     const savedProfileData = localStorage.getItem("onboarding_profile_data");
-    if (savedProfileData && step === 5) {
+    if (savedProfileData && step === 4) {
       try {
         setProfileData(JSON.parse(savedProfileData));
       } catch (error) {
@@ -51,7 +63,7 @@ function OnboardingContent() {
         if (state.has_processed_profile && state.profile_data) {
           console.log("Resuming from preview step with saved profile data");
           setProfileData(state.profile_data);
-          setStep(5);
+          setStep(4);
         } else if (state.current_step > 1) {
           // Resume from saved step
           console.log(`Resuming from step ${state.current_step}`);
@@ -99,22 +111,12 @@ function OnboardingContent() {
 
   const handleStep3 = async (file: File) => {
     setCvFile(file);
-    // Always go to posts import step after CV upload
-    setStep(4);
-  };
-
-  const handleStep4 = async (importedPosts: string[]) => {
-    setPosts(importedPosts);
-    // Process CV and posts, then go to preview
-    await handleProcessing(cvFile!, importedPosts);
+    // Directly process CV and go to preview (no posts import step)
+    await handleProcessing(file, []);
   };
 
   const handleBackFromStep4 = () => {
     setStep(3); // Back to CV upload
-  };
-
-  const handleBackFromStep5 = () => {
-    setStep(4); // Back to posts import
   };
 
   const handleProcessing = async (file: File, importedPosts: string[]) => {
@@ -148,7 +150,7 @@ function OnboardingContent() {
         
         // Save to localStorage for persistence
         localStorage.setItem("onboarding_profile_data", JSON.stringify(profileDataFromResponse));
-        setStep(5);
+        setStep(4);
       } catch (processError: any) {
         console.warn("Profile processing failed:", processError);
         const errorDetail = processError?.response?.data?.detail || processError?.detail || processError?.message || "Unknown error";
@@ -156,8 +158,38 @@ function OnboardingContent() {
       }
     } catch (error: any) {
       console.error("Processing error:", error);
-      const errorMessage = error?.detail || error?.message || JSON.stringify(error) || "Unknown error occurred";
-      alert("Processing failed: " + errorMessage);
+      
+      // Extract error message from various possible locations
+      const errorMessage = 
+        error?.detail || 
+        error?.message || 
+        error?.error || 
+        (typeof error === 'string' ? error : '') ||
+        JSON.stringify(error) || 
+        "";
+      
+      console.log("Extracted error message:", errorMessage);
+      
+      // Check if this is a CV validation error
+      const lowerMessage = errorMessage.toLowerCase();
+      if (lowerMessage.includes("cv") || 
+          lowerMessage.includes("resume") ||
+          lowerMessage.includes("doesn't appear to be") ||
+          lowerMessage.includes("not a cv")) {
+        setErrorDialog({
+          open: true,
+          title: "Invalid Document",
+          message: "The file you uploaded doesn't appear to be a CV or Resume. Please make sure you're uploading your actual CV/Resume in PDF format."
+        });
+      } else {
+        setErrorDialog({
+          open: true,
+          title: "Upload Failed",
+          message: errorMessage && errorMessage !== "{}" 
+            ? errorMessage 
+            : "Something went wrong while processing your file. Please try again."
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -192,7 +224,7 @@ function OnboardingContent() {
     }
   };
 
-  const progress = (step / 5) * 100;
+  const progress = (step / 4) * 100;
 
   if (initializing) {
     return (
@@ -215,7 +247,7 @@ function OnboardingContent() {
     );
   }
 
-  const totalSteps = 5; // All flows now have 5 steps
+  const totalSteps = 4; // Simplified flow: Account Type, Style Choice, CV Upload, Preview
   const actualProgress = (step / totalSteps) * 100;
 
   const handleLogout = () => {
@@ -225,7 +257,7 @@ function OnboardingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F2F0] py-12 px-4 relative">
+    <div className="min-h-screen bg-[#F3F2F0] py-4 px-4 relative">
       {/* Logout Button - Bottom Left */}
       <Button
         variant="ghost"
@@ -237,9 +269,9 @@ function OnboardingContent() {
         Logout
       </Button>
       {/* Progress Bar */}
-      <div className="max-w-3xl mx-auto mb-10">
-        <div className="bg-white rounded-xl shadow-linkedin-md p-6 border border-[#E0DFDC]">
-          <div className="flex justify-between items-center text-sm text-[#666666] mb-3">
+      <div className="max-w-3xl mx-auto mb-4">
+        <div className="bg-white rounded-xl shadow-linkedin-md p-3 border border-[#E0DFDC]">
+          <div className="flex justify-between items-center text-sm text-[#666666] mb-2">
             <span className="font-semibold text-black">
               Step {step} of {totalSteps}
             </span>
@@ -260,22 +292,46 @@ function OnboardingContent() {
         {step === 3 && (
           <Step4UploadCV onNext={handleStep3} onBack={() => setStep(2)} />
         )}
-        {step === 4 && (
-          <Step3ImportPosts
-            styleChoice={styleChoice}
-            onNext={handleStep4}
-            onBack={handleBackFromStep4}
-          />
-        )}
-        {step === 5 && profileData && (
+        {step === 4 && profileData && (
           <Step5Preview
             profileData={profileData}
             tokenUsage={tokenUsage}
             onComplete={handleStep5}
-            onBack={handleBackFromStep5}
+            onBack={handleBackFromStep4}
           />
         )}
       </div>
+
+      {/* Error Dialog */}
+      <Dialog open={errorDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setErrorDialog({ ...errorDialog, open: false });
+          setStep(3);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader className="text-center sm:text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <FileX className="h-8 w-8 text-red-600" />
+            </div>
+            <DialogTitle className="text-xl text-center">{errorDialog.title}</DialogTitle>
+            <DialogDescription className="text-center text-base mt-2">
+              {errorDialog.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center mt-4">
+            <Button 
+              onClick={() => {
+                setErrorDialog({ ...errorDialog, open: false });
+                setStep(3);
+              }}
+              className="w-full sm:w-auto bg-[#0A66C2] hover:bg-[#004182]"
+            >
+              Try Again
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -287,4 +343,3 @@ export default function OnboardingPage() {
     </Suspense>
   );
 }
-

@@ -132,15 +132,15 @@ export function GoogleConnect() {
   };
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 bg-[#EA4335] rounded-lg flex items-center justify-center flex-shrink-0">
-            <Mail className="w-5 h-5 text-white" />
+    <Card className="p-3 sm:p-4 bg-white dark:bg-slate-800 border-[#E0DFDC] dark:border-slate-700">
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#EA4335] rounded-lg flex items-center justify-center flex-shrink-0">
+            <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base">Google Account</h3>
-            <p className="text-xs text-gray-600 truncate">
+            <h3 className="font-semibold text-sm sm:text-base text-black dark:text-white">Google Account</h3>
+            <p className="text-[10px] sm:text-xs text-gray-600 dark:text-slate-400 truncate">
               {connected && profileData
                 ? `Connected - ${profileData.email || profileData.name}`
                 : "Connect your Google account"}
@@ -148,19 +148,19 @@ export function GoogleConnect() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {connected && (
-            <CheckCircle className="w-5 h-5 text-green-500" />
+            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
           )}
           {!connected ? (
             <Button
               onClick={handleConnect}
               disabled={loading}
-              className="bg-[#EA4335] hover:bg-[#C5221F]"
+              className="bg-[#EA4335] hover:bg-[#C5221F] h-8 sm:h-9 text-xs sm:text-sm px-2.5 sm:px-3 active:scale-[0.98]"
               size="sm"
             >
-              <Mail className="w-4 h-4 mr-2" />
-              {loading ? "Connecting..." : "Connect"}
+              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              {loading ? "..." : "Connect"}
             </Button>
           ) : (
             <Button
@@ -168,6 +168,7 @@ export function GoogleConnect() {
               disabled={loading}
               variant="destructive"
               size="sm"
+              className="h-8 sm:h-9 text-xs sm:text-sm px-2.5 sm:px-3 active:scale-[0.98]"
             >
               Disconnect
             </Button>
