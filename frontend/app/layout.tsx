@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PWAInstall } from "@/components/PWAInstall";
 
 export const metadata: Metadata = {
   title: "LinkedIn Content SaaS - AI-Powered Content Generation",
@@ -30,7 +31,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
       </head>
-      <body className="antialiased" suppressHydrationWarning>{children}</body>
+      <body className="antialiased" suppressHydrationWarning>
+        {children}
+        <PWAInstall />
+      </body>
     </html>
   );
 }
