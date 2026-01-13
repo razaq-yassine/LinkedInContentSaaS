@@ -81,7 +81,14 @@ export default function AdminDashboardLayout({
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b">
-            <h1 className="text-xl font-bold text-gray-900">Admin Portal</h1>
+            <div className="flex items-center gap-2">
+              <img 
+                src="/logo-sm.png" 
+                alt="Admin Portal" 
+                className="h-8 w-auto"
+              />
+              <h1 className="text-xl font-bold text-gray-900">Admin Portal</h1>
+            </div>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden text-gray-500 hover:text-gray-700"

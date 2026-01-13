@@ -111,13 +111,13 @@ const defaultSettings: GlobalSettings = {
   public_theme: 'modern-gradient',
   public_hero_style: 'gradient',
   public_accent_color: '#6366f1',
-  public_dark_mode: false,
+  public_dark_mode: true,
   
   // App Theme
   app_theme: 'professional-light',
   app_sidebar_style: 'default',
   app_accent_color: '#0A66C2',
-  app_dark_mode: false,
+  app_dark_mode: true,
   app_card_style: 'elevated',
   app_animations_enabled: true,
   

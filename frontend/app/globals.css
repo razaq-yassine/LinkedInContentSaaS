@@ -564,3 +564,148 @@
 .dark .scrollbar-right::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* Logo Loader Animations */
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes rotate-scale {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+}
+
+@keyframes fade-rotate {
+  0% {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: rotate(180deg);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes wave {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+  75% {
+    transform: translateY(10px) rotate(-5deg);
+  }
+}
+
+@keyframes shimmer-loader {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 2s linear infinite;
+}
+
+.animate-rotate-scale {
+  animation: rotate-scale 2s ease-in-out infinite;
+}
+
+.animate-fade-rotate {
+  animation: fade-rotate 2s ease-in-out infinite;
+}
+
+.animate-wave {
+  animation: wave 1.5s ease-in-out infinite;
+}
+
+.animate-shimmer-loader {
+  animation: shimmer-loader 2s ease-in-out infinite;
+}
+
+/* Fade Spin Animation - 2 ultra fast spins, then pause, then loop */
+@keyframes fade-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(720deg); /* 2 full rotations */
+  }
+  100% {
+    transform: rotate(720deg);
+    /* Pause at 720deg before looping */
+  }
+}
+
+.animate-fade-spin {
+  /* Animation duration: 2s total (1s for 2 spins + 1s pause) */
+  /* Ease-in-out creates slow start, fast middle, slow end */
+  animation: fade-spin 2s ease-in-out infinite;
+}
+
+/* Glow Heartbeat Animation - two quick pulses like a heartbeat */
+@keyframes glow-heartbeat {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  10% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  20% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  30% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+}
+
+@keyframes heartbeat-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10% {
+    transform: scale(1.05);
+  }
+  20% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.03);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+.animate-glow-heartbeat {
+  animation: glow-heartbeat 1.5s ease-in-out infinite;
+}
+
+.animate-heartbeat-pulse {
+  animation: heartbeat-pulse 1.5s ease-in-out infinite;
+}

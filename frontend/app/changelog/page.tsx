@@ -8,12 +8,10 @@ import {
   Image as ImageIcon, 
   MessageSquare, 
   Calendar,
-  Shield,
   Zap,
   Users,
   FileText,
   TrendingUp,
-  Mail,
   Linkedin,
   Target,
   Layers,
@@ -41,86 +39,74 @@ const changelog: ChangelogEntry[] = [
     version: "2.0",
     date: "January 2025",
     title: "ContentAI 2.0 - The Intelligence Update",
-    description: "A massive upgrade with AI-powered image generation, advanced conversation management, and enterprise-grade security features.",
+    description: "A massive upgrade with AI-powered image generation, advanced conversation management, and more ways to create engaging LinkedIn content.",
     features: [
       {
         icon: ImageIcon,
         title: "AI Image Generation",
-        description: "Generate professional LinkedIn images using Cloudflare AI. Automatically creates images from your post content with custom prompts and regeneration options.",
+        description: "Create stunning professional images for your LinkedIn posts with just one click. AI automatically generates visuals that match your content.",
         tag: "New"
       },
       {
         icon: Layers,
-        title: "Carousel PDF Generator",
-        description: "Create multi-slide carousel posts with AI-generated visuals. Each slide is individually customizable with regeneration support.",
+        title: "Carousel Post Creator",
+        description: "Design eye-catching multi-slide carousel posts. Each slide gets its own AI-generated visual that you can customize and regenerate.",
         tag: "New"
       },
       {
         icon: MessageSquare,
-        title: "Conversation Management",
-        description: "Organize your content creation with smart conversations. Auto-generated titles, date-based grouping, and inline editing for seamless workflow.",
+        title: "Smart Conversations",
+        description: "Keep your content organized with intelligent conversations. Pick up where you left off and refine your posts over multiple sessions.",
         tag: "New"
-      },
-      {
-        icon: Brain,
-        title: "TOON Profile Context",
-        description: "Token-efficient profile format that reduces AI costs by 50%. Intelligent defaults for missing information with industry-specific templates.",
-        tag: "Enhanced"
       },
       {
         icon: TrendingUp,
         title: "Content Ideas Engine",
-        description: "Get 10-15 evergreen content ideas from your CV plus 5-10 trending topics from web search. Never run out of inspiration.",
+        description: "Never run out of inspiration! Get 10-15 personalized content ideas based on your expertise, plus trending topics in your industry.",
         tag: "New"
       },
       {
         icon: Linkedin,
-        title: "LinkedIn OAuth Integration",
-        description: "Connect your LinkedIn account to import profile data and sync your posts for better writing style analysis.",
+        title: "LinkedIn Integration",
+        description: "Connect your LinkedIn account to import your profile and analyze your writing style for even more authentic posts.",
         tag: "New"
       },
       {
-        icon: Mail,
-        title: "Email Verification System",
-        description: "Secure 6-digit verification codes with 15-minute expiration. One-click verification links and resend functionality.",
+        icon: Upload,
+        title: "Image Upload Support",
+        description: "Upload your own images for AI to analyze and create content around. Perfect for sharing experiences, events, and achievements.",
         tag: "New"
       },
       {
         icon: Target,
-        title: "Advanced Post Options",
-        description: "Fine-tune your posts with tone, length, hashtag count controls. Enable trending topics and internet search for timely content.",
+        title: "Advanced Post Controls",
+        description: "Fine-tune your posts with tone, length, and hashtag controls. Enable trending topics for timely, relevant content.",
         tag: "Enhanced"
       },
       {
         icon: FileText,
         title: "Multiple Post Formats",
-        description: "Generate text posts, image posts, and carousel posts with format-specific optimization and preview.",
+        description: "Choose between text posts, image posts, and carousels. Each format is optimized for maximum LinkedIn engagement.",
         tag: "Enhanced"
       },
       {
         icon: Calendar,
         title: "Post Scheduling",
-        description: "Schedule your posts for optimal engagement times. Manage scheduled posts with an intuitive calendar interface.",
+        description: "Schedule your posts for the best engagement times. Plan your content calendar weeks in advance.",
         tag: "Enhanced"
       },
       {
-        icon: Zap,
-        title: "Token Usage Tracking",
-        description: "Real-time tracking of AI token consumption with detailed cost breakdown for every generation.",
-        tag: "New"
-      },
-      {
-        icon: Upload,
-        title: "Image Upload in Chat",
-        description: "Upload up to 4 images in the generation interface for visual context. AI analyzes your images to create better content.",
-        tag: "New"
+        icon: Brain,
+        title: "Smarter AI Responses",
+        description: "Improved AI that better understands your professional context and creates more authentic, personalized content.",
+        tag: "Enhanced"
       }
     ]
   },
   {
     version: "1.0",
     date: "November 2024",
-    title: "ContentAI Launch - The Foundation",
+    title: "ContentAI Launch",
     description: "The initial release bringing AI-powered LinkedIn content creation to professionals worldwide.",
     features: [
       {
@@ -131,47 +117,37 @@ const changelog: ChangelogEntry[] = [
       {
         icon: FileText,
         title: "CV-Based Profile Building",
-        description: "Upload your CV to automatically extract your expertise, experience, and professional context for personalized content."
+        description: "Upload your CV to automatically extract your expertise and experience for personalized content that sounds like you."
       },
       {
         icon: Sparkles,
         title: "Writing Style Analysis",
-        description: "AI analyzes your existing posts to learn your unique tone, vocabulary, and writing patterns."
+        description: "AI learns your unique tone, vocabulary, and writing patterns from your existing posts."
       },
       {
         icon: MessageSquare,
-        title: "Comment Worthiness Evaluator",
-        description: "Evaluate LinkedIn posts to determine if they're worth engaging with. Get AI-powered insights and comment suggestions."
+        title: "Comment Suggestions",
+        description: "Get AI-powered suggestions for engaging comments on LinkedIn posts in your feed."
       },
       {
         icon: Users,
-        title: "Smart Onboarding Wizard",
-        description: "5-step guided onboarding to build your complete profile with AI assistance at every stage."
+        title: "Easy Onboarding",
+        description: "5-step guided setup to build your complete profile with AI assistance at every stage."
       },
       {
         icon: Target,
-        title: "Target Audience Profiling",
-        description: "Define your audience personas and content goals for laser-focused post generation."
+        title: "Audience Targeting",
+        description: "Define your audience and content goals for laser-focused post generation that resonates."
       },
       {
         icon: CheckCircle2,
-        title: "LinkedIn Post Preview",
-        description: "See how your post will look on LinkedIn before publishing with an authentic preview interface."
-      },
-      {
-        icon: Shield,
-        title: "Admin Dashboard",
-        description: "Comprehensive admin panel for user management, system settings, and platform monitoring."
+        title: "LinkedIn Preview",
+        description: "See exactly how your post will look on LinkedIn before publishing."
       },
       {
         icon: Settings,
-        title: "User Preferences",
-        description: "Customize your content mix, posting frequency, and default generation settings."
-      },
-      {
-        icon: Zap,
-        title: "Fast & Secure",
-        description: "Built on FastAPI and Next.js 14 for blazing-fast performance with enterprise-grade security."
+        title: "Personalization Settings",
+        description: "Customize your content preferences, posting style, and default generation settings."
       }
     ]
   }

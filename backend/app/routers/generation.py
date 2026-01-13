@@ -1475,6 +1475,17 @@ async def schedule_post(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
+    # Check if user has LinkedIn connected before allowing scheduling
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.linkedin_connected or not user.linkedin_access_token:
+        raise HTTPException(
+            status_code=400, 
+            detail="LINKEDIN_NOT_CONNECTED: Please connect your LinkedIn account first to schedule posts. Go to Settings > LinkedIn to connect your account."
+        )
+    
     # Don't allow scheduling if already published
     if post.published_to_linkedin:
         raise HTTPException(status_code=400, detail="Cannot schedule a post that is already published. Please mark it as not published first.")

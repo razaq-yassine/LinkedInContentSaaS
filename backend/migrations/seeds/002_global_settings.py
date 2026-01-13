@@ -65,7 +65,7 @@ def seed_global_settings():
             },
             {
                 "key": "public_dark_mode",
-                "value": "false",
+                "value": "true",
                 "description": "Enable dark mode for public pages (true/false)"
             },
             
@@ -87,7 +87,7 @@ def seed_global_settings():
             },
             {
                 "key": "app_dark_mode",
-                "value": "false",
+                "value": "true",
                 "description": "Enable dark mode for the application (true/false)"
             },
             {

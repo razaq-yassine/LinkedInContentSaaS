@@ -169,3 +169,4 @@ class PostsListResponse(BaseModel):
     total_tokens: int
     avg_cost_per_post: float
 
+

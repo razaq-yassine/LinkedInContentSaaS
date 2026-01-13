@@ -328,9 +328,8 @@ class ErrorLogger:
                 "details": sanitize_data(error.details) if error.details else None,
             }
             
-            # Log to database if available
-            if self._db_session_factory:
-                self._log_to_database(log_entry)
+            # Always try to log to database
+            self._log_to_database(log_entry)
             
             # Always log to console/file as fallback
             self._log_to_console(log_entry)
@@ -345,7 +344,7 @@ class ErrorLogger:
     def _log_to_database(self, log_entry: Dict[str, Any]):
         """Log error to database"""
         try:
-            from ..models import ErrorLog
+            from ..models import ErrorLog, ErrorResolutionStatus
             from ..database import SessionLocal
             
             db = SessionLocal()
@@ -361,7 +360,7 @@ class ErrorLogger:
                     request_context=log_entry["request_context"],
                     user_id=log_entry["user_id"],
                     environment=log_entry["environment"],
-                    resolution_status=log_entry["resolution_status"],
+                    resolution_status=ErrorResolutionStatus.NEW,
                     details=log_entry["details"],
                     created_at=datetime.now(timezone.utc)
                 )

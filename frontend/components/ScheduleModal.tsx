@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toaster";
-import { Calendar, Clock, ExternalLink } from "lucide-react";
+import { Calendar, Clock, ExternalLink, Link2Off, Settings } from "lucide-react";
 import { format, addDays, isBefore, startOfToday } from "date-fns";
 
 interface ScheduleModalProps {
@@ -55,6 +55,7 @@ export function ScheduleModal({
   const [timezone, setTimezone] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showLinkedInError, setShowLinkedInError] = useState(false);
 
   // Initialize date/time to tomorrow at 9 AM
   useEffect(() => {
@@ -144,11 +145,17 @@ export function ScheduleModal({
       setShowConfirmDialog(false);
       loadScheduledPosts();
     } catch (error: any) {
-      addToast({
-        title: "Error",
-        description: error.response?.data?.detail || "Failed to schedule post",
-        variant: "error",
-      });
+      const errorDetail = error.response?.data?.detail || "Failed to schedule post";
+      
+      if (errorDetail.includes("LINKEDIN_NOT_CONNECTED")) {
+        setShowLinkedInError(true);
+      } else {
+        addToast({
+          title: "Error",
+          description: errorDetail,
+          variant: "error",
+        });
+      }
     } finally {
       setScheduling(false);
     }
@@ -308,6 +315,43 @@ export function ScheduleModal({
               {scheduling ? "Scheduling..." : "Yes, Schedule"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* LinkedIn Not Connected Error Dialog */}
+      <Dialog open={showLinkedInError} onOpenChange={setShowLinkedInError}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center justify-center py-6 px-4">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+              <Link2Off className="w-8 h-8 text-amber-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-amber-600 mb-2">LinkedIn Not Connected</h3>
+            <p className="text-[#666666] text-sm text-center mb-2">
+              You need to connect your LinkedIn account before you can schedule posts.
+            </p>
+            <p className="text-[#666666] text-xs text-center mb-6">
+              Go to Settings to connect your LinkedIn account and start scheduling posts.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowLinkedInError(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowLinkedInError(false);
+                  onOpenChange(false);
+                  router.push('/settings');
+                }}
+                className="bg-[#0A66C2] hover:bg-[#004182] text-white flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Connect LinkedIn
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </Dialog>

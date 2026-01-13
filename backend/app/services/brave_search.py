@@ -87,3 +87,4 @@ def format_search_results(results: Dict, max_results: int = 5) -> str:
     
     return formatted
 
+

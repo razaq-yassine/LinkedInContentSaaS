@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
-import { ArrowLeft, Brain, Check, Wrench } from "lucide-react";
+import { ArrowLeft, Check, Wrench } from "lucide-react";
 import axios from "axios";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
@@ -160,10 +160,11 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/30">
-              <Brain className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent">PostInAi</span>
+            <img 
+              src="/logo-dark.png" 
+              alt="PostInAi" 
+              className="h-10 w-auto"
+            />
           </Link>
           
           {/* Main content */}
@@ -226,12 +227,11 @@ export default function LoginPage() {
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8">
               <Link href="/" className="inline-flex items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-                  PostInAi
-                </span>
+                <img 
+                  src="/logo-dark-sm.png" 
+                  alt="PostInAi" 
+                  className="h-10 w-auto"
+                />
               </Link>
             </div>
 

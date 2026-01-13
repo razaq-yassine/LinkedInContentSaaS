@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { CheckCircle2, Loader2 } from "lucide-react"
+import { CheckCircle2, Loader2, Link2Off, Settings } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog"
+import { AppLoader } from "./AppLoader"
+import { useRouter } from "next/navigation"
 
 interface PublishingModalProps {
   open: boolean
@@ -13,6 +15,9 @@ interface PublishingModalProps {
 
 export function PublishingModal({ open, status, errorMessage, onClose }: PublishingModalProps) {
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const router = useRouter()
+  
+  const isLinkedInNotConnected = errorMessage?.includes("LINKEDIN_NOT_CONNECTED")
 
   React.useEffect(() => {
     // Load success sound
@@ -58,11 +63,8 @@ export function PublishingModal({ open, status, errorMessage, onClose }: Publish
         <div className="flex flex-col items-center justify-center py-8 px-6">
           {status === "publishing" && (
             <>
-              <div className="relative mb-6">
-                <Loader2 className="w-16 h-16 text-[#0A66C2] animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 bg-[#0A66C2]/10 rounded-full animate-pulse" />
-                </div>
+              <div className="mb-6">
+                <AppLoader size="lg" />
               </div>
               <h3 className="text-xl font-semibold text-black mb-2">Publishing to LinkedIn</h3>
               <p className="text-[#666666] text-sm text-center">
@@ -96,31 +98,66 @@ export function PublishingModal({ open, status, errorMessage, onClose }: Publish
 
           {status === "error" && (
             <>
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
-                <svg
-                  className="w-12 h-12 text-red-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-red-600 mb-2">Publish Failed</h3>
-              <p className="text-[#666666] text-sm text-center mb-4">
-                {errorMessage || "Failed to publish post to LinkedIn."}
-              </p>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 bg-[#0A66C2] hover:bg-[#004182] text-white rounded-lg font-medium transition-colors"
-              >
-                Close
-              </button>
+              {isLinkedInNotConnected ? (
+                <>
+                  <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mb-6">
+                    <Link2Off className="w-12 h-12 text-amber-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-amber-600 mb-2">LinkedIn Not Connected</h3>
+                  <p className="text-[#666666] text-sm text-center mb-2">
+                    You need to connect your LinkedIn account before you can publish posts.
+                  </p>
+                  <p className="text-[#666666] text-xs text-center mb-6">
+                    Go to Settings to connect your LinkedIn account and start publishing directly from the app.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={onClose}
+                      className="px-4 py-2 border border-[#E0DFDC] hover:bg-[#F3F2F0] text-[#666666] rounded-lg font-medium transition-colors"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => {
+                        onClose?.()
+                        router.push('/settings')
+                      }}
+                      className="px-4 py-2 bg-[#0A66C2] hover:bg-[#004182] text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Connect LinkedIn
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                    <svg
+                      className="w-12 h-12 text-red-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-red-600 mb-2">Publish Failed</h3>
+                  <p className="text-[#666666] text-sm text-center mb-4">
+                    {errorMessage || "Failed to publish post to LinkedIn."}
+                  </p>
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 bg-[#0A66C2] hover:bg-[#004182] text-white rounded-lg font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

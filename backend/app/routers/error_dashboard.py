@@ -261,14 +261,22 @@ async def get_error_trends(
         ErrorLog.created_at >= start_time
     ).all()
     
+    # Helper to make datetime timezone-aware if needed
+    def ensure_utc(dt):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+    
     # Group by time interval
     data_points = []
     current = start_time
     while current <= now:
         next_time = current + timedelta(minutes=interval_minutes)
         
-        # Count errors in this interval
-        interval_errors = [e for e in errors if current <= e.created_at < next_time]
+        # Count errors in this interval (handle timezone-naive datetimes from DB)
+        interval_errors = [e for e in errors if current <= ensure_utc(e.created_at) < next_time]
         
         data_points.append(ErrorTrendPoint(
             timestamp=current.strftime(format_str),

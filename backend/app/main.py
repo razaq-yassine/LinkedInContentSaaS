@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -88,13 +88,36 @@ async def app_exception_handler(request: Request, exc: AppException):
     """Handle all AppException instances with standardized responses"""
     return await global_exception_handler(request, exc)
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTPExceptions and log them for monitoring"""
+    from .core.error_handler import generate_error_id, extract_request_context, error_logger, map_http_exception
+    
+    # Log all HTTP errors (4xx and 5xx) for comprehensive monitoring
+    if exc.status_code >= 400:
+        error_id = generate_error_id()
+        request_context = extract_request_context(request)
+        user_id = getattr(request.state, 'user_id', None) if hasattr(request, 'state') else None
+        environment = "development" if settings.dev_mode else "production"
+        
+        app_error = map_http_exception(exc)
+        error_logger.log_error(
+            error_id=error_id,
+            error=app_error,
+            request_context=request_context,
+            user_id=user_id,
+            environment=environment
+        )
+    
+    # Return standard FastAPI HTTP error response
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Catch-all handler for unhandled exceptions"""
-    # Don't handle HTTPExceptions here, let FastAPI handle them
-    from fastapi import HTTPException
-    if isinstance(exc, HTTPException):
-        raise exc
     return await global_exception_handler(request, exc)
 
 @app.on_event("startup")
@@ -183,13 +206,13 @@ async def get_public_settings():
             "public_theme": get_setting("public_theme", "modern-gradient"),
             "public_hero_style": get_setting("public_hero_style", "gradient"),
             "public_accent_color": get_setting("public_accent_color", "#6366f1"),
-            "public_dark_mode": get_setting("public_dark_mode", "false"),
+            "public_dark_mode": get_setting("public_dark_mode", "true"),
             
             # App Theme
             "app_theme": get_setting("app_theme", "professional-light"),
             "app_sidebar_style": get_setting("app_sidebar_style", "default"),
             "app_accent_color": get_setting("app_accent_color", "#0A66C2"),
-            "app_dark_mode": get_setting("app_dark_mode", "false"),
+            "app_dark_mode": get_setting("app_dark_mode", "true"),
             "app_card_style": get_setting("app_card_style", "elevated"),
             "app_animations_enabled": get_setting("app_animations_enabled", "true"),
             

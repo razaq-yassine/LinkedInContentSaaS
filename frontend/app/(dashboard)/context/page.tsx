@@ -9,6 +9,7 @@ import CollapsibleSection, { Field } from "@/components/onboarding/CollapsibleSe
 import FieldEditor from "@/components/onboarding/FieldEditor";
 import { api } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
+import { AppLoader } from "@/components/AppLoader";
 
 export default function ContextPage() {
   const [context, setContext] = useState<any>(null);
@@ -150,10 +151,7 @@ export default function ContextPage() {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A66C2] mx-auto"></div>
-          <p className="mt-4 text-[#666666] dark:text-slate-400">Loading your profile context...</p>
-        </div>
+        <AppLoader message="Loading your profile context..." />
       </div>
     );
   }

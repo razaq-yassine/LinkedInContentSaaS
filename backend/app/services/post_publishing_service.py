@@ -29,7 +29,7 @@ async def publish_post_to_linkedin(post_id: str, db: Session) -> Dict[str, Any]:
         raise ValueError("User not found")
     
     if not user.linkedin_connected or not user.linkedin_access_token:
-        raise ValueError("LinkedIn account not connected")
+        raise ValueError("LINKEDIN_NOT_CONNECTED: Please connect your LinkedIn account first to publish posts. Go to Settings > LinkedIn to connect your account.")
     
     # Check if token is expired and refresh if needed
     access_token = user.linkedin_access_token
@@ -120,4 +120,5 @@ async def publish_post_to_linkedin(post_id: str, db: Session) -> Dict[str, Any]:
         "linkedin_post_id": result.get("id"),
         "linkedin_post_url": result.get("url")
     }
+
 

@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { PublishingModal } from "@/components/PublishingModal";
 import { ScheduleModal } from "@/components/ScheduleModal";
+import { AppLoader } from "@/components/AppLoader";
 
 interface MessageAttachment {
   type: string;
@@ -2308,13 +2309,11 @@ export default function GeneratePage() {
             {loading && (
               <div className="flex justify-start">
                 <div className="bg-white dark:bg-slate-800 rounded-lg px-4 py-3 sm:px-5 sm:py-4 shadow-linkedin-sm border border-[#E0DFDC] dark:border-slate-700">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1.5">
-                      <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 bg-[#0A66C2] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    <span className="text-sm text-[#666666] dark:text-slate-300 font-medium">{loadingMessage}</span>
+                  <div className="flex flex-col items-center gap-3">
+                    <AppLoader size="sm" />
+                    {loadingMessage && (
+                      <span className="text-sm text-[#666666] dark:text-slate-300 font-medium">{loadingMessage}</span>
+                    )}
                   </div>
                 </div>
               </div>
