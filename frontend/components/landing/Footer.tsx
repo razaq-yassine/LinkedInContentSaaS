@@ -9,7 +9,6 @@ const footerLinks = {
       { name: "Content Calendar", href: "/features/calendar" },
       { name: "Voice Matching", href: "/features/voice" },
       { name: "Smart Suggestions", href: "/features/suggestions" },
-      { name: "Carousel Generation", href: "/features/carousel" },
     ],
   },
   company: {
