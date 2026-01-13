@@ -83,7 +83,8 @@ export function Header() {
                   <ChevronDown className={`w-4 h-4 transition-transform ${activeDropdown === "features" ? "rotate-180" : ""}`} />
                 </button>
                 {activeDropdown === "features" && (
-                  <div className="absolute top-full left-0 mt-1 w-72 bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-xl border border-slate-700/50 py-2 animate-fade-in">
+                  <div className="absolute top-full left-0 pt-2 w-72">
+                    <div className="bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-xl border border-slate-700/50 py-2 animate-fade-in">
                     {navigation.features.map((item) => (
                       <Link
                         key={item.name}
@@ -94,6 +95,7 @@ export function Header() {
                         <div className="text-sm text-slate-500">{item.desc}</div>
                       </Link>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>

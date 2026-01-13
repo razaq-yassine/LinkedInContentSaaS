@@ -1,13 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import os
 import sqlalchemy as sa
 from .config import get_settings
 from .database import engine, Base
-from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription, env_config, ai_config, test_subscription
+from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription, env_config, ai_config, test_subscription, errors, error_dashboard
 from .services.scheduler_service import start_scheduler, stop_scheduler
 from .logging_config import setup_logging, get_logger
+from .core.error_handler import global_exception_handler, error_logger
+from .core.exceptions import AppException
 
 settings = get_settings()
 
@@ -72,10 +75,27 @@ app.include_router(pdfs.router, prefix="/api/pdfs", tags=["pdfs"])
 app.include_router(subscription.router, prefix="/api/subscription", tags=["subscription"])
 app.include_router(env_config.router, prefix="/api/admin", tags=["env-config"])
 app.include_router(ai_config.router, prefix="/api/admin", tags=["ai-config"])
+app.include_router(errors.router, prefix="/api/errors", tags=["errors"])
+app.include_router(error_dashboard.router, prefix="/api/admin/error-dashboard", tags=["error-dashboard"])
 
 # Test endpoints (only in development mode)
 if settings.dev_mode:
     app.include_router(test_subscription.router, tags=["test"])
+
+# Register global exception handlers
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """Handle all AppException instances with standardized responses"""
+    return await global_exception_handler(request, exc)
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler for unhandled exceptions"""
+    # Don't handle HTTPExceptions here, let FastAPI handle them
+    from fastapi import HTTPException
+    if isinstance(exc, HTTPException):
+        raise exc
+    return await global_exception_handler(request, exc)
 
 @app.on_event("startup")
 async def startup_event():

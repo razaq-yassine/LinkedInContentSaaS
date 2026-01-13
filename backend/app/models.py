@@ -431,3 +431,59 @@ class SystemLog(Base):
     user = relationship("User")
     admin = relationship("Admin")
 
+
+class ErrorResolutionStatus(str, enum.Enum):
+    """Error resolution status"""
+    NEW = "new"
+    ACKNOWLEDGED = "acknowledged"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    WONT_FIX = "wont_fix"
+
+
+class ErrorLog(Base):
+    """
+    Structured error logging for comprehensive error tracking.
+    Stores all application errors with full context for debugging.
+    """
+    __tablename__ = "error_logs"
+    
+    id = Column(String(36), primary_key=True)  # Format: ERR-YYYYMMDD-XXXX
+    
+    # Error classification
+    error_type = Column(String(50), nullable=False, index=True)  # Error code like E1001
+    category = Column(String(50), nullable=False, index=True)  # authentication, database, etc.
+    severity = Column(String(20), nullable=False, index=True)  # info, warning, error, critical
+    
+    # Error messages
+    technical_message = Column(Text)  # Technical details for developers
+    user_message = Column(Text, nullable=False)  # Message shown to user
+    
+    # Stack trace and debugging info
+    stack_trace = Column(Text)
+    
+    # Request context (sanitized - no sensitive data)
+    request_context = Column(JSON)  # endpoint, method, params, ip, user_agent
+    
+    # User context
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    session_id = Column(String(100), nullable=True, index=True)
+    
+    # Environment info
+    environment = Column(String(50), default="production", index=True)
+    
+    # Resolution tracking
+    resolution_status = Column(SQLEnum(ErrorResolutionStatus), default=ErrorResolutionStatus.NEW, index=True)
+    resolved_by = Column(String(36), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    
+    # Additional metadata
+    details = Column(JSON)  # Any additional structured data
+    
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+    resolver = relationship("Admin", foreign_keys=[resolved_by])
+

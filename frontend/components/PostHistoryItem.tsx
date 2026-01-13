@@ -20,7 +20,15 @@ import {
   CheckCircle2,
   FileText,
   XCircle,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toaster";
 
@@ -69,6 +77,7 @@ export function PostHistoryItem({
   const [currentPDFSlides, setCurrentPDFSlides] = useState<string[]>([]);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Determine post status
   const getPostStatus = (): PostStatus => {
@@ -199,30 +208,30 @@ export function PostHistoryItem({
       >
         {/* Collapsible Header */}
         <CollapsibleTrigger asChild>
-          <div className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#F9F9F9] transition-colors">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="px-3 sm:px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#F9F9F9] transition-colors">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
               {/* Expand/Collapse Icon */}
-              <div className="text-[#666666]">
+              <div className="text-[#666666] flex-shrink-0">
                 {isOpen ? (
-                  <ChevronDown className="w-5 h-5" />
+                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
                 ) : (
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
               </div>
 
               {/* Status Badge */}
               {getStatusBadge()}
 
-              {/* Format Badge */}
-              {getFormatBadge()}
+              {/* Format Badge - hidden on mobile */}
+              <span className="hidden sm:inline-flex">{getFormatBadge()}</span>
 
               {/* Post Title */}
-              <span className="font-medium text-sm text-black truncate flex-1">
+              <span className="font-medium text-xs sm:text-sm text-black truncate flex-1 max-w-[120px] sm:max-w-none">
                 {getPostTitle()}
               </span>
 
-              {/* Date and Time */}
-              <div className="flex items-center gap-1.5 text-xs text-[#666666] flex-shrink-0">
+              {/* Date and Time - hidden on mobile */}
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#666666] flex-shrink-0">
                 <Clock className="w-3.5 h-3.5" />
                 <span>
                   {post.scheduled_at
@@ -244,9 +253,9 @@ export function PostHistoryItem({
               </div>
             </div>
 
-            {/* Quick Actions in Header */}
+            {/* Desktop Quick Actions in Header - hidden on mobile */}
             <div
-              className="flex items-center gap-2 ml-3"
+              className="hidden sm:flex items-center gap-2 ml-3"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Edit Button */}
@@ -289,12 +298,68 @@ export function PostHistoryItem({
                 </Button>
               )}
             </div>
+
+            {/* Mobile Action Menu */}
+            <div
+              className="sm:hidden ml-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DropdownMenu open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-[#666666]"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-lg">
+                  {post.conversation_id && (
+                    <DropdownMenuItem onClick={handleEdit}>
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Edit Post
+                    </DropdownMenuItem>
+                  )}
+                  {canPublishOrSchedule && onPublish && (
+                    <DropdownMenuItem onClick={() => onPublish(post.id)}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Publish Now
+                    </DropdownMenuItem>
+                  )}
+                  {onSchedule && !post.published_to_linkedin && (
+                    <DropdownMenuItem onClick={() => onSchedule(post.id)}>
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Schedule
+                    </DropdownMenuItem>
+                  )}
+                  {onTogglePublished && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleTogglePublished}>
+                        {post.published_to_linkedin ? (
+                          <>
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Mark as Not Published
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Mark as Published
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CollapsibleTrigger>
 
         {/* Collapsible Content */}
         <CollapsibleContent>
-          <div className="border-t border-[#E0DFDC] p-4">
+          <div className="border-t border-[#E0DFDC] p-3 sm:p-4">
             {/* LinkedIn Post Preview */}
             <div className="flex justify-center">
               <LinkedInPostPreview
@@ -330,8 +395,90 @@ export function PostHistoryItem({
               />
             </div>
 
-            {/* Action Buttons Below Preview */}
-            <div className="flex items-center justify-center gap-3 mt-4 pt-4 border-t border-[#E0DFDC]">
+            {/* Mobile Action Buttons - Grouped with dropdown */}
+            <div className="sm:hidden flex flex-col gap-3 mt-4 pt-4 border-t border-[#E0DFDC]">
+              {/* Primary action button and dropdown */}
+              <div className="flex items-center gap-2">
+                {/* Main publish button for drafts */}
+                {canPublishOrSchedule && onPublish && (
+                  <Button
+                    onClick={() => onPublish(post.id)}
+                    className="flex-1 bg-[#0A66C2] hover:bg-[#004182] text-white"
+                    size="sm"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Publish Now
+                  </Button>
+                )}
+                
+                {/* More actions dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="px-3">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-800 border border-[#E0DFDC] dark:border-slate-700 shadow-lg">
+                    {post.conversation_id && (
+                      <DropdownMenuItem onClick={handleEdit}>
+                        <Edit2 className="w-4 h-4 mr-2" />
+                        Edit Post
+                      </DropdownMenuItem>
+                    )}
+                    {onSchedule && !post.published_to_linkedin && (
+                      <DropdownMenuItem onClick={() => onSchedule(post.id)}>
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Schedule
+                      </DropdownMenuItem>
+                    )}
+                    {onTogglePublished && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleTogglePublished}>
+                          {post.published_to_linkedin ? (
+                            <>
+                              <XCircle className="w-4 h-4 mr-2" />
+                              Mark as Not Published
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 mr-2" />
+                              Mark as Published
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Status indicators */}
+              {status === "published" && !onTogglePublished && (
+                <div className="flex items-center justify-center gap-2 text-green-600 text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="font-medium">Published to LinkedIn</span>
+                </div>
+              )}
+
+              {status === "scheduled" && post.scheduled_at && (
+                <div className="flex items-center justify-center gap-2 text-amber-600 text-sm">
+                  <Clock className="w-4 h-4" />
+                  <span className="font-medium">
+                    Scheduled for{" "}
+                    {new Date(post.scheduled_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Action Buttons Below Preview */}
+            <div className="hidden sm:flex items-center justify-center gap-3 mt-4 pt-4 border-t border-[#E0DFDC]">
               {/* Edit Button - Takes to conversation */}
               {post.conversation_id && (
                 <Button

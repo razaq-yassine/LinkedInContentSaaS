@@ -1,6 +1,6 @@
 import { Header } from "@/components/landing/Header";
 import { Footer } from "@/components/landing/Footer";
-import { Cookie, Settings, BarChart, Shield, ToggleRight } from "lucide-react";
+import { Cookie, Settings, BarChart, Shield, ToggleRight, Scale, MapPin } from "lucide-react";
 
 export default function CookiePolicyPage() {
   return (
@@ -135,6 +135,77 @@ export default function CookiePolicyPage() {
                 </div>
               </div>
 
+              {/* US Privacy Rights */}
+              <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center">
+                    <Scale className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Your US Privacy Rights</h2>
+                </div>
+                <div className="space-y-4 text-slate-400">
+                  <p>Under various US state privacy laws, you have specific rights regarding cookies and online tracking:</p>
+                  
+                  <div className="p-4 bg-slate-800/50 rounded-xl">
+                    <h3 className="text-white font-semibold mb-2">California (CCPA/CPRA)</h3>
+                    <p className="text-sm">California residents have the right to opt out of the &quot;sale&quot; or &quot;sharing&quot; of personal information, including data collected via cookies. We honor the Global Privacy Control (GPC) signal.</p>
+                  </div>
+                  
+                  <div className="p-4 bg-slate-800/50 rounded-xl">
+                    <h3 className="text-white font-semibold mb-2">Virginia, Colorado, Connecticut, Utah & Other States</h3>
+                    <p className="text-sm">Residents of states with comprehensive privacy laws can opt out of targeted advertising and the processing of personal data for certain purposes.</p>
+                  </div>
+                  
+                  <div className="p-4 bg-slate-800/50 rounded-xl">
+                    <h3 className="text-white font-semibold mb-2">Global Privacy Control (GPC)</h3>
+                    <p className="text-sm">We recognize and honor browser-based opt-out signals including the Global Privacy Control. When we detect a GPC signal, we automatically limit non-essential cookies.</p>
+                  </div>
+                  
+                  <div className="mt-4 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
+                    <p className="text-cyan-200 text-sm"><strong>Do Not Sell or Share My Personal Information:</strong> To exercise your right to opt out, use our cookie banner, adjust your browser settings, or contact us at <a href="mailto:privacy@contentai.com" className="underline hover:text-cyan-400">privacy@contentai.com</a>.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* State-by-State Compliance */}
+              <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">State Privacy Law Compliance</h2>
+                </div>
+                <div className="space-y-4 text-slate-400">
+                  <p>We comply with the following US state privacy laws that regulate cookies and online tracking:</p>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-white font-medium text-sm">California (CCPA/CPRA)</p>
+                      <p className="text-xs text-slate-500">Effective Jan 1, 2023</p>
+                    </div>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-white font-medium text-sm">Virginia (VCDPA)</p>
+                      <p className="text-xs text-slate-500">Effective Jan 1, 2023</p>
+                    </div>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-white font-medium text-sm">Colorado (CPA)</p>
+                      <p className="text-xs text-slate-500">Effective Jul 1, 2023</p>
+                    </div>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-white font-medium text-sm">Connecticut (CTDPA)</p>
+                      <p className="text-xs text-slate-500">Effective Jul 1, 2023</p>
+                    </div>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-white font-medium text-sm">Utah (UCPA)</p>
+                      <p className="text-xs text-slate-500">Effective Dec 31, 2023</p>
+                    </div>
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <p className="text-white font-medium text-sm">Texas, Oregon, Montana & More</p>
+                      <p className="text-xs text-slate-500">Effective 2024-2025</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Managing Cookies */}
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
@@ -148,15 +219,19 @@ export default function CookiePolicyPage() {
                   <ul className="space-y-3 ml-4">
                     <li className="flex items-start gap-3">
                       <span className="text-emerald-400 mt-1">•</span>
+                      <span><strong className="text-white">Cookie Banner:</strong> Use our cookie consent banner to manage your preferences when you first visit our site. You can accept all, reject optional cookies, or customize your choices.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-emerald-400 mt-1">•</span>
                       <span><strong className="text-white">Browser Settings:</strong> Most browsers allow you to block or delete cookies. Check your browser&apos;s help section for instructions.</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-emerald-400 mt-1">•</span>
-                      <span><strong className="text-white">Cookie Banner:</strong> Use our cookie consent banner to manage your preferences when you first visit our site.</span>
+                      <span><strong className="text-white">Global Privacy Control:</strong> Enable GPC in your browser to automatically signal your opt-out preference to websites.</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-emerald-400 mt-1">•</span>
-                      <span><strong className="text-white">Opt-Out Links:</strong> Use industry opt-out tools like the <a href="https://optout.networkadvertising.org" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">NAI Consumer Opt-Out</a>.</span>
+                      <span><strong className="text-white">Opt-Out Links:</strong> Use industry opt-out tools like the <a href="https://optout.networkadvertising.org" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">NAI Consumer Opt-Out</a> or <a href="https://optout.aboutads.info" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">DAA Opt-Out</a>.</span>
                     </li>
                   </ul>
                   <p className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-200">

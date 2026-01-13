@@ -259,25 +259,26 @@ export default function ContextPage() {
   const trendingIdeas = context.content_ideas_trending || [];
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8 overflow-x-hidden">
-      {/* Header - Mobile optimized with sticky save status */}
-      <div className="mb-4 md:mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg md:text-3xl font-bold mb-1 md:mb-2 text-gray-900 dark:text-white">Profile Context</h1>
-            <p className="text-xs md:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
+    <div className="w-full max-w-4xl mx-auto md:px-6 lg:px-8 py-0 md:py-8 pb-20 md:pb-8 overflow-x-hidden bg-[#F5F5F5] md:bg-transparent dark:bg-slate-900 md:dark:bg-transparent min-h-screen">
+      {/* Header - Mobile: sticky app-like header. Desktop: standard header */}
+      <div className="sticky top-0 z-10 bg-white dark:bg-slate-800 border-b border-[#E8E7E5] dark:border-slate-700 px-4 py-3 md:relative md:bg-transparent md:dark:bg-transparent md:border-0 md:px-0 md:py-0 md:mb-8">
+        <div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:gap-2">
+          <div className="min-w-0 flex-1 md:flex-none">
+            <h1 className="text-[17px] md:text-3xl font-semibold md:font-bold text-black dark:text-white">Profile Context</h1>
+            <p className="hidden md:block text-base text-slate-600 dark:text-slate-400 mt-2">
               Manage your profile context for generating posts
             </p>
           </div>
           {saveStatus !== "idle" && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 self-start md:self-auto text-xs md:text-sm px-2.5 py-1">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[11px] md:text-sm px-2 py-0.5 md:px-2.5 md:py-1 flex-shrink-0">
               {saveStatus === "saving" ? "Saving..." : "✓ Saved"}
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="space-y-2.5 md:space-y-4 mb-6 md:mb-8 w-full overflow-hidden">
+      {/* Sections container - Mobile: no gaps (dividers via borders), Desktop: gaps */}
+      <div className="md:space-y-4 mb-6 md:mb-8 w-full overflow-hidden">
         {/* Personal Information */}
         <CollapsibleSection
           title="Personal Information"
@@ -540,20 +541,20 @@ export default function ContextPage() {
           </div>
         </CollapsibleSection>
 
-        {/* Additional Context and Rules - Mobile optimized */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-linkedin-md border border-[#E0DFDC] dark:border-slate-700 p-3 md:p-6 overflow-hidden">
-          <div className="flex items-start gap-2.5 mb-3 overflow-hidden">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-purple-600" />
+        {/* Additional Context and Rules - Mobile: edge-to-edge, Desktop: card */}
+        <div className="bg-white dark:bg-slate-800 rounded-none border-t border-[#E8E7E5] dark:border-slate-700 shadow-none md:rounded-xl md:shadow-linkedin-md md:border md:border-[#E0DFDC] px-4 py-3 md:p-6 overflow-hidden">
+          <div className="flex items-center gap-3 mb-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center flex-shrink-0 md:w-10 md:h-10 md:rounded-lg">
+              <Sparkles className="h-5 w-5 text-purple-600" />
             </div>
             <div className="min-w-0 flex-1 overflow-hidden">
-              <h3 className="text-sm md:text-lg font-semibold text-black dark:text-white leading-tight truncate">Additional Context</h3>
-              <p className="text-[11px] md:text-sm text-[#666666] dark:text-slate-400 mt-0.5 truncate md:whitespace-normal">Customize tone and content guidelines</p>
+              <h3 className="text-[15px] md:text-lg font-semibold text-black dark:text-white leading-tight">Additional Context</h3>
+              <p className="text-[13px] md:text-sm text-[#666666] dark:text-slate-400 mt-0.5 truncate md:whitespace-normal">Customize tone and content guidelines</p>
             </div>
           </div>
           <div className="space-y-3 md:space-y-4">
             <div>
-              <Label className="text-xs md:text-sm font-medium text-black dark:text-white mb-2 block">
+              <Label className="text-[13px] md:text-sm font-medium text-black dark:text-white mb-2 block">
                 Custom Instructions (Optional)
               </Label>
               <Textarea
@@ -561,7 +562,7 @@ export default function ContextPage() {
                 value={context.additional_context || ""}
                 onChange={(e) => handleFieldUpdate("additional_context", "additional_context", e.target.value)}
                 rows={4}
-                className="resize-none text-sm md:text-base min-h-[120px] md:min-h-[140px] touch-manipulation"
+                className="resize-none text-[15px] md:text-base min-h-[120px] md:min-h-[140px] touch-manipulation rounded-lg"
               />
               <p className="text-[11px] md:text-xs text-[#666666] dark:text-slate-400 mt-2">
                 {(context.additional_context || "").length}/500 characters
