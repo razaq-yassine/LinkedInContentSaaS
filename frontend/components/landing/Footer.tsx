@@ -53,7 +53,11 @@ export function Footer() {
           {/* Brand Column */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <span className="text-xl font-bold text-white">PostInAi</span>
+              <img 
+                src="/logo-dark.png" 
+                alt="PostInAi" 
+                className="h-8 w-auto"
+              />
             </Link>
             <p className="text-slate-500 mb-6 max-w-xs">
               AI-powered LinkedIn content creation. Generate posts, carousels, and images—then publish directly from one place.

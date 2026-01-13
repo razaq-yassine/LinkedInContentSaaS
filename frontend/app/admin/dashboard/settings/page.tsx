@@ -9,6 +9,8 @@ import {
   CheckCircle, XCircle, AlertCircle, Loader2, ChevronDown, ChevronUp,
   Upload, Image as ImageIcon
 } from 'lucide-react';
+import { LogoLoader, type LoaderEffect } from '@/components/LogoLoader';
+import { AppLoader } from '@/components/AppLoader';
 
 interface GlobalSetting {
   id: string;
@@ -296,6 +298,9 @@ export default function GlobalSettingsPage() {
   const [imageTestResult, setImageTestResult] = useState<any>(null);
   const [imageTesting, setImageTesting] = useState(false);
   const [savingAiConfig, setSavingAiConfig] = useState(false);
+  
+  // Loader preview dark mode toggle
+  const [loaderPreviewDarkMode, setLoaderPreviewDarkMode] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -1381,6 +1386,110 @@ export default function GlobalSettingsPage() {
               </div>
             )}
 
+            {/* Logo Loader Preview Section */}
+            {activeCategory === 'theme' && (
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="mb-6 flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Logo Loader Preview</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Compare the webp loader with animated CSS loader effects. These can be used for loading states throughout the application.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 ml-4">
+                    <span className={`text-sm font-medium ${!loaderPreviewDarkMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      Light
+                    </span>
+                    <button
+                      onClick={() => setLoaderPreviewDarkMode(!loaderPreviewDarkMode)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
+                        loaderPreviewDarkMode ? 'bg-cyan-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                      role="switch"
+                      aria-checked={loaderPreviewDarkMode}
+                      aria-label="Toggle dark mode preview"
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          loaderPreviewDarkMode ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-sm font-medium ${loaderPreviewDarkMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      Dark
+                    </span>
+                  </div>
+                </div>
+                
+                {/* WebP Loader Preview */}
+                <div className="mb-8">
+                  <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">WebP Loader</h4>
+                  <div 
+                    className={`transition-colors ${loaderPreviewDarkMode ? 'dark' : ''}`}
+                    data-preview-dark={loaderPreviewDarkMode}
+                  >
+                    <div className={`flex flex-col items-center p-8 rounded-lg border transition-colors ${
+                      loaderPreviewDarkMode 
+                        ? 'bg-gray-800 border-gray-700' 
+                        : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <div className="flex items-center justify-center h-40 w-full mb-4">
+                        <img 
+                          src="/logo-loader.webp" 
+                          alt="Logo Loader" 
+                          className={`max-h-full max-w-full object-contain transition-opacity ${
+                            loaderPreviewDarkMode ? '' : ''
+                          }`}
+                        />
+                      </div>
+                      <p className={`text-sm font-medium ${
+                        loaderPreviewDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>
+                        WebP Animation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CSS Animated Loaders */}
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">CSS Animated Loaders</h4>
+                  <div 
+                    className={`transition-colors ${loaderPreviewDarkMode ? 'dark' : ''}`}
+                    data-preview-dark={loaderPreviewDarkMode}
+                  >
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {(['spin', 'pulse', 'bounce', 'rotate-scale', 'fade-rotate', 'orbit', 'wave', 'glow-pulse', 'shimmer', 'fade-spin', 'glow-heartbeat'] as LoaderEffect[]).map((effect) => (
+                        <div 
+                          key={effect}
+                          className={`flex flex-col items-center p-6 rounded-lg border transition-colors ${
+                            loaderPreviewDarkMode 
+                              ? 'bg-gray-800 border-gray-700 hover:border-cyan-500' 
+                              : 'bg-gray-50 border-gray-200 hover:border-cyan-500'
+                          }`}
+                        >
+                        <div className="mb-3 flex items-center justify-center h-32 w-full">
+                          <LogoLoader effect={effect} size="md" showBackground={true} darkMode={loaderPreviewDarkMode} />
+                        </div>
+                          <h4 className={`text-sm font-medium capitalize ${
+                            loaderPreviewDarkMode ? 'text-gray-100' : 'text-gray-900'
+                          }`}>
+                            {effect.replace('-', ' ')}
+                          </h4>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Note:</strong> Compare the webp loader with the CSS animated alternatives. The webp loader is a single animated image, while CSS loaders are customizable and don't require additional image files.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {categorySettings.length === 0 && activeCategory !== 'apikeys' && activeCategory !== 'ai' && (
               <div className="text-center py-8">
                 <SettingsIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -1394,7 +1503,7 @@ export default function GlobalSettingsPage() {
                 {/* Loading State */}
                 {aiConfigLoading && (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                    <AppLoader size="md" />
                   </div>
                 )}
 

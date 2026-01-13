@@ -163,13 +163,13 @@ async def get_public_settings():
             "public_theme": get_setting("public_theme", "modern-gradient"),
             "public_hero_style": get_setting("public_hero_style", "gradient"),
             "public_accent_color": get_setting("public_accent_color", "#6366f1"),
-            "public_dark_mode": get_setting("public_dark_mode", "false"),
+            "public_dark_mode": get_setting("public_dark_mode", "true"),
             
             # App Theme
             "app_theme": get_setting("app_theme", "professional-light"),
             "app_sidebar_style": get_setting("app_sidebar_style", "default"),
             "app_accent_color": get_setting("app_accent_color", "#0A66C2"),
-            "app_dark_mode": get_setting("app_dark_mode", "false"),
+            "app_dark_mode": get_setting("app_dark_mode", "true"),
             "app_card_style": get_setting("app_card_style", "elevated"),
             "app_animations_enabled": get_setting("app_animations_enabled", "true"),
             

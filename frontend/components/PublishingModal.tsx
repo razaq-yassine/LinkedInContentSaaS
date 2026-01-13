@@ -3,6 +3,7 @@
 import * as React from "react"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog"
+import { AppLoader } from "./AppLoader"
 
 interface PublishingModalProps {
   open: boolean
@@ -58,11 +59,8 @@ export function PublishingModal({ open, status, errorMessage, onClose }: Publish
         <div className="flex flex-col items-center justify-center py-8 px-6">
           {status === "publishing" && (
             <>
-              <div className="relative mb-6">
-                <Loader2 className="w-16 h-16 text-[#0A66C2] animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 bg-[#0A66C2]/10 rounded-full animate-pulse" />
-                </div>
+              <div className="mb-6">
+                <AppLoader size="lg" />
               </div>
               <h3 className="text-xl font-semibold text-black mb-2">Publishing to LinkedIn</h3>
               <p className="text-[#666666] text-sm text-center">

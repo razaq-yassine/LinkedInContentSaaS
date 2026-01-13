@@ -183,7 +183,7 @@ async def mock_login(request: MockLoginRequest, db: Session = Depends(get_db)):
         subscription = Subscription(
             user_id=user_id,
             plan="free",
-            credits_limit=5
+            credits_limit=5.0
         )
         db.add(subscription)
         
@@ -274,7 +274,7 @@ async def register(
     subscription = Subscription(
         user_id=user_id,
         plan="free",
-        credits_limit=5
+        credits_limit=5.0
     )
     db.add(subscription)
     
@@ -800,7 +800,7 @@ async def google_callback(
                 subscription = Subscription(
                     user_id=user_id,
                     plan="free",
-                    credits_limit=5
+                    credits_limit=5.0
                 )
                 db.add(subscription)
             
@@ -1117,7 +1117,7 @@ async def linkedin_callback(
                 subscription = Subscription(
                     user_id=new_user_id,
                     plan="free",
-                    credits_limit=5
+                    credits_limit=5.0
                 )
                 db.add(subscription)
             

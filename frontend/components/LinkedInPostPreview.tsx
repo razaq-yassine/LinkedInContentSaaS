@@ -32,6 +32,7 @@ import { CarouselSlider } from './CarouselSlider';
 import { CarouselPDFLoading } from './CarouselPDFLoading';
 import { FullscreenImageViewer } from './FullscreenImageViewer';
 import { FullscreenCarouselViewer } from './FullscreenCarouselViewer';
+import { AppLoader } from './AppLoader';
 
 interface UserProfile {
   name: string;
@@ -420,8 +421,8 @@ export function LinkedInPostPreview({
               
               {/* Content */}
               <div className="relative z-10 text-center px-4">
-                <div className="w-12 h-12 mx-auto mb-2 border-4 border-[#0A66C2] border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-xs font-semibold text-[#0A66C2] mb-0.5">Generating image...</p>
+                <AppLoader size="md" />
+                <p className="text-xs font-semibold text-[#0A66C2] mb-0.5 mt-4">Generating image...</p>
                 <p className="text-[10px] text-[#666666]">This may take 10-15 seconds</p>
               </div>
             </div>

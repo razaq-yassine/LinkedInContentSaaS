@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { AppLoader } from './AppLoader';
 
 interface CarouselPDFLoadingProps {
   currentSlide: number;
@@ -25,8 +26,8 @@ export function CarouselPDFLoading({ currentSlide, totalSlides }: CarouselPDFLoa
       
       {/* Content */}
       <div className="relative z-10 text-center px-4">
-        <div className="w-12 h-12 mx-auto mb-2 border-4 border-[#0A66C2] border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-semibold text-[#0A66C2] mb-0.5">Generating PDF...</p>
+        <AppLoader size="md" />
+        <p className="text-xs font-semibold text-[#0A66C2] mb-0.5 mt-4">Generating PDF...</p>
         <p className="text-[10px] text-[#666666] mb-1">
           Generated slides: <span className="font-semibold">{currentSlide}</span> / <span className="font-semibold">{totalSlides}</span>
         </p>
