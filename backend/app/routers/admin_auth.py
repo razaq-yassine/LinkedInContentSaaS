@@ -5,6 +5,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
+from collections import defaultdict
+import time
 
 from ..database import get_db
 from ..models import Admin
@@ -14,9 +16,12 @@ from ..schemas.admin_schemas import (
     AdminResponse,
     CreateAdminRequest,
     UpdateAdminRequest,
-    ChangePasswordRequest
+    ChangePasswordRequest,
+    AdminRequestCodeRequest,
+    AdminCodeLoginRequest
 )
 from ..config import get_settings
+from ..services.email_service import EmailService
 
 router = APIRouter()
 settings = get_settings()
@@ -27,6 +32,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = settings.jwt_secret_key
 ALGORITHM = settings.jwt_algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
+
+# Rate limiting storage (in-memory, resets on server restart)
+code_request_times: dict[str, list[float]] = defaultdict(list)
+failed_code_attempts: dict[str, list[datetime]] = defaultdict(list)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -88,17 +97,78 @@ async def get_current_super_admin(
     return admin
 
 
-@router.post("/login", response_model=AdminLoginResponse)
-async def admin_login(
-    request: AdminLoginRequest,
+@router.post("/request-code")
+async def request_login_code(
+    request: AdminRequestCodeRequest,
     db: Session = Depends(get_db)
 ):
+    """Request a login code for passwordless admin authentication"""
+    # Rate limiting: Max 3 requests per email per 15 minutes
+    rate_key = f"code_request:{request.email}"
+    now = time.time()
+    window_seconds = 15 * 60  # 15 minutes
+    
+    # Clean old requests
+    code_request_times[rate_key] = [
+        req_time for req_time in code_request_times[rate_key]
+        if now - req_time < window_seconds
+    ]
+    
+    if len(code_request_times[rate_key]) >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many code requests. Please wait 15 minutes before requesting another code."
+        )
+    
+    # Check if admin exists and is active
     admin = db.query(Admin).filter(Admin.email == request.email).first()
     
-    if not admin or not verify_password(request.password, admin.password_hash):
+    if not admin:
+        # Don't reveal if admin exists or not for security
+        code_request_times[rate_key].append(now)
+        return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
+    
+    if not admin.is_active:
+        # Don't reveal account status for security - return same message as non-existent account
+        code_request_times[rate_key].append(now)
+        return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
+    
+    # Generate code
+    code = EmailService.generate_verification_code()
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store code in database
+    admin.email_code = code
+    admin.email_code_expires_at = expires_at
+    db.commit()
+    
+    # Send email and log result
+    email_sent = EmailService.send_admin_login_code(admin.email, admin.name, code)
+    if not email_sent:
+        # Log warning but don't reveal to user (security)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to send admin login code email to {admin.email}. Code: {code}")
+        print(f"[WARNING] Failed to send admin login code email to {admin.email}. Check SMTP configuration.")
+    
+    # Record request time
+    code_request_times[rate_key].append(now)
+    
+    return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
+
+
+@router.post("/login", response_model=AdminLoginResponse)
+async def admin_login(
+    request: AdminCodeLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """Login with email and code (passwordless authentication)"""
+    admin = db.query(Admin).filter(Admin.email == request.email).first()
+    
+    if not admin:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="Incorrect email or code"
         )
     
     if not admin.is_active:
@@ -107,7 +177,49 @@ async def admin_login(
             detail="Admin account is inactive"
         )
     
+    # Check failed attempts rate limiting
+    failed_key = f"failed_code:{request.email}"
+    now = datetime.utcnow()
+    lockout_duration = timedelta(minutes=15)
+    
+    # Clean old attempts
+    failed_code_attempts[failed_key] = [
+        attempt_time for attempt_time in failed_code_attempts[failed_key]
+        if now - attempt_time < lockout_duration
+    ]
+    
+    # Check if locked out
+    if len(failed_code_attempts[failed_key]) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Too many failed attempts. Please wait 15 minutes before trying again."
+        )
+    
+    # Verify code
+    if not admin.email_code or admin.email_code != request.code:
+        failed_code_attempts[failed_key].append(now)
+        remaining = 5 - len(failed_code_attempts[failed_key])
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Incorrect code. {remaining} attempts remaining."
+        )
+    
+    # Check expiration
+    if not admin.email_code_expires_at or admin.email_code_expires_at < datetime.utcnow():
+        failed_code_attempts[failed_key].append(now)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Code has expired. Please request a new code."
+        )
+    
+    # Clear code and failed attempts on successful login
+    admin.email_code = None
+    admin.email_code_expires_at = None
     admin.last_login = datetime.utcnow()
+    
+    if failed_key in failed_code_attempts:
+        del failed_code_attempts[failed_key]
+    
     db.commit()
     
     access_token = create_admin_access_token(data={"sub": admin.id})
@@ -161,9 +273,12 @@ async def create_admin(
             detail="Invalid role. Must be 'admin' or 'super_admin'"
         )
     
+    # For passwordless login, password_hash is optional
+    password_hash = get_password_hash(request.password) if request.password else None
+    
     new_admin = Admin(
         email=request.email,
-        password_hash=get_password_hash(request.password),
+        password_hash=password_hash,
         name=request.name,
         role=request.role
     )
@@ -249,6 +364,13 @@ async def change_password(
     admin: Admin = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
+    """Change password (deprecated for passwordless login, kept for backward compatibility)"""
+    if not admin.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password authentication is not enabled for this account"
+        )
+    
     if not verify_password(request.current_password, admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

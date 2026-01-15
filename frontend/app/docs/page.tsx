@@ -49,7 +49,7 @@ export default function DocsPage() {
               </h1>
               
               <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-                Integrate ContentAI&apos;s powerful AI content generation into your applications with our REST API.
+                Integrate PostInAi&apos;s powerful AI content generation into your applications with our REST API.
               </p>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function DocsPage() {
                 <Zap className="w-12 h-12 text-cyan-400 mx-auto mb-6" />
                 <h2 className="text-2xl font-bold text-white mb-4">Ready to Build?</h2>
                 <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-                  Get your API key and start integrating ContentAI into your application today.
+                  Get your API key and start integrating PostInAi into your application today.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link href="/register">

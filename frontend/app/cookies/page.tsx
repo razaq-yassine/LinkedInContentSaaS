@@ -28,7 +28,7 @@ export default function CookiePolicyPage() {
                 Last updated: January 1, 2026
               </p>
               <p className="text-slate-400">
-                This Cookie Policy explains how ContentAI Inc. uses cookies and similar technologies when you visit our website and use our services.
+                This Cookie Policy explains how PostInAi Inc. uses cookies and similar technologies when you visit our website and use our services.
               </p>
             </div>
           </div>

@@ -411,7 +411,7 @@ export function LinkedInPostPreview({
             <div className="bg-gradient-to-br from-[#E7F3FF] to-[#F3F2F0] aspect-[1.91/1] flex items-center justify-center relative overflow-hidden">
               {/* Logo in background */}
               <div className="absolute inset-0 opacity-10 flex items-center justify-center">
-                <div className="text-[#0A66C2] font-bold text-6xl">ContentAI</div>
+                <div className="text-[#0A66C2] font-bold text-6xl">PostInAi</div>
               </div>
               
               {/* Animated progress bar */}

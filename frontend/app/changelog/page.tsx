@@ -38,8 +38,8 @@ const changelog: ChangelogEntry[] = [
   {
     version: "2.0",
     date: "January 2025",
-    title: "ContentAI 2.0 - The Intelligence Update",
-    description: "A massive upgrade with AI-powered image generation, advanced conversation management, and more ways to create engaging LinkedIn content.",
+    title: "PostInAi 2.0 - The Intelligence Update",
+    description: "A massive upgrade with AI-powered image generation, advanced conversation management, and enterprise-grade security features.",
     features: [
       {
         icon: ImageIcon,
@@ -106,7 +106,7 @@ const changelog: ChangelogEntry[] = [
   {
     version: "1.0",
     date: "November 2024",
-    title: "ContentAI Launch",
+    title: "PostInAi Launch - The Foundation",
     description: "The initial release bringing AI-powered LinkedIn content creation to professionals worldwide.",
     features: [
       {
@@ -187,7 +187,7 @@ export default function ChangelogPage() {
               </span>
             </h1>
             <p className="text-xl text-slate-400">
-              Track the evolution of ContentAI. Every update brings you closer to perfect LinkedIn content.
+              Track the evolution of PostInAi. Every update brings you closer to perfect LinkedIn content.
             </p>
           </div>
         </div>
@@ -269,7 +269,7 @@ export default function ChangelogPage() {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">
-              Ready to experience ContentAI 2.0?
+              Ready to experience PostInAi 2.0?
             </h2>
             <p className="text-xl text-slate-400 mb-8">
               Join thousands of professionals creating authentic LinkedIn content with AI.
@@ -295,7 +295,7 @@ export default function ChangelogPage() {
       <footer className="py-8 border-t border-slate-800/50">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center text-slate-500 text-sm">
-            <p>© 2025 ContentAI. All rights reserved.</p>
+            <p>© 2025 PostInAi. All rights reserved.</p>
           </div>
         </div>
       </footer>

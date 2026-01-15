@@ -198,7 +198,7 @@ async def get_public_settings():
             # Site Configuration
             "maintenance_mode": get_setting("maintenance_mode", "false"),
             "maintenance_message": get_setting("maintenance_message", "We're currently performing maintenance."),
-            "app_name": get_setting("app_name", "LinkedIn Content AI"),
+            "app_name": get_setting("app_name", "PostInAi"),
             "registration_enabled": get_setting("registration_enabled", "true"),
             "require_email_verification": get_setting("require_email_verification", "true"),
             

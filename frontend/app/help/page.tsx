@@ -21,7 +21,7 @@ const categories = [
   {
     icon: Zap,
     title: "Getting Started",
-    description: "New to ContentAI? Start here.",
+    description: "New to PostInAi? Start here.",
     articles: [
       "How to create your first post",
       "Setting up your voice profile",

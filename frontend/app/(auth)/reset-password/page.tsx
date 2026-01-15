@@ -113,7 +113,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-slate-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600 mb-2">ContentAI</h1>
+          <h1 className="text-3xl font-bold text-blue-600 mb-2">PostInAi</h1>
           <p className="text-slate-600">Create a new password</p>
         </div>
 

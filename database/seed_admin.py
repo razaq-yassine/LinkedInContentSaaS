@@ -15,35 +15,37 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 # Import all models to ensure they're registered
-print("Creating all tables...")
-Base.metadata.create_all(bind=engine)
+# Note: Tables should be created via migrations, not here
+# Base.metadata.create_all(bind=engine)  # Commented out - use migrations instead
 
 # Create session
 db = SessionLocal()
 
 try:
+    admin_email = "postinai.inc@gmail.com"
+    
     # Check if admin already exists
-    existing_admin = db.query(Admin).filter(Admin.email == "admin@linkedincontent.com").first()
+    existing_admin = db.query(Admin).filter(Admin.email == admin_email).first()
     
     if existing_admin:
-        print(f"\n⚠️  Admin user already exists with email: admin@linkedincontent.com")
+        print(f"\n⚠️  Admin user already exists with email: {admin_email}")
         print(f"   ID: {existing_admin.id}")
         print(f"   Role: {existing_admin.role}")
         print(f"   Active: {existing_admin.is_active}")
-        response = input("\nDo you want to update the password? (y/n): ")
-        if response.lower() == 'y':
-            existing_admin.password_hash = get_password_hash("Admin@123456")
-            db.commit()
-            print("✓ Password updated successfully")
-        else:
-            print("Skipping password update")
+        
+        # Update email if it was different, ensure password_hash is None for passwordless login
+        if existing_admin.email != admin_email:
+            existing_admin.email = admin_email
+        existing_admin.password_hash = None  # Passwordless login
+        db.commit()
+        print("✓ Admin user updated for passwordless login")
     else:
-        # Create admin user
+        # Create admin user with passwordless login
         print("\nCreating admin user...")
         admin = Admin(
             id=str(uuid.uuid4()),
-            email="admin@linkedincontent.com",
-            password_hash=get_password_hash("Admin@123456"),
+            email=admin_email,
+            password_hash=None,  # Passwordless login - no password required
             name="Admin",
             role=AdminRole.SUPER_ADMIN,
             is_active=True,
@@ -55,8 +57,8 @@ try:
         db.refresh(admin)
         
         print("✓ Admin user created successfully!")
-        print(f"   Email: admin@linkedincontent.com")
-        print(f"   Password: Admin@123456")
+        print(f"   Email: {admin_email}")
+        print(f"   Authentication: Passwordless (email code)")
         print(f"   Role: super_admin")
         print(f"   ID: {admin.id}")
     

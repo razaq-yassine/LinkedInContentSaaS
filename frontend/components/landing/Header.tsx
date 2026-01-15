@@ -65,15 +65,10 @@ export function Header() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <img 
-                src="/logo-dark.png" 
-                alt="PostInAi" 
-                className="h-8 w-auto hidden lg:block"
-              />
-              <img 
-                src="/logo-dark-sm.png" 
-                alt="PostInAi" 
-                className="h-6 w-auto lg:hidden"
+              <img
+                src="/logo-dark.png"
+                alt="PostInAi"
+                className="h-8 w-auto"
               />
             </Link>
 

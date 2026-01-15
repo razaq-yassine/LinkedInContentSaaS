@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CreditCard, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -31,7 +31,7 @@ export default function AdminDashboardLayout({
     const adminData = localStorage.getItem('admin_user');
 
     if (!token || !adminData) {
-      router.push('/admin/login');
+      router.push('/secure-access');
       return;
     }
 
@@ -41,7 +41,7 @@ export default function AdminDashboardLayout({
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
-    router.push('/admin/login');
+    router.push('/secure-access');
   };
 
   const navigation = [
@@ -74,17 +74,16 @@ export default function AdminDashboardLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b">
             <div className="flex items-center gap-2">
-              <img 
-                src="/logo-sm.png" 
-                alt="Admin Portal" 
+              <img
+                src="/logo-sm.png"
+                alt="Admin Portal"
                 className="h-8 w-auto"
               />
               <h1 className="text-xl font-bold text-gray-900">Admin Portal</h1>
@@ -105,11 +104,10 @@ export default function AdminDashboardLayout({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isActive
                       ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                   onClick={() => setSidebarOpen(false)}
                 >
                   <item.icon className="w-5 h-5 mr-3" />

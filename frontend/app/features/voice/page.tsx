@@ -36,7 +36,7 @@ const features = [
   {
     icon: RefreshCw,
     title: "Continuous Learning",
-    description: "The more you use ContentAI, the better it understands your voice. It learns from your edits and preferences.",
+    description: "The more you use PostInAi, the better it understands your voice. It learns from your edits and preferences.",
   },
   {
     icon: Target,

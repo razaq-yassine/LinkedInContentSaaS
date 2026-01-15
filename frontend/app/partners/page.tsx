@@ -15,14 +15,14 @@ const partnerTypes = [
   {
     icon: Users,
     title: "Referral Partners",
-    description: "Earn commissions by referring customers to ContentAI.",
+    description: "Earn commissions by referring customers to PostInAi.",
     benefits: ["20% recurring commission", "90-day cookie window", "Real-time tracking dashboard", "Marketing materials"],
     color: "cyan"
   },
   {
     icon: Rocket,
     title: "Integration Partners",
-    description: "Build integrations that connect ContentAI to your platform.",
+    description: "Build integrations that connect PostInAi to your platform.",
     benefits: ["API access", "Technical documentation", "Co-marketing opportunities", "Featured in marketplace"],
     color: "emerald"
   },
@@ -57,7 +57,7 @@ export default function PartnersPage() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
                 Grow together with{" "}
                 <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
-                  ContentAI
+                  PostInAi
                 </span>
               </h1>
               
@@ -198,7 +198,7 @@ export default function PartnersPage() {
                 </div>
                 <div className="bg-gradient-to-br from-cyan-500/10 to-teal-500/10 border border-cyan-500/20 rounded-2xl p-8">
                   <h3 className="text-white font-semibold mb-4">Ready to Partner?</h3>
-                  <p className="text-slate-400 mb-6">Join hundreds of partners already growing with ContentAI.</p>
+                  <p className="text-slate-400 mb-6">Join hundreds of partners already growing with PostInAi.</p>
                   <Link href="/contact?subject=Partnership Application">
                     <Button className="w-full bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white">
                       Apply Now

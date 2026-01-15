@@ -234,11 +234,11 @@ export default function TipsPage() {
               Let AI apply these tips for you
             </h2>
             <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-              ContentAI automatically implements these best practices in every post it generates.
+              PostInAi automatically implements these best practices in every post it generates.
             </p>
             <Link href="/register">
               <Button size="lg" className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-full px-10 py-7 text-lg font-bold shadow-lg shadow-violet-500/25">
-                Try ContentAI Free
+                Try PostInAi Free
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>

@@ -28,7 +28,7 @@ export default function PrivacyPolicyPage() {
                 Last updated: January 1, 2026
               </p>
               <p className="text-slate-400">
-                This Privacy Policy describes how ContentAI Inc. (&quot;ContentAI,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and shares information about you when you use our website, applications, and services.
+                This Privacy Policy describes how PostInAi Inc. (&quot;PostInAi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and shares information about you when you use our website, applications, and services.
               </p>
             </div>
           </div>
@@ -169,7 +169,7 @@ export default function PrivacyPolicyPage() {
                   <p className="mb-4">If you have questions about this Privacy Policy or our data practices, contact us:</p>
                   <div className="space-y-2">
                     <p><strong className="text-white">Email:</strong> <a href="mailto:privacy@contentai.com" className="text-cyan-400 hover:underline">privacy@contentai.com</a></p>
-                    <p><strong className="text-white">Address:</strong> ContentAI Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
+                    <p><strong className="text-white">Address:</strong> PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                 </div>
               </div>

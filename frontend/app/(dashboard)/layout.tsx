@@ -224,12 +224,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 <Link href="/generate" className="flex items-center gap-2">
                   <img
                     src="/logo.png"
-                    alt="ContentAI"
+                    alt="PostInAi"
                     className="h-7 w-auto dark:hidden"
                   />
                   <img
                     src="/logo-dark.png"
-                    alt="ContentAI"
+                    alt="PostInAi"
                     className="h-7 w-auto hidden dark:block"
                   />
                 </Link>

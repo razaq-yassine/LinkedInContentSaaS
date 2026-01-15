@@ -47,7 +47,7 @@ const integrations = [
   },
   {
     name: "Zapier",
-    description: "Connect ContentAI to 5,000+ apps with automated workflows.",
+    description: "Connect PostInAi to 5,000+ apps with automated workflows.",
     icon: Zap,
     status: "Coming Soon",
     color: "orange",
@@ -88,7 +88,7 @@ export default function IntegrationsPage() {
               </h1>
               
               <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-                ContentAI integrates seamlessly with the tools you already use, making your content workflow smoother than ever.
+                PostInAi integrates seamlessly with the tools you already use, making your content workflow smoother than ever.
               </p>
               
               <Link href="/register">
@@ -107,7 +107,7 @@ export default function IntegrationsPage() {
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold text-white mb-4">Available Integrations</h2>
-                <p className="text-slate-400">Connect ContentAI with your existing workflow.</p>
+                <p className="text-slate-400">Connect PostInAi with your existing workflow.</p>
               </div>
               
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -274,7 +274,7 @@ export default function IntegrationsPage() {
                 <Plug className="w-12 h-12 text-cyan-400 mx-auto mb-6" />
                 <h2 className="text-3xl font-bold text-white mb-4">Ready to Streamline Your Workflow?</h2>
                 <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-                  Start using ContentAI with your favorite tools today. All integrations are included in every plan.
+                  Start using PostInAi with your favorite tools today. All integrations are included in every plan.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link href="/register">

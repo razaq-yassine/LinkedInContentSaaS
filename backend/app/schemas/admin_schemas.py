@@ -8,6 +8,15 @@ class AdminLoginRequest(BaseModel):
     password: str
 
 
+class AdminRequestCodeRequest(BaseModel):
+    email: EmailStr
+
+
+class AdminCodeLoginRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
 class AdminLoginResponse(BaseModel):
     access_token: str
     token_type: str
@@ -29,7 +38,7 @@ class AdminResponse(BaseModel):
 
 class CreateAdminRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: Optional[str] = None  # Optional for passwordless login
     name: str
     role: str = "admin"
 

@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
             <img 
               src="/logo-dark-sm.png" 
-              alt="ContentAI" 
+              alt="PostInAi" 
               className="h-10 w-auto"
             />
           </Link>

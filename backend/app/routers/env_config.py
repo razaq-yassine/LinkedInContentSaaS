@@ -69,7 +69,7 @@ ENV_VARIABLES = {
             {"key": "SMTP_USERNAME", "label": "Username", "type": "text", "default": "", "sensitive": False},
             {"key": "SMTP_PASSWORD", "label": "Password", "type": "password", "default": "", "sensitive": True},
             {"key": "SMTP_FROM_EMAIL", "label": "From Email", "type": "text", "default": "", "sensitive": False},
-            {"key": "SMTP_FROM_NAME", "label": "From Name", "type": "text", "default": "ContentAI", "sensitive": False},
+            {"key": "SMTP_FROM_NAME", "label": "From Name", "type": "text", "default": "PostInAi", "sensitive": False},
         ]
     },
     "app": {

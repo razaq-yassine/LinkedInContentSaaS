@@ -103,7 +103,7 @@ const defaultSettings: GlobalSettings = {
   // Site Configuration
   maintenance_mode: false,
   maintenance_message: '',
-  app_name: 'LinkedIn Content AI',
+  app_name: 'LinkedIn PostInAi',
   registration_enabled: true,
   require_email_verification: true,
   
@@ -229,7 +229,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         // Site Configuration
         maintenance_mode: data.maintenance_mode === 'true' || data.maintenance_mode === true,
         maintenance_message: data.maintenance_message || '',
-        app_name: data.app_name || 'LinkedIn Content AI',
+        app_name: data.app_name || 'LinkedIn PostInAi',
         registration_enabled: data.registration_enabled !== 'false' && data.registration_enabled !== false,
         require_email_verification: data.require_email_verification !== 'false',
         

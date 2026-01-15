@@ -294,11 +294,13 @@ class Admin(Base):
     
     id = Column(String(36), primary_key=True, default=generate_uuid)
     email = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)  # Made nullable for passwordless login
     name = Column(String(255), nullable=False)
     role = Column(SQLEnum(AdminRole), default=AdminRole.ADMIN)
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime)
+    email_code = Column(String(10), nullable=True)  # Temporary login code
+    email_code_expires_at = Column(DateTime, nullable=True)  # Code expiration timestamp
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

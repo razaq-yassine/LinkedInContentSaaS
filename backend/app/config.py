@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""  # For Gmail, use App Password
     smtp_from_email: str = ""
-    smtp_from_name: str = "ContentAI"
+    smtp_from_name: str = "PostInAi"
     smtp_use_tls: bool = True
     admin_email: str = ""  # Email address to send critical alerts
     
