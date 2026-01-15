@@ -22,7 +22,7 @@ export default function PressPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20 flex items-center justify-center min-h-[80vh]">
         <div className="container mx-auto px-4 lg:px-8 text-center">
           <div className="max-w-2xl mx-auto">
@@ -42,7 +42,7 @@ export default function PressPage() {
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );
@@ -52,28 +52,28 @@ export function PressPageDisabled() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-20 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Newspaper className="w-4 h-4" />
                 <span>Press & Media</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
                 Press Kit
               </h1>
-              
+
               <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
                 Resources for journalists and media professionals covering PostInAi.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/contact?subject=Press Inquiry">
                   <Button size="lg" className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-full px-8">
@@ -147,7 +147,7 @@ export function PressPageDisabled() {
                 <h2 className="text-2xl font-bold text-white mb-4">Brand Assets</h2>
                 <p className="text-slate-400">Download official logos and brand materials.</p>
               </div>
-              
+
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 text-center">
                   <div className="w-20 h-20 bg-gradient-to-br from-violet-600 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -192,7 +192,7 @@ export function PressPageDisabled() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-8">Press Releases</h2>
-              
+
               <div className="space-y-4">
                 {pressReleases.map((release, i) => (
                   <div key={i} className="bg-slate-900/50 border border-slate-800 hover:border-cyan-500/30 rounded-xl p-6 transition-colors cursor-pointer">
@@ -211,7 +211,7 @@ export function PressPageDisabled() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-8">Media Coverage</h2>
-              
+
               <div className="grid md:grid-cols-2 gap-4">
                 {mediaFeatures.map((feature, i) => (
                   <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 flex items-start justify-between">
@@ -239,14 +239,14 @@ export function PressPageDisabled() {
                   For press inquiries, interview requests, or additional information, please contact our communications team.
                 </p>
                 <div className="text-slate-300">
-                  <p><strong className="text-white">Email:</strong> <a href="mailto:press@contentai.com" className="text-cyan-400 hover:underline">press@contentai.com</a></p>
+                  <p><strong className="text-white">Email:</strong> <a href="mailto:press@postinai.com" className="text-cyan-400 hover:underline">press@postinai.com</a></p>
                 </div>
               </div>
             </div>
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

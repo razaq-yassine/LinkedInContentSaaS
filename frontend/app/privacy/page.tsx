@@ -6,24 +6,24 @@ export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Shield className="w-4 h-4" />
                 <span>Privacy Policy</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 Your privacy matters to us
               </h1>
-              
+
               <p className="text-lg text-slate-400 mb-4">
                 Last updated: January 1, 2026
               </p>
@@ -38,7 +38,7 @@ export default function PrivacyPolicyPage() {
         <section className="py-12">
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-4xl mx-auto space-y-12">
-              
+
               {/* Information We Collect */}
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
                       <span><strong className="text-white">Right to Non-Discrimination:</strong> We will not discriminate against you for exercising your privacy rights.</span>
                     </li>
                   </ul>
-                  <p className="mt-4">To exercise these rights, contact us at <a href="mailto:privacy@contentai.com" className="text-cyan-400 hover:underline">privacy@contentai.com</a>.</p>
+                  <p className="mt-4">To exercise these rights, contact us at <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a>.</p>
                 </div>
               </div>
 
@@ -168,7 +168,7 @@ export default function PrivacyPolicyPage() {
                 <div className="text-slate-400">
                   <p className="mb-4">If you have questions about this Privacy Policy or our data practices, contact us:</p>
                   <div className="space-y-2">
-                    <p><strong className="text-white">Email:</strong> <a href="mailto:privacy@contentai.com" className="text-cyan-400 hover:underline">privacy@contentai.com</a></p>
+                    <p><strong className="text-white">Email:</strong> <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a></p>
                     <p><strong className="text-white">Address:</strong> PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                 </div>
@@ -178,7 +178,7 @@ export default function PrivacyPolicyPage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

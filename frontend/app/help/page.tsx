@@ -1,6 +1,6 @@
 import { Header, Footer } from "@/components/landing";
-import { 
-  HelpCircle, 
+import {
+  HelpCircle,
   Search,
   BookOpen,
   MessageSquare,
@@ -109,7 +109,7 @@ export default function HelpPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32">
         {/* Hero with Search */}
         <section className="pb-16 relative overflow-hidden">
@@ -118,17 +118,17 @@ export default function HelpPage() {
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-teal-600/20 rounded-full blur-3xl" />
           </div>
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-3xl mx-auto text-center py-16">
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 How can we help?
               </h1>
-              
+
               <p className="text-xl text-slate-400 mb-8">
                 Search our knowledge base or browse categories below.
               </p>
-              
+
               <div className="relative max-w-xl mx-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <input
@@ -166,7 +166,7 @@ export default function HelpPage() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-5xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-8">Browse by Category</h2>
-              
+
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {categories.map((category, i) => {
                   const colors = colorClasses[category.color];
@@ -213,7 +213,7 @@ export default function HelpPage() {
                   Our support team is here to help you succeed.
                 </p>
               </div>
-              
+
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-6 border border-slate-700/50 text-center">
                   <div className="w-14 h-14 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -229,7 +229,7 @@ export default function HelpPage() {
                     </Button>
                   </Link>
                 </div>
-                
+
                 <div className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-6 border border-slate-700/50 text-center">
                   <div className="w-14 h-14 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                     <MessageSquare className="w-7 h-7 text-cyan-400" />
@@ -242,7 +242,7 @@ export default function HelpPage() {
                     Start Chat
                   </Button>
                 </div>
-                
+
                 <div className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-6 border border-slate-700/50 text-center">
                   <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                     <Mail className="w-7 h-7 text-emerald-400" />
@@ -251,7 +251,7 @@ export default function HelpPage() {
                   <p className="text-sm text-slate-400 mb-4">
                     We&apos;ll respond within 24 hours
                   </p>
-                  <Link href="mailto:support@contentai.com">
+                  <Link href="mailto:support@postinai.com">
                     <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
                       Send Email
                     </Button>
@@ -269,7 +269,7 @@ export default function HelpPage() {
               <h2 className="text-2xl font-bold text-white mb-8 text-center">
                 Frequently Asked Questions
               </h2>
-              
+
               <div className="space-y-4">
                 {[
                   { q: "How does the AI learn my writing style?", a: "Our AI analyzes your past LinkedIn posts, writing samples, and voice recordings to create a unique voice profile that captures your tone, vocabulary, and style." },
@@ -283,7 +283,7 @@ export default function HelpPage() {
                   </div>
                 ))}
               </div>
-              
+
               <div className="text-center mt-8">
                 <Link href="/pricing">
                   <Button variant="outline" className="rounded-full border-slate-700 text-slate-300 hover:bg-slate-800">
@@ -296,7 +296,7 @@ export default function HelpPage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

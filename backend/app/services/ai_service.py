@@ -919,9 +919,7 @@ Focus on:
 - Current trends (last 1-3 months)
 - Topics with high engagement potential
 - Practical, actionable topics
-- Mix of technical and strategic topics"""
-
-    user_message = f"""Find trending topics for someone with this background:
+- Mix of technical and strategic topics"""    user_message = f"""Find trending topics for someone with this background:
 
 Expertise Areas: {', '.join(expertise_areas)}
 Industry: {industry}

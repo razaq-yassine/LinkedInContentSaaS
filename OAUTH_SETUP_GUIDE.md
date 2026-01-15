@@ -97,7 +97,7 @@ SMTP_PORT=587
 SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=your-app-password-here
 SMTP_FROM_EMAIL=your-email@gmail.com
-SMTP_FROM_NAME=ContentAI
+SMTP_FROM_NAME=PostInAI
 SMTP_USE_TLS=true
 ```
 

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const contactMethods = [
-  { icon: Mail, title: "Email Us", description: "support@contentai.com", subtitle: "We'll respond within 24 hours" },
+  { icon: Mail, title: "Email Us", description: "support@postinai.com", subtitle: "We'll respond within 24 hours" },
   { icon: MessageSquare, title: "Live Chat", description: "Chat with our team", subtitle: "Available 9am-6pm PT" },
   { icon: Phone, title: "Phone", description: "+1 (415) 555-0123", subtitle: "Mon-Fri 9am-5pm PT" },
 ];
@@ -47,9 +47,9 @@ export default function ContactPage() {
               <p className="text-slate-400 mb-8">
                 Thank you for contacting us. We&apos;ll get back to you within 24 hours.
               </p>
-              <Button 
+              <Button
                 onClick={() => setSubmitted(false)}
-                variant="outline" 
+                variant="outline"
                 className="border-slate-700 text-slate-300 hover:bg-slate-800"
               >
                 Send Another Message
@@ -65,24 +65,24 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Mail className="w-4 h-4" />
                 <span>Contact Us</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 Get in Touch
               </h1>
-              
+
               <p className="text-xl text-slate-400 max-w-2xl mx-auto">
                 Have a question or need help? We&apos;re here for you. Reach out and we&apos;ll respond as soon as possible.
               </p>
@@ -118,7 +118,7 @@ export default function ContactPage() {
                 {/* Form */}
                 <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
                   <h2 className="text-2xl font-bold text-white mb-6">Send us a message</h2>
-                  
+
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -128,7 +128,7 @@ export default function ContactPage() {
                           type="text"
                           placeholder="John Doe"
                           value={formData.name}
-                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           required
                           className="bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500"
                         />
@@ -140,13 +140,13 @@ export default function ContactPage() {
                           type="email"
                           placeholder="john@example.com"
                           value={formData.email}
-                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           required
                           className="bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500"
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="subject" className="text-slate-300">Subject</Label>
                       <Input
@@ -154,12 +154,12 @@ export default function ContactPage() {
                         type="text"
                         placeholder="How can we help?"
                         value={formData.subject}
-                        onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                         required
                         className="bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500"
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="message" className="text-slate-300">Message</Label>
                       <textarea
@@ -167,14 +167,14 @@ export default function ContactPage() {
                         rows={5}
                         placeholder="Tell us more about your question or feedback..."
                         value={formData.message}
-                        onChange={(e) => setFormData({...formData, message: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                         required
                         className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 resize-none"
                       />
                     </div>
-                    
-                    <Button 
-                      type="submit" 
+
+                    <Button
+                      type="submit"
                       disabled={loading}
                       className="w-full bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white py-6"
                     >
@@ -188,7 +188,7 @@ export default function ContactPage() {
                 <div className="space-y-8">
                   <div>
                     <h2 className="text-2xl font-bold text-white mb-6">Other Ways to Reach Us</h2>
-                    
+
                     <div className="space-y-6">
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-cyan-500/10 border border-cyan-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -204,7 +204,7 @@ export default function ContactPage() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
                           <Clock className="w-5 h-5 text-emerald-400" />
@@ -217,7 +217,7 @@ export default function ContactPage() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
                           <MessageSquare className="w-5 h-5 text-amber-400" />
@@ -249,7 +249,7 @@ export default function ContactPage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

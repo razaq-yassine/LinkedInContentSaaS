@@ -8,24 +8,24 @@ export default function GDPRPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Shield className="w-4 h-4" />
                 <span>GDPR Compliance</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 GDPR Compliance
               </h1>
-              
+
               <p className="text-lg text-slate-400">
                 PostInAi is committed to protecting the privacy rights of individuals in the European Union (EU) and European Economic Area (EEA) under the General Data Protection Regulation (GDPR).
               </p>
@@ -37,7 +37,7 @@ export default function GDPRPage() {
         <section className="py-12">
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-4xl mx-auto space-y-12">
-              
+
               {/* Our Commitment */}
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
@@ -157,7 +157,7 @@ export default function GDPRPage() {
                       </Button>
                     </Link>
                   </div>
-                  <p className="text-sm mt-4">We will respond to your request within 30 days. You may also email us directly at <a href="mailto:dpo@contentai.com" className="text-cyan-400 hover:underline">dpo@contentai.com</a>.</p>
+                  <p className="text-sm mt-4">We will respond to your request within 30 days. You may also email us directly at <a href="mailto:dpo@postinai.com" className="text-cyan-400 hover:underline">dpo@postinai.com</a>.</p>
                 </div>
               </div>
 
@@ -190,7 +190,7 @@ export default function GDPRPage() {
                 <div className="text-slate-400">
                   <p className="mb-4">For any GDPR-related inquiries or concerns, contact our Data Protection Officer:</p>
                   <div className="space-y-2">
-                    <p><strong className="text-white">Email:</strong> <a href="mailto:dpo@contentai.com" className="text-cyan-400 hover:underline">dpo@contentai.com</a></p>
+                    <p><strong className="text-white">Email:</strong> <a href="mailto:dpo@postinai.com" className="text-cyan-400 hover:underline">dpo@postinai.com</a></p>
                     <p><strong className="text-white">Address:</strong> Data Protection Officer, PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                   <p className="mt-4">You also have the right to lodge a complaint with your local data protection authority if you believe we have not adequately addressed your concerns.</p>
@@ -201,7 +201,7 @@ export default function GDPRPage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

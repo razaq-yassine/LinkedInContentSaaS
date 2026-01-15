@@ -6,24 +6,24 @@ export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <FileText className="w-4 h-4" />
                 <span>Terms of Service</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 Terms of Service
               </h1>
-              
+
               <p className="text-lg text-slate-400 mb-4">
                 Last updated: January 1, 2026
               </p>
@@ -38,7 +38,7 @@ export default function TermsOfServicePage() {
         <section className="py-12">
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-4xl mx-auto space-y-12">
-              
+
               {/* Acceptance */}
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
@@ -168,7 +168,7 @@ export default function TermsOfServicePage() {
                 <h2 className="text-2xl font-bold text-white mb-6">8. Disclaimers & Limitation of Liability</h2>
                 <div className="space-y-4 text-slate-400">
                   <p>OUR SERVICES ARE PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND. WE DO NOT GUARANTEE THAT OUR SERVICES WILL BE ERROR-FREE OR UNINTERRUPTED.</p>
-                  <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, CONTENTAI SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.</p>
+                  <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, POSTINAI SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.</p>
                   <p>OUR TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID US IN THE 12 MONTHS PRECEDING THE CLAIM.</p>
                 </div>
               </div>
@@ -189,7 +189,7 @@ export default function TermsOfServicePage() {
                 <div className="text-slate-400">
                   <p className="mb-4">For questions about these Terms, contact us:</p>
                   <div className="space-y-2">
-                    <p><strong className="text-white">Email:</strong> <a href="mailto:legal@contentai.com" className="text-teal-400 hover:underline">legal@contentai.com</a></p>
+                    <p><strong className="text-white">Email:</strong> <a href="mailto:legal@postinai.com" className="text-teal-400 hover:underline">legal@postinai.com</a></p>
                     <p><strong className="text-white">Address:</strong> PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export default function TermsOfServicePage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

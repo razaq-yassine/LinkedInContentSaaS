@@ -20,34 +20,34 @@ const endpoints = [
 ];
 
 const sdks = [
-  { name: "Python", icon: "🐍", install: "pip install contentai" },
-  { name: "JavaScript", icon: "🟨", install: "npm install @contentai/sdk" },
-  { name: "Ruby", icon: "💎", install: "gem install contentai" },
-  { name: "Go", icon: "🔵", install: "go get github.com/contentai/go-sdk" },
+  { name: "Python", icon: "🐍", install: "pip install postinai" },
+  { name: "JavaScript", icon: "🟨", install: "npm install @postinai/sdk" },
+  { name: "Ruby", icon: "💎", install: "gem install postinai" },
+  { name: "Go", icon: "🔵", install: "go get github.com/postinai/go-sdk" },
 ];
 
 export default function DocsPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Code className="w-4 h-4" />
                 <span>API Documentation</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 API Documentation
               </h1>
-              
+
               <p className="text-xl text-slate-400 max-w-2xl mx-auto">
                 Integrate PostInAi&apos;s powerful AI content generation into your applications with our REST API.
               </p>
@@ -90,7 +90,7 @@ export default function DocsPage() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-5xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-8">Quick Start</h2>
-              
+
               <div className="grid md:grid-cols-3 gap-6 mb-8">
                 {quickStart.map((item, i) => (
                   <div key={i} className="relative">
@@ -115,7 +115,7 @@ export default function DocsPage() {
                 </div>
                 <pre className="p-4 text-sm overflow-x-auto">
                   <code className="text-slate-300">
-{`curl -X POST https://api.contentai.com/v1/posts/generate \\
+                    {`curl -X POST https://api.postinai.com/v1/posts/generate \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -135,7 +135,7 @@ export default function DocsPage() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-5xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-8">Official SDKs</h2>
-              
+
               <div className="grid md:grid-cols-4 gap-4">
                 {sdks.map((sdk, i) => (
                   <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-xl p-6">
@@ -154,14 +154,13 @@ export default function DocsPage() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-5xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-8">API Endpoints</h2>
-              
+
               <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
                 <div className="divide-y divide-slate-800">
                   {endpoints.map((endpoint, i) => (
                     <div key={i} className="flex items-center gap-4 p-4 hover:bg-slate-800/30 transition-colors cursor-pointer">
-                      <span className={`px-2 py-1 rounded text-xs font-mono font-bold ${
-                        endpoint.method === 'GET' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                      }`}>
+                      <span className={`px-2 py-1 rounded text-xs font-mono font-bold ${endpoint.method === 'GET' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                        }`}>
                         {endpoint.method}
                       </span>
                       <code className="text-cyan-400 text-sm flex-1">{endpoint.path}</code>
@@ -247,7 +246,7 @@ export default function DocsPage() {
                       Get API Key
                     </Button>
                   </Link>
-                  <a href="https://github.com/contentai" target="_blank" rel="noopener noreferrer">
+                  <a href="https://github.com/postinai" target="_blank" rel="noopener noreferrer">
                     <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 text-slate-300 hover:bg-slate-800">
                       <ExternalLink className="w-4 h-4 mr-2" />
                       View on GitHub
@@ -259,7 +258,7 @@ export default function DocsPage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );

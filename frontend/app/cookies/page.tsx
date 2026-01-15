@@ -6,24 +6,24 @@ export default function CookiePolicyPage() {
   return (
     <div className="min-h-screen bg-slate-950">
       <Header />
-      
+
       <main className="pt-32 pb-20">
         {/* Hero */}
         <section className="pb-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
           <div className="absolute top-20 right-0 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-          
+
           <div className="container mx-auto px-4 lg:px-8 relative">
             <div className="max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6">
                 <Cookie className="w-4 h-4" />
                 <span>Cookie Policy</span>
               </div>
-              
+
               <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 Cookie Policy
               </h1>
-              
+
               <p className="text-lg text-slate-400 mb-4">
                 Last updated: January 1, 2026
               </p>
@@ -38,7 +38,7 @@ export default function CookiePolicyPage() {
         <section className="py-12">
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-4xl mx-auto space-y-12">
-              
+
               {/* What Are Cookies */}
               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
@@ -71,7 +71,7 @@ export default function CookiePolicyPage() {
                       <li>• Load balancing and server routing</li>
                     </ul>
                   </div>
-                  
+
                   <div className="p-4 bg-slate-800/50 rounded-xl">
                     <h3 className="text-white font-semibold mb-2">Functional Cookies</h3>
                     <p>Enable enhanced functionality and personalization, such as remembering your preferences.</p>
@@ -81,7 +81,7 @@ export default function CookiePolicyPage() {
                       <li>• Recently viewed content</li>
                     </ul>
                   </div>
-                  
+
                   <div className="p-4 bg-slate-800/50 rounded-xl">
                     <h3 className="text-white font-semibold mb-2">Analytics Cookies</h3>
                     <p>Help us understand how visitors interact with our website to improve our services.</p>
@@ -91,7 +91,7 @@ export default function CookiePolicyPage() {
                       <li>• Performance monitoring</li>
                     </ul>
                   </div>
-                  
+
                   <div className="p-4 bg-slate-800/50 rounded-xl">
                     <h3 className="text-white font-semibold mb-2">Marketing Cookies</h3>
                     <p>Used to deliver relevant advertisements and track campaign effectiveness.</p>
@@ -145,24 +145,24 @@ export default function CookiePolicyPage() {
                 </div>
                 <div className="space-y-4 text-slate-400">
                   <p>Under various US state privacy laws, you have specific rights regarding cookies and online tracking:</p>
-                  
+
                   <div className="p-4 bg-slate-800/50 rounded-xl">
                     <h3 className="text-white font-semibold mb-2">California (CCPA/CPRA)</h3>
                     <p className="text-sm">California residents have the right to opt out of the &quot;sale&quot; or &quot;sharing&quot; of personal information, including data collected via cookies. We honor the Global Privacy Control (GPC) signal.</p>
                   </div>
-                  
+
                   <div className="p-4 bg-slate-800/50 rounded-xl">
                     <h3 className="text-white font-semibold mb-2">Virginia, Colorado, Connecticut, Utah & Other States</h3>
                     <p className="text-sm">Residents of states with comprehensive privacy laws can opt out of targeted advertising and the processing of personal data for certain purposes.</p>
                   </div>
-                  
+
                   <div className="p-4 bg-slate-800/50 rounded-xl">
                     <h3 className="text-white font-semibold mb-2">Global Privacy Control (GPC)</h3>
                     <p className="text-sm">We recognize and honor browser-based opt-out signals including the Global Privacy Control. When we detect a GPC signal, we automatically limit non-essential cookies.</p>
                   </div>
-                  
+
                   <div className="mt-4 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
-                    <p className="text-cyan-200 text-sm"><strong>Do Not Sell or Share My Personal Information:</strong> To exercise your right to opt out, use our cookie banner, adjust your browser settings, or contact us at <a href="mailto:privacy@contentai.com" className="underline hover:text-cyan-400">privacy@contentai.com</a>.</p>
+                    <p className="text-cyan-200 text-sm"><strong>Do Not Sell or Share My Personal Information:</strong> To exercise your right to opt out, use our cookie banner, adjust your browser settings, or contact us at <a href="mailto:privacy@postinai.com" className="underline hover:text-cyan-400">privacy@postinai.com</a>.</p>
                   </div>
                 </div>
               </div>
@@ -250,7 +250,7 @@ export default function CookiePolicyPage() {
                 </div>
                 <div className="space-y-4 text-slate-400">
                   <p>We may update this Cookie Policy from time to time. We will notify you of significant changes by posting a notice on our website or sending you an email.</p>
-                  <p>For questions about our use of cookies, contact us at <a href="mailto:privacy@contentai.com" className="text-cyan-400 hover:underline">privacy@contentai.com</a>.</p>
+                  <p>For questions about our use of cookies, contact us at <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a>.</p>
                 </div>
               </div>
 
@@ -258,7 +258,7 @@ export default function CookiePolicyPage() {
           </div>
         </section>
       </main>
-      
+
       <Footer />
     </div>
   );
