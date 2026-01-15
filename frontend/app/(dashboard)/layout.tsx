@@ -37,6 +37,7 @@ import { ThemeProvider, useTheme } from "@/components/ThemeProvider";
 import { api } from "@/lib/api-client";
 import axios from "axios";
 import { AppLoader } from "@/components/AppLoader";
+import { initializePushNotifications } from "@/lib/push-notifications";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -91,6 +92,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     // Load conversations and subscription
     loadConversations();
     loadSubscription();
+
+    // Initialize push notifications
+    initializePushNotifications().catch((error) => {
+      console.error('Failed to initialize push notifications:', error);
+    });
 
     // Listen for new conversations being created
     const handleConversationCreated = () => {

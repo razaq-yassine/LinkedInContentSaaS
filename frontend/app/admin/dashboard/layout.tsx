@@ -13,7 +13,8 @@ import {
   X,
   BarChart3,
   FileText,
-  ScrollText
+  ScrollText,
+  Bell
 } from 'lucide-react';
 
 export default function AdminDashboardLayout({
@@ -31,7 +32,8 @@ export default function AdminDashboardLayout({
     const adminData = localStorage.getItem('admin_user');
 
     if (!token || !adminData) {
-      router.push('/secure-access');
+      // Don't redirect to login - show error instead
+      router.replace('/not-found');
       return;
     }
 
@@ -41,7 +43,8 @@ export default function AdminDashboardLayout({
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
-    router.push('/secure-access');
+    // Don't redirect to login - go to home page instead
+    router.push('/');
   };
 
   const navigation = [
@@ -51,6 +54,7 @@ export default function AdminDashboardLayout({
     { name: 'Posts', href: '/admin/dashboard/posts', icon: FileText },
     { name: 'Subscription Plans', href: '/admin/dashboard/plans', icon: CreditCard },
     { name: 'System Logs', href: '/admin/dashboard/logs', icon: ScrollText },
+    { name: 'Notifications', href: '/admin/dashboard/notifications', icon: Bell },
     { name: 'Global Settings', href: '/admin/dashboard/settings', icon: Settings },
   ];
 
@@ -105,8 +109,8 @@ export default function AdminDashboardLayout({
                   key={item.name}
                   href={item.href}
                   className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isActive
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   onClick={() => setSidebarOpen(false)}
                 >

@@ -489,3 +489,70 @@ class ErrorLog(Base):
     user = relationship("User", foreign_keys=[user_id])
     resolver = relationship("Admin", foreign_keys=[resolved_by])
 
+
+class NotificationAction(Base):
+    """Defines all possible notification events"""
+    __tablename__ = "notification_actions"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    action_code = Column(String(100), unique=True, nullable=False, index=True)
+    action_name = Column(String(255), nullable=False)
+    description = Column(Text)
+    category = Column(String(50), nullable=False, index=True)  # "post", "subscription", "account", "error"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    preferences = relationship("NotificationPreference", back_populates="action", cascade="all, delete-orphan")
+    logs = relationship("NotificationLog", back_populates="action")
+
+
+class NotificationPreference(Base):
+    """Admin-controlled global notification preferences"""
+    __tablename__ = "notification_preferences"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    action_id = Column(String(36), ForeignKey("notification_actions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    email_enabled = Column(Boolean, default=True, nullable=False)
+    push_enabled = Column(Boolean, default=True, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by_admin_id = Column(String(36), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    action = relationship("NotificationAction", back_populates="preferences")
+    updated_by_admin = relationship("Admin")
+
+
+class PushSubscription(Base):
+    """Stores user push notification subscriptions"""
+    __tablename__ = "push_subscriptions"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False)
+    p256dh_key = Column(Text, nullable=False)
+    auth_key = Column(Text, nullable=False)
+    user_agent = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+
+
+class NotificationLog(Base):
+    """Audit trail of sent notifications"""
+    __tablename__ = "notification_logs"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    action_id = Column(String(36), ForeignKey("notification_actions.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel = Column(String(20), nullable=False, index=True)  # "email" or "push"
+    status = Column(String(20), nullable=False, index=True)  # "sent", "failed", "pending"
+    error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    action = relationship("NotificationAction", back_populates="logs")
+    user = relationship("User")
+

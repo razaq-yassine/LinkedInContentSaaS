@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import (
     User, UserProfile, AdminSetting, GeneratedPost, GeneratedComment,
     Subscription, SubscriptionPlan, SubscriptionPlanConfig, Conversation, Admin, UsageTracking,
-    SystemLog, LogLevel
+    SystemLog, LogLevel, NotificationAction, NotificationPreference, NotificationLog
 )
 from ..routers.admin_auth import get_current_admin
 from ..schemas.admin_schemas import (
@@ -22,6 +22,12 @@ from ..schemas.admin_schemas import (
     SubscriptionPlanResponse, CreateSubscriptionPlanRequest, UpdateSubscriptionPlanRequest,
     GlobalSettingResponse, UpdateGlobalSettingRequest, CreateGlobalSettingRequest,
     PublicSettingsResponse, DashboardStatsResponse
+)
+from ..schemas.notifications import (
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+    NotificationLogResponse,
+    NotificationLogsFilter
 )
 from ..schemas.analytics import (
     UsageSummaryResponse, TopUserResponse, UserUsageDetailResponse,
@@ -1415,3 +1421,128 @@ async def export_logs_json(
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+
+
+@router.get("/notifications/preferences", response_model=List[NotificationPreferenceResponse])
+async def get_notification_preferences(
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all notification preferences with action details.
+    """
+    preferences = db.query(NotificationPreference).join(
+        NotificationAction
+    ).order_by(NotificationAction.category, NotificationAction.action_name).all()
+    
+    return [
+        NotificationPreferenceResponse(
+            id=pref.id,
+            action_id=pref.action_id,
+            action_code=pref.action.action_code,
+            action_name=pref.action.action_name,
+            description=pref.action.description,
+            category=pref.action.category,
+            email_enabled=pref.email_enabled,
+            push_enabled=pref.push_enabled,
+            updated_at=pref.updated_at,
+            updated_by_admin_id=pref.updated_by_admin_id
+        )
+        for pref in preferences
+    ]
+
+
+@router.put("/notifications/preferences/{action_id}", response_model=NotificationPreferenceResponse)
+async def update_notification_preference(
+    action_id: str,
+    request: NotificationPreferenceUpdate,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Update notification preference for a specific action.
+    """
+    preference = db.query(NotificationPreference).filter(
+        NotificationPreference.action_id == action_id
+    ).first()
+    
+    if not preference:
+        raise HTTPException(status_code=404, detail="Notification preference not found")
+    
+    # Update fields if provided
+    if request.email_enabled is not None:
+        preference.email_enabled = request.email_enabled
+    if request.push_enabled is not None:
+        preference.push_enabled = request.push_enabled
+    
+    preference.updated_by_admin_id = admin.id
+    preference.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(preference)
+    
+    # Get action details
+    action = db.query(NotificationAction).filter(
+        NotificationAction.id == action_id
+    ).first()
+    
+    return NotificationPreferenceResponse(
+        id=preference.id,
+        action_id=preference.action_id,
+        action_code=action.action_code,
+        action_name=action.action_name,
+        description=action.description,
+        category=action.category,
+        email_enabled=preference.email_enabled,
+        push_enabled=preference.push_enabled,
+        updated_at=preference.updated_at,
+        updated_by_admin_id=preference.updated_by_admin_id
+    )
+
+
+@router.get("/notifications/logs", response_model=List[NotificationLogResponse])
+async def get_notification_logs(
+    action_code: Optional[str] = None,
+    user_id: Optional[str] = None,
+    channel: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get notification logs with filtering options.
+    """
+    query = db.query(NotificationLog).join(
+        NotificationAction, NotificationLog.action_id == NotificationAction.id, isouter=True
+    )
+    
+    # Apply filters
+    if action_code:
+        query = query.filter(NotificationAction.action_code == action_code)
+    if user_id:
+        query = query.filter(NotificationLog.user_id == user_id)
+    if channel:
+        query = query.filter(NotificationLog.channel == channel)
+    if status:
+        query = query.filter(NotificationLog.status == status)
+    
+    # Order by created_at descending and paginate
+    logs = query.order_by(NotificationLog.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return [
+        NotificationLogResponse(
+            id=log.id,
+            action_id=log.action_id,
+            action_code=log.action.action_code if log.action else None,
+            action_name=log.action.action_name if log.action else None,
+            user_id=log.user_id,
+            channel=log.channel,
+            status=log.status,
+            error_message=log.error_message,
+            sent_at=log.sent_at,
+            created_at=log.created_at
+        )
+        for log in logs
+    ]

@@ -51,7 +51,7 @@ export default function SubscriptionPlansPage() {
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
     if (!token) {
-      router.push('/secure-access');
+      router.replace('/not-found');
       return;
     }
     setIsAuthenticated(true);
@@ -62,7 +62,7 @@ export default function SubscriptionPlansPage() {
     try {
       const token = localStorage.getItem('admin_token');
       if (!token) {
-        router.push('/secure-access');
+        router.replace('/not-found');
         return;
       }
       const apiUrl = getApiUrl();
@@ -78,7 +78,7 @@ export default function SubscriptionPlansPage() {
       if (error.response?.status === 401) {
         localStorage.removeItem('admin_token');
         localStorage.removeItem('admin_user');
-        router.push('/secure-access');
+        router.replace('/not-found');
       }
     } finally {
       setLoading(false);

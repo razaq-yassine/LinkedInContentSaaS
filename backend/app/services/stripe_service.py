@@ -10,6 +10,7 @@ import stripe
 from ..config import get_settings
 from ..models import User, Subscription, SubscriptionPlanConfig, SubscriptionPlan, BillingCycle, SubscriptionStatus
 from .credit_service import reset_monthly_credits
+from .notification_service import send_notification
 from fastapi import HTTPException
 
 settings = get_settings()
@@ -399,6 +400,20 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
     db.commit()
     db.refresh(subscription)
     
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="subscription_activated",
+            user_id=user_id,
+            data={
+                "plan": plan_name,
+                "credits_limit": plan_config.credits_limit
+            }
+        )
+    except Exception as e:
+        print(f"Failed to send subscription activation notification: {str(e)}")
+    
     return {
         "user_id": user_id,
         "plan": plan_name,
@@ -442,6 +457,20 @@ def handle_invoice_paid(db: Session, invoice: stripe.Invoice) -> Dict:
     
     db.commit()
     
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="subscription_renewed",
+            user_id=subscription.user_id,
+            data={
+                "plan": subscription.plan.value,
+                "credits_reset": True
+            }
+        )
+    except Exception as e:
+        print(f"Failed to send subscription renewal notification: {str(e)}")
+    
     return {
         "user_id": subscription.user_id,
         "status": "renewed",
@@ -478,6 +507,20 @@ def handle_invoice_failed(db: Session, invoice: stripe.Invoice) -> Dict:
     
     db.commit()
     
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="payment_failed",
+            user_id=subscription.user_id,
+            data={
+                "plan": subscription.plan.value,
+                "invoice_id": invoice.id
+            }
+        )
+    except Exception as e:
+        print(f"Failed to send payment failure notification: {str(e)}")
+    
     return {
         "user_id": subscription.user_id,
         "status": "past_due"
@@ -512,6 +555,19 @@ def handle_subscription_deleted(db: Session, stripe_subscription: stripe.Subscri
     subscription.billing_cycle = BillingCycle.MONTHLY
     
     db.commit()
+    
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="subscription_canceled",
+            user_id=subscription.user_id,
+            data={
+                "plan": subscription.plan.value
+            }
+        )
+    except Exception as e:
+        print(f"Failed to send subscription cancellation notification: {str(e)}")
     
     return {
         "user_id": subscription.user_id,

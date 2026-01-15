@@ -6,7 +6,7 @@ import os
 import sqlalchemy as sa
 from .config import get_settings
 from .database import engine, Base
-from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription, env_config, ai_config, test_subscription, errors, error_dashboard
+from .routers import auth, onboarding, generation, comments, admin, admin_auth, user, conversations, images, pdfs, subscription, env_config, ai_config, test_subscription, notifications, errors, error_dashboard
 from .services.scheduler_service import start_scheduler, stop_scheduler
 from .logging_config import setup_logging, get_logger
 from .core.error_handler import global_exception_handler, error_logger
@@ -73,6 +73,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(pdfs.router, prefix="/api/pdfs", tags=["pdfs"])
 app.include_router(subscription.router, prefix="/api/subscription", tags=["subscription"])
+app.include_router(notifications.router, tags=["notifications"])
 app.include_router(env_config.router, prefix="/api/admin", tags=["env-config"])
 app.include_router(ai_config.router, prefix="/api/admin", tags=["ai-config"])
 app.include_router(errors.router, prefix="/api/errors", tags=["errors"])

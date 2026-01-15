@@ -108,6 +108,20 @@ def log_error_to_db(
                 stack_trace=stack_trace,
                 extra_info=extra_data
             )
+            
+            # Also send notification
+            from ..services.notification_service import send_notification
+            send_notification(
+                db=db,
+                action_code="admin_error_critical",
+                user_id=None,  # Admin notification
+                data={
+                    "error_message": message,
+                    "endpoint": endpoint,
+                    "user_id": user_id,
+                    "stack_trace": stack_trace
+                }
+            )
         except Exception as e:
             print(f"Failed to send error alert email: {str(e)}")
 

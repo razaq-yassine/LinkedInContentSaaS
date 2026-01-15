@@ -1429,6 +1429,21 @@ async def publish_post(
         return result
     except ValueError as e:
         error_message = str(e)
+        # Send failure notification
+        try:
+            from ..services.notification_service import send_notification
+            send_notification(
+                db=db,
+                action_code="post_failed",
+                user_id=user_id,
+                data={
+                    "post_id": post_id,
+                    "error": error_message
+                }
+            )
+        except Exception as notif_error:
+            print(f"Failed to send failure notification: {str(notif_error)}")
+        
         if "not found" in error_message.lower():
             raise HTTPException(status_code=404, detail=error_message)
         elif "not connected" in error_message.lower():
@@ -1439,6 +1454,21 @@ async def publish_post(
             raise HTTPException(status_code=400, detail=error_message)
     except Exception as e:
         error_message = str(e)
+        # Send failure notification
+        try:
+            from ..services.notification_service import send_notification
+            send_notification(
+                db=db,
+                action_code="post_failed",
+                user_id=user_id,
+                data={
+                    "post_id": post_id,
+                    "error": error_message
+                }
+            )
+        except Exception as notif_error:
+            print(f"Failed to send failure notification: {str(notif_error)}")
+        
         # Provide more helpful error messages
         if "401" in error_message or "unauthorized" in error_message.lower():
             raise HTTPException(
@@ -1507,6 +1537,21 @@ async def schedule_post(
     # Update post with scheduled time (store as naive UTC datetime for database)
     post.scheduled_at = scheduled_at_utc.replace(tzinfo=None)
     db.commit()
+    
+    # Send notification
+    try:
+        from ..services.notification_service import send_notification
+        send_notification(
+            db=db,
+            action_code="post_scheduled",
+            user_id=user_id,
+            data={
+                "post_id": post_id,
+                "scheduled_at": scheduled_at_utc.isoformat()
+            }
+        )
+    except Exception as notif_error:
+        print(f"Failed to send scheduling notification: {str(notif_error)}")
     
     return {
         "success": True,

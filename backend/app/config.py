@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     company_website: str = "http://localhost:3000"
     support_email: str = "support@postinai.com"
     
+    # VAPID keys for push notifications (generated automatically if not set)
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = ""  # Email or URL for VAPID
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

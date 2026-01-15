@@ -19,10 +19,13 @@ def run_all_seeds():
         # Import seed functions
         from migrations.seeds.seed_admin_settings import seed_admin_settings
         from migrations.seeds.seed_subscription_plans import seed_subscription_plans
+        from migrations.seeds.seed_notification_actions import seed_notification_actions
         
         seed_admin_settings()
         print()
         seed_subscription_plans()
+        print()
+        seed_notification_actions()
         
         print("-" * 50)
         print("✅ All seeds completed successfully!")

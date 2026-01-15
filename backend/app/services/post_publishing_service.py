@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from ..models import GeneratedPost, User, GeneratedImage, GeneratedPDF, PostFormat
 from ..services.linkedin_service import LinkedInService
+from ..services.notification_service import send_notification
 
 async def publish_post_to_linkedin(post_id: str, db: Session) -> Dict[str, Any]:
     """
@@ -113,6 +114,22 @@ async def publish_post_to_linkedin(post_id: str, db: Session) -> Dict[str, Any]:
     post.published_to_linkedin = True
     post.scheduled_at = None  # Clear scheduled_at after publishing
     db.commit()
+    
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="post_published",
+            user_id=user.id,
+            data={
+                "post_id": post.id,
+                "post_title": post.topic or "Your post" if post.topic else "Your post",
+                "linkedin_url": result.get("url")
+            }
+        )
+    except Exception as e:
+        # Don't fail the publish if notification fails
+        print(f"Failed to send notification: {str(e)}")
     
     return {
         "success": True,

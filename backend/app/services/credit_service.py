@@ -10,6 +10,7 @@ import uuid
 from ..models import Subscription, CreditTransaction, User
 from fastapi import HTTPException
 from ..logging_config import get_logger, log_credit_transaction
+from ..services.notification_service import send_notification
 
 logger = get_logger(__name__)
 
@@ -145,6 +146,9 @@ def deduct_credits(
     )
     logger.info(f"Deducted {amount} credits from user {user_id} for {action_type}")
     
+    # Check and notify about credit levels
+    check_and_notify_credits(db, user_id)
+    
     return {
         "transaction_id": transaction.id,
         "credits_deducted": amount,
@@ -275,6 +279,19 @@ def reset_monthly_credits(db: Session, user_id: str) -> Dict:
     db.commit()
     db.refresh(subscription)
     
+    # Send notification about credits reset
+    try:
+        send_notification(
+            db=db,
+            action_code="credits_reset",
+            user_id=user_id,
+            data={
+                "credits_limit": subscription.credits_limit
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to send credits reset notification: {str(e)}")
+    
     return {
         "user_id": user_id,
         "credits_reset": True,
@@ -335,4 +352,47 @@ def get_credit_transactions(
     ).order_by(CreditTransaction.created_at.desc()).limit(limit).all()
     
     return transactions
+
+
+def check_and_notify_credits(db: Session, user_id: str):
+    """
+    Check credit levels and send notifications if needed.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+    """
+    try:
+        credits_info = get_user_credits(db, user_id)
+        credits_remaining = credits_info['credits_remaining']
+        credits_limit = credits_info['credits_limit']
+        
+        # Skip if unlimited credits
+        if credits_limit == -1:
+            return
+        
+        # Check if credits exhausted
+        if credits_remaining == 0:
+            send_notification(
+                db=db,
+                action_code="credits_exhausted",
+                user_id=user_id,
+                data={
+                    "credits_limit": credits_limit
+                }
+            )
+        # Check if credits are low (< 20%)
+        elif credits_limit > 0 and credits_remaining / credits_limit < 0.2:
+            send_notification(
+                db=db,
+                action_code="credits_low",
+                user_id=user_id,
+                data={
+                    "credits_remaining": credits_remaining,
+                    "credits_limit": credits_limit,
+                    "percentage": (credits_remaining / credits_limit) * 100
+                }
+            )
+    except Exception as e:
+        logger.error(f"Error checking credits for notifications: {str(e)}")
 
