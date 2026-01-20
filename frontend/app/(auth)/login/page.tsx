@@ -23,8 +23,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [mockEmail, setMockEmail] = useState("");
-  const [mockLoading, setMockLoading] = useState(false);
   const [error, setError] = useState("");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
@@ -112,30 +110,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleMockLogin = async () => {
-    if (!mockEmail) {
-      setError("Please enter an email");
-      return;
-    }
-
-    setMockLoading(true);
-    setError("");
-    try {
-      const response = await api.auth.mockLogin(mockEmail);
-      localStorage.setItem("token", response.data.access_token);
-      localStorage.setItem("user", JSON.stringify(response.data));
-
-      if (response.data.onboarding_completed) {
-        router.push("/generate");
-      } else {
-        router.push("/onboarding");
-      }
-    } catch (error: any) {
-      setError(error.detail || error.message || "Login failed");
-    } finally {
-      setMockLoading(false);
-    }
-  };
 
   // Show maintenance page if maintenance mode is active
   if (maintenanceMode) {
@@ -335,29 +309,6 @@ export default function LoginPage() {
                   Create free account
                 </Link>
               </p>
-
-              {/* Dev Mode Section */}
-              <div className="pt-6 border-t border-slate-800">
-                <p className="text-xs text-center text-slate-600 mb-4">Development Mode</p>
-                <div className="space-y-3">
-                  <Input
-                    type="email"
-                    placeholder="test@example.com"
-                    value={mockEmail}
-                    onChange={(e) => setMockEmail(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleMockLogin()}
-                    className="py-5 px-4 rounded-xl bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 text-sm"
-                  />
-                  <Button
-                    variant="outline"
-                    className="w-full py-5 rounded-xl text-sm border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:bg-slate-800"
-                    onClick={handleMockLogin}
-                    disabled={mockLoading}
-                  >
-                    {mockLoading ? "Signing in..." : "Quick Login (Dev Only)"}
-                  </Button>
-                </div>
-              </div>
 
               <p className="text-xs text-center text-slate-600">
                 By signing in, you agree to our{" "}

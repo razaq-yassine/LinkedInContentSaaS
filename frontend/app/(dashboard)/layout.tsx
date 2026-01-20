@@ -132,6 +132,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const loadSubscription = async () => {
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/user/subscription`,
         {
@@ -145,6 +149,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         setShowUpgradeModal(true);
       }
     } catch (error: any) {
+      // Handle 401 unauthorized - token expired or invalid
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/login");
+        return;
+      }
       console.error("Failed to load subscription:", error);
     }
   };

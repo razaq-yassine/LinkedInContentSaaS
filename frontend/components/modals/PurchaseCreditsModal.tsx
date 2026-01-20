@@ -37,6 +37,7 @@ export default function PurchaseCreditsModal({
   const [loading, setLoading] = useState(false);
   const [pricing, setPricing] = useState<CreditPricing | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [agreed, setAgreed] = useState(false);
   const [priceInfo, setPriceInfo] = useState<{
     subtotal: number;
     discount_percentage: number;

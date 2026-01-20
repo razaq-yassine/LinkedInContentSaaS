@@ -23,7 +23,7 @@ import {
   File,
   Video
 } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 
 interface Post {
   id: string;
@@ -68,7 +68,6 @@ export default function PostsBrowserPage() {
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("admin_token");
       const params = new URLSearchParams({
         sort_by: sortBy,
         sort_order: sortOrder,
@@ -79,9 +78,7 @@ export default function PostsBrowserPage() {
       if (searchTerm) params.append("search", searchTerm);
       if (formatFilter !== "all") params.append("format", formatFilter);
 
-      const response = await apiClient.get(`/api/admin/posts?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.admin.getPosts(params);
       setData(response.data);
     } catch (error) {
       console.error("Failed to fetch posts:", error);

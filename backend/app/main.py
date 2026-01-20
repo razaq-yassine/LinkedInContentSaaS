@@ -50,9 +50,10 @@ app.add_middleware(
     allow_origin_regex=r"https?://.*\.trycloudflare\.com",
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    allow_methods=["*"],  # Allow all methods including OPTIONS
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
+    max_age=3600  # Cache preflight requests for 1 hour
 )
 
 # Create uploads directory if it doesn't exist

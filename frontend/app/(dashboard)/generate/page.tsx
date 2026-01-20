@@ -581,10 +581,12 @@ export default function GeneratePage() {
         }
       }
     } catch (error: any) {
-      // Silently fail - network errors shouldn't break the UI
-      // Only log if it's not a network error (which is expected if backend is down)
-      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
-        console.error("Failed to check context:", error);
+      // Silently fail - network errors and auth errors shouldn't break the UI
+      // Only log unexpected errors (not network/auth issues)
+      const isNetworkError = error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED';
+      const isAuthError = error?.error?.code === 'E401' || error?.status === 401;
+      if (!isNetworkError && !isAuthError) {
+        console.error("Failed to check context:", error?.error?.message || error?.message || error);
       }
       setHasContext(false);
     }

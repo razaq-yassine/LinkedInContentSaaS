@@ -103,58 +103,86 @@ async def request_login_code(
     db: Session = Depends(get_db)
 ):
     """Request a login code for passwordless admin authentication"""
-    # Rate limiting: Max 3 requests per email per 15 minutes
-    rate_key = f"code_request:{request.email}"
-    now = time.time()
-    window_seconds = 15 * 60  # 15 minutes
-    
-    # Clean old requests
-    code_request_times[rate_key] = [
-        req_time for req_time in code_request_times[rate_key]
-        if now - req_time < window_seconds
-    ]
-    
-    if len(code_request_times[rate_key]) >= 3:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many code requests. Please wait 15 minutes before requesting another code."
-        )
-    
-    # Check if admin exists and is active
-    admin = db.query(Admin).filter(Admin.email == request.email).first()
-    
-    if not admin:
-        # Don't reveal if admin exists or not for security
+    try:
+        # Rate limiting: Max 3 requests per email per 15 minutes
+        rate_key = f"code_request:{request.email}"
+        now = time.time()
+        window_seconds = 15 * 60  # 15 minutes
+        
+        # Clean old requests
+        code_request_times[rate_key] = [
+            req_time for req_time in code_request_times[rate_key]
+            if now - req_time < window_seconds
+        ]
+        
+        if len(code_request_times[rate_key]) >= 3:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many code requests. Please wait 15 minutes before requesting another code."
+            )
+        
+        # Check if admin exists and is active
+        admin = db.query(Admin).filter(Admin.email == request.email).first()
+        
+        if not admin:
+            # Don't reveal if admin exists or not for security
+            code_request_times[rate_key].append(now)
+            return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
+        
+        if not admin.is_active:
+            # Don't reveal account status for security - return same message as non-existent account
+            code_request_times[rate_key].append(now)
+            return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
+        
+        # Generate code
+        code = EmailService.generate_verification_code()
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        
+        # Store code in database
+        admin.email_code = code
+        admin.email_code_expires_at = expires_at
+        db.commit()
+        
+        # Send email and log result
+        try:
+            email_sent = EmailService.send_admin_login_code(admin.email, admin.name, code)
+            if not email_sent:
+                # Log warning but don't reveal to user (security)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to send admin login code email to {admin.email}. Code: {code}")
+                print(f"[WARNING] Failed to send admin login code email to {admin.email}. Check SMTP configuration.")
+                print(f"[DEV MODE] Login code for {admin.email}: {code}")
+        except Exception as email_error:
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            logger.error(f"Exception sending admin login code email: {str(email_error)}")
+            logger.error(traceback.format_exc())
+            print(f"[ERROR] Exception sending email: {str(email_error)}")
+            print(f"[DEV MODE] Login code for {admin.email}: {code}")
+        
+        # Record request time
         code_request_times[rate_key].append(now)
+        
         return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
     
-    if not admin.is_active:
-        # Don't reveal account status for security - return same message as non-existent account
-        code_request_times[rate_key].append(now)
-        return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
-    
-    # Generate code
-    code = EmailService.generate_verification_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-    
-    # Store code in database
-    admin.email_code = code
-    admin.email_code_expires_at = expires_at
-    db.commit()
-    
-    # Send email and log result
-    email_sent = EmailService.send_admin_login_code(admin.email, admin.name, code)
-    if not email_sent:
-        # Log warning but don't reveal to user (security)
+    except HTTPException:
+        # Re-raise HTTP exceptions (like rate limiting)
+        raise
+    except Exception as e:
+        # Catch any other unexpected errors
         import logging
+        import traceback
         logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to send admin login code email to {admin.email}. Code: {code}")
-        print(f"[WARNING] Failed to send admin login code email to {admin.email}. Check SMTP configuration.")
-    
-    # Record request time
-    code_request_times[rate_key].append(now)
-    
-    return {"success": True, "message": "If an admin account exists with this email, a code has been sent."}
+        logger.error(f"Unexpected error in request_login_code: {str(e)}")
+        logger.error(traceback.format_exc())
+        print(f"[ERROR] Unexpected error in request_login_code: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while processing your request. Please try again."
+        )
 
 
 @router.post("/login", response_model=AdminLoginResponse)

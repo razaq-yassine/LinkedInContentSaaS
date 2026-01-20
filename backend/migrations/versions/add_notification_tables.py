@@ -1,6 +1,6 @@
 """add notification tables
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c7d8e9f0a1b2
 Revises: f1a2b3c4d5e6
 Create Date: 2026-01-15
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'a1b2c3d4e5f6'
+revision = 'c7d8e9f0a1b2'
 down_revision = 'f1a2b3c4d5e6'
 branch_labels = None
 depends_on = None
