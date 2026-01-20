@@ -46,6 +46,18 @@ const faqs = [
     question: "Is my data used to train AI models?",
     answer: "No. Your content and data are never used to train our models. Your information is encrypted, private, and only used to improve your personal content generation.",
   },
+  {
+    question: "How does plan switching work?",
+    answer: "When you upgrade to a higher plan, your current subscription is cancelled and the new plan starts immediately. Your existing credits are preserved and new plan credits are added. When downgrading to free, you keep premium features and credits until your billing period ends, then move to the free plan.",
+  },
+  {
+    question: "What's the difference between subscription credits and purchased credits?",
+    answer: "Subscription credits reset monthly with your plan renewal. Purchased credits are permanent and never expire - they're used after your subscription credits are exhausted. You can only purchase credits when you have a paid plan.",
+  },
+  {
+    question: "Can I buy additional credits?",
+    answer: "Yes! Paid plan subscribers can purchase additional credits that never expire. These credits are separate from your monthly subscription credits and are used after your subscription credits run out.",
+  },
 ];
 
 const fallbackPlans: Plan[] = [

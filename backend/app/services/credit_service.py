@@ -1,13 +1,14 @@
 """
 Credit management service
 Handles all credit operations including deductions, grants, and tracking
+Supports dual credit system: subscription credits (monthly reset) + purchased credits (permanent)
 """
 from typing import Dict, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
 
-from ..models import Subscription, CreditTransaction, User
+from ..models import Subscription, CreditTransaction, User, PurchasedCreditsBalance
 from fastapi import HTTPException
 from ..logging_config import get_logger, log_credit_transaction
 from ..services.notification_service import send_notification
@@ -15,12 +16,36 @@ from ..services.notification_service import send_notification
 logger = get_logger(__name__)
 
 
-def get_user_credits(db: Session, user_id: str) -> Dict:
+def get_purchased_credits_balance(db: Session, user_id: str) -> PurchasedCreditsBalance:
     """
-    Get current credit balance for a user
+    Get or create purchased credits balance for a user
     
     Returns:
-        Dict with credits_limit, credits_used, credits_remaining
+        PurchasedCreditsBalance object
+    """
+    balance = db.query(PurchasedCreditsBalance).filter(
+        PurchasedCreditsBalance.user_id == user_id
+    ).first()
+    
+    if not balance:
+        balance = PurchasedCreditsBalance(
+            user_id=user_id,
+            balance=0.0,
+            last_updated=datetime.utcnow()
+        )
+        db.add(balance)
+        db.commit()
+        db.refresh(balance)
+    
+    return balance
+
+
+def get_total_credits(db: Session, user_id: str) -> float:
+    """
+    Get total available credits (subscription + purchased)
+    
+    Returns:
+        Total credits available
     """
     subscription = db.query(Subscription).filter(
         Subscription.user_id == user_id
@@ -29,18 +54,74 @@ def get_user_credits(db: Session, user_id: str) -> Dict:
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
-    credits_remaining = subscription.credits_limit - subscription.credits_used_this_month
+    # Unlimited credits
+    if subscription.subscription_credits_limit == -1:
+        return -1
+    
+    subscription_available = subscription.subscription_credits_limit - subscription.subscription_credits_used
+    purchased_balance = get_purchased_credits_balance(db, user_id)
+    
+    return subscription_available + purchased_balance.balance
+
+
+def get_credit_breakdown(db: Session, user_id: str) -> Dict:
+    """
+    Get detailed credit breakdown showing both pools
+    
+    Returns:
+        Dict with subscription and purchased credit details
+    """
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user_id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    purchased_balance = get_purchased_credits_balance(db, user_id)
+    
+    subscription_available = subscription.subscription_credits_limit - subscription.subscription_credits_used
+    if subscription.subscription_credits_limit == -1:
+        subscription_available = -1
+    
+    total_available = subscription_available
+    if subscription_available != -1:
+        total_available += purchased_balance.balance
     
     return {
-        "credits_limit": subscription.credits_limit,
-        "credits_used": subscription.credits_used_this_month,
-        "credits_remaining": credits_remaining
+        "subscription": {
+            "limit": subscription.subscription_credits_limit,
+            "used": subscription.subscription_credits_used,
+            "available": subscription_available
+        },
+        "purchased": {
+            "balance": purchased_balance.balance
+        },
+        "total_available": total_available
+    }
+
+
+def get_user_credits(db: Session, user_id: str) -> Dict:
+    """
+    Get current credit balance for a user (backward compatible)
+    
+    Returns:
+        Dict with credits_limit, credits_used, credits_remaining (total)
+    """
+    breakdown = get_credit_breakdown(db, user_id)
+    subscription = breakdown["subscription"]
+    
+    return {
+        "credits_limit": subscription["limit"],
+        "credits_used": subscription["used"],
+        "credits_remaining": breakdown["total_available"],
+        "breakdown": breakdown  # Include detailed breakdown
     }
 
 
 def check_sufficient_credits(db: Session, user_id: str, required_credits: float) -> bool:
     """
-    Check if user has sufficient credits for an action
+    Check if user has sufficient credits for an action (checks total: subscription + purchased)
     
     Args:
         db: Database session
@@ -57,15 +138,15 @@ def check_sufficient_credits(db: Session, user_id: str, required_credits: float)
     if not subscription:
         return False
     
-    # Unlimited credits (credits_limit == -1)
-    if subscription.credits_limit == -1:
+    # Unlimited credits
+    if subscription.subscription_credits_limit == -1:
         return True
     
-    credits_info = get_user_credits(db, user_id)
-    return credits_info["credits_remaining"] >= required_credits
+    total_available = get_total_credits(db, user_id)
+    return total_available >= required_credits
 
 
-def deduct_credits(
+def deduct_credits_v2(
     db: Session,
     user_id: str,
     amount: float,
@@ -74,7 +155,7 @@ def deduct_credits(
     post_id: Optional[str] = None
 ) -> Dict:
     """
-    Deduct credits from user's account and log transaction
+    Deduct credits using dual credit system: subscription credits first, then purchased credits
     
     Args:
         db: Database session
@@ -97,26 +178,43 @@ def deduct_credits(
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
-    # Unlimited credits (credits_limit == -1) - no deduction needed
-    if subscription.credits_limit == -1:
+    # Unlimited credits - no deduction needed
+    if subscription.subscription_credits_limit == -1:
         return {
             "transaction_id": None,
             "credits_deducted": 0,
-            "credits_remaining": -1,  # Unlimited
-            "action_type": action_type
+            "credits_remaining": -1,
+            "action_type": action_type,
+            "source": "unlimited"
         }
     
-    credits_before = subscription.credits_limit - subscription.credits_used_this_month
+    purchased_balance = get_purchased_credits_balance(db, user_id)
     
-    if credits_before < amount:
+    # Calculate available credits
+    subscription_available = subscription.subscription_credits_limit - subscription.subscription_credits_used
+    total_available = subscription_available + purchased_balance.balance
+    
+    if total_available < amount:
         raise HTTPException(
             status_code=403,
-            detail=f"Insufficient credits. You have {credits_before} credits but need {amount}"
+            detail=f"Insufficient credits. You have {total_available} credits but need {amount}"
         )
     
-    # Deduct credits
-    subscription.credits_used_this_month += amount
-    credits_after = subscription.credits_limit - subscription.credits_used_this_month
+    credits_before_total = total_available
+    source = "subscription"
+    
+    # Use subscription credits first
+    if subscription_available >= amount:
+        # All from subscription
+        subscription.subscription_credits_used += amount
+        credits_after_total = (subscription.subscription_credits_limit - subscription.subscription_credits_used) + purchased_balance.balance
+    else:
+        # Use subscription + purchased
+        remaining = amount - subscription_available
+        subscription.subscription_credits_used = subscription.subscription_credits_limit
+        purchased_balance.balance -= remaining
+        credits_after_total = purchased_balance.balance
+        source = "mixed"
     
     # Log transaction
     transaction = CreditTransaction(
@@ -125,26 +223,27 @@ def deduct_credits(
         post_id=post_id,
         action_type=action_type,
         credits_used=-amount,  # Negative for deduction
-        credits_before=credits_before,
-        credits_after=credits_after,
-        description=description or f"Deducted {amount} credits for {action_type}",
+        credits_before=int(credits_before_total),
+        credits_after=int(credits_after_total),
+        description=description or f"Deducted {amount} credits for {action_type} (from {source})",
         created_at=datetime.utcnow()
     )
     
     db.add(transaction)
     db.commit()
     db.refresh(subscription)
+    db.refresh(purchased_balance)
     
     # Log credit transaction
     log_credit_transaction(
         user_id=user_id,
         action="deduct",
-        credits_before=credits_before,
-        credits_after=credits_after,
+        credits_before=credits_before_total,
+        credits_after=credits_after_total,
         credits_changed=-amount,
         description=description
     )
-    logger.info(f"Deducted {amount} credits from user {user_id} for {action_type}")
+    logger.info(f"Deducted {amount} credits from user {user_id} for {action_type} (from {source})")
     
     # Check and notify about credit levels
     check_and_notify_credits(db, user_id)
@@ -152,8 +251,76 @@ def deduct_credits(
     return {
         "transaction_id": transaction.id,
         "credits_deducted": amount,
+        "credits_remaining": credits_after_total,
+        "action_type": action_type,
+        "source": source
+    }
+
+
+def deduct_credits(
+    db: Session,
+    user_id: str,
+    amount: float,
+    action_type: str,
+    description: Optional[str] = None,
+    post_id: Optional[str] = None
+) -> Dict:
+    """
+    Deduct credits (wrapper for backward compatibility, uses new v2 logic)
+    """
+    return deduct_credits_v2(db, user_id, amount, action_type, description, post_id)
+
+
+def add_purchased_credits(
+    db: Session,
+    user_id: str,
+    amount: float,
+    purchase_id: Optional[str] = None,
+    description: Optional[str] = None
+) -> Dict:
+    """
+    Add credits to purchased credits balance
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        amount: Credits to add
+        purchase_id: Optional purchase ID
+        description: Optional description
+    
+    Returns:
+        Dict with transaction details
+    """
+    purchased_balance = get_purchased_credits_balance(db, user_id)
+    credits_before = purchased_balance.balance
+    
+    purchased_balance.balance += amount
+    purchased_balance.last_updated = datetime.utcnow()
+    credits_after = purchased_balance.balance
+    
+    # Log transaction
+    transaction = CreditTransaction(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        action_type="credit_purchase",
+        credits_used=amount,  # Positive for addition
+        credits_before=int(credits_before),
+        credits_after=int(credits_after),
+        description=description or f"Purchased {amount} credits",
+        created_at=datetime.utcnow()
+    )
+    
+    db.add(transaction)
+    db.commit()
+    db.refresh(purchased_balance)
+    
+    logger.info(f"Added {amount} purchased credits to user {user_id}: {description}")
+    
+    return {
+        "transaction_id": transaction.id,
+        "credits_added": amount,
         "credits_remaining": credits_after,
-        "action_type": action_type
+        "description": description
     }
 
 
@@ -166,6 +333,7 @@ def add_credits(
 ) -> Dict:
     """
     Add credits to user's account (for refunds or admin grants)
+    Adds to subscription credits by reducing used amount
     
     Args:
         db: Database session
@@ -184,11 +352,11 @@ def add_credits(
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
-    credits_before = subscription.credits_limit - subscription.credits_used_this_month
+    credits_before = subscription.subscription_credits_limit - subscription.subscription_credits_used
     
     # Add credits by reducing used credits (can go negative to allow bonus credits)
-    subscription.credits_used_this_month = max(0.0, subscription.credits_used_this_month - amount)
-    credits_after = subscription.credits_limit - subscription.credits_used_this_month
+    subscription.subscription_credits_used = max(0.0, subscription.subscription_credits_used - amount)
+    credits_after = subscription.subscription_credits_limit - subscription.subscription_credits_used
     
     # Log transaction
     transaction = CreditTransaction(
@@ -197,8 +365,8 @@ def add_credits(
         admin_id=admin_id,
         action_type="credit_grant" if admin_id else "credit_refund",
         credits_used=amount,  # Positive for addition
-        credits_before=credits_before,
-        credits_after=credits_after,
+        credits_before=int(credits_before),
+        credits_after=int(credits_after),
         description=description,
         created_at=datetime.utcnow()
     )
@@ -255,9 +423,9 @@ def admin_grant_credits(
     )
 
 
-def reset_monthly_credits(db: Session, user_id: str) -> Dict:
+def reset_subscription_credits(db: Session, user_id: str) -> Dict:
     """
-    Reset monthly credits at period renewal
+    Reset subscription credits at period renewal (does not affect purchased credits)
     
     Args:
         db: Database session
@@ -273,8 +441,8 @@ def reset_monthly_credits(db: Session, user_id: str) -> Dict:
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
-    old_used = subscription.credits_used_this_month
-    subscription.credits_used_this_month = 0.0
+    old_used = subscription.subscription_credits_used
+    subscription.subscription_credits_used = 0.0
     
     db.commit()
     db.refresh(subscription)
@@ -283,10 +451,10 @@ def reset_monthly_credits(db: Session, user_id: str) -> Dict:
     try:
         send_notification(
             db=db,
-            action_code="credits_reset",
+            action_code="subscription_credits_reset",
             user_id=user_id,
             data={
-                "credits_limit": subscription.credits_limit
+                "credits_limit": subscription.subscription_credits_limit
             }
         )
     except Exception as e:
@@ -296,8 +464,15 @@ def reset_monthly_credits(db: Session, user_id: str) -> Dict:
         "user_id": user_id,
         "credits_reset": True,
         "previous_used": old_used,
-        "credits_available": subscription.credits_limit
+        "credits_available": subscription.subscription_credits_limit
     }
+
+
+def reset_monthly_credits(db: Session, user_id: str) -> Dict:
+    """
+    Reset monthly credits at period renewal (backward compatible wrapper)
+    """
+    return reset_subscription_credits(db, user_id)
 
 
 def calculate_post_estimates(credits: int) -> Dict:
@@ -357,15 +532,17 @@ def get_credit_transactions(
 def check_and_notify_credits(db: Session, user_id: str):
     """
     Check credit levels and send notifications if needed.
+    Uses total credits (subscription + purchased) for notifications.
     
     Args:
         db: Database session
         user_id: User ID
     """
     try:
-        credits_info = get_user_credits(db, user_id)
-        credits_remaining = credits_info['credits_remaining']
-        credits_limit = credits_info['credits_limit']
+        breakdown = get_credit_breakdown(db, user_id)
+        subscription = breakdown["subscription"]
+        credits_remaining = breakdown["total_available"]
+        credits_limit = subscription["limit"]
         
         # Skip if unlimited credits
         if credits_limit == -1:
@@ -378,7 +555,8 @@ def check_and_notify_credits(db: Session, user_id: str):
                 action_code="credits_exhausted",
                 user_id=user_id,
                 data={
-                    "credits_limit": credits_limit
+                    "credits_limit": credits_limit,
+                    "breakdown": breakdown
                 }
             )
         # Check if credits are low (< 20%)
@@ -390,7 +568,8 @@ def check_and_notify_credits(db: Session, user_id: str):
                 data={
                     "credits_remaining": credits_remaining,
                     "credits_limit": credits_limit,
-                    "percentage": (credits_remaining / credits_limit) * 100
+                    "percentage": (credits_remaining / credits_limit) * 100,
+                    "breakdown": breakdown
                 }
             )
     except Exception as e:

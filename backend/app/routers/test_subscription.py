@@ -60,12 +60,12 @@ async def simulate_subscription_completion(
     
     # Store old values for response
     old_plan = subscription.plan
-    old_credits = subscription.credits_limit
+    old_credits = subscription.subscription_credits_limit
     
     # Update subscription (simulate what the webhook handler does)
     subscription.plan = SubscriptionPlan(request.plan_name)
-    subscription.credits_limit = plan_config.credits_limit
-    subscription.credits_used_this_month = 0.0  # Reset credits on new subscription
+    subscription.subscription_credits_limit = plan_config.credits_limit
+    subscription.subscription_credits_used = 0.0  # Reset credits on new subscription
     subscription.billing_cycle = BillingCycle(request.billing_cycle)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     
@@ -88,13 +88,14 @@ async def simulate_subscription_completion(
         "message": "Subscription activated successfully (TEST MODE)",
         "previous": {
             "plan": old_plan,
-            "credits_limit": old_credits
+            "credits_limit": old_credits,
+            "old_credits_limit": old_credits
         },
         "current": {
             "plan": subscription.plan,
-            "credits_limit": subscription.credits_limit,
-            "credits_used": subscription.credits_used_this_month,
-            "credits_remaining": subscription.credits_limit - subscription.credits_used_this_month if subscription.credits_limit != -1 else "unlimited",
+            "credits_limit": subscription.subscription_credits_limit,
+            "credits_used": subscription.subscription_credits_used,
+            "credits_remaining": subscription.subscription_credits_limit - subscription.subscription_credits_used if subscription.subscription_credits_limit != -1 else "unlimited",
             "billing_cycle": subscription.billing_cycle,
             "status": subscription.subscription_status,
             "period_start": subscription.current_period_start.isoformat(),
@@ -136,8 +137,8 @@ async def reset_to_free_plan(
     # Reset to free plan
     old_plan = subscription.plan
     subscription.plan = SubscriptionPlan.FREE
-    subscription.credits_limit = free_plan.credits_limit
-    subscription.credits_used_this_month = 0.0
+    subscription.subscription_credits_limit = free_plan.credits_limit
+    subscription.subscription_credits_used = 0.0
     subscription.billing_cycle = BillingCycle.MONTHLY
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     subscription.stripe_customer_id = None
@@ -154,8 +155,8 @@ async def reset_to_free_plan(
         "previous_plan": old_plan,
         "current": {
             "plan": subscription.plan,
-            "credits_limit": subscription.credits_limit,
-            "credits_used": subscription.credits_used_this_month
+            "credits_limit": subscription.subscription_credits_limit,
+            "credits_used": subscription.subscription_credits_used
         }
     }
 

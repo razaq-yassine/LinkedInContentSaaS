@@ -139,8 +139,8 @@ async def get_all_users(
         if subscription:
             subscription_detail = UserSubscriptionDetail(
                 plan=subscription.plan.value,
-                credits_used_this_month=subscription.credits_used_this_month,
-                credits_limit=subscription.credits_limit,
+                credits_used_this_month=subscription.subscription_credits_used,
+                credits_limit=subscription.subscription_credits_limit,
                 stripe_customer_id=subscription.stripe_customer_id,
                 stripe_subscription_id=subscription.stripe_subscription_id,
                 current_period_end=subscription.current_period_end
@@ -210,8 +210,8 @@ async def get_user_detail(
     if subscription:
         subscription_detail = UserSubscriptionDetail(
             plan=subscription.plan.value,
-            credits_used_this_month=subscription.credits_used_this_month,
-            credits_limit=subscription.credits_limit,
+            credits_used_this_month=subscription.subscription_credits_used,
+            credits_limit=subscription.subscription_credits_limit,
             stripe_customer_id=subscription.stripe_customer_id,
             stripe_subscription_id=subscription.stripe_subscription_id,
             current_period_end=subscription.current_period_end
@@ -266,7 +266,7 @@ async def update_user_subscription(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid plan: {plan}")
     
-    subscription.credits_limit = plan_config.credits_limit
+    subscription.subscription_credits_limit = plan_config.credits_limit
     db.commit()
     
     return {"success": True, "message": "Subscription updated successfully"}
@@ -562,6 +562,107 @@ async def grant_user_credits(
         "success": True,
         "message": f"Granted {credits} credits to user",
         "result": result
+    }
+
+
+@router.post("/users/{user_id}/credits/purchase-grant")
+async def grant_purchased_credits(
+    user_id: str,
+    credits: float,
+    reason: str,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Grant purchased credits to a user (admin action) - adds to purchased credits balance"""
+    from ..services.credit_service import add_purchased_credits
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    result = add_purchased_credits(
+        db=db,
+        user_id=user_id,
+        amount=credits,
+        purchase_id=None,
+        description=f"Admin grant: {reason}"
+    )
+    
+    return {
+        "success": True,
+        "message": f"Granted {credits} purchased credits to user",
+        "result": result
+    }
+
+
+@router.get("/settings/credit-pricing")
+async def get_credit_pricing_settings(
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get credit pricing configuration"""
+    from ..services import credit_purchase_service
+    
+    pricing = credit_purchase_service.get_credit_pricing(db)
+    return pricing
+
+
+@router.put("/settings/credit-pricing")
+async def update_credit_pricing_settings(
+    price_per_unit: Optional[float] = None,
+    purchase_steps: Optional[str] = None,  # JSON string
+    bulk_discounts: Optional[str] = None,  # JSON string
+    max_purchase: Optional[int] = None,
+    enabled: Optional[bool] = None,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Update credit pricing configuration"""
+    import json
+    
+    settings_to_update = {}
+    
+    if price_per_unit is not None:
+        settings_to_update["credit_price_per_unit"] = str(price_per_unit)
+    if purchase_steps is not None:
+        # Validate JSON
+        try:
+            json.loads(purchase_steps)
+            settings_to_update["credit_purchase_steps"] = purchase_steps
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON for purchase_steps")
+    if bulk_discounts is not None:
+        # Validate JSON
+        try:
+            json.loads(bulk_discounts)
+            settings_to_update["credit_bulk_discounts"] = bulk_discounts
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON for bulk_discounts")
+    if max_purchase is not None:
+        settings_to_update["credit_max_purchase"] = str(max_purchase)
+    if enabled is not None:
+        settings_to_update["credit_purchase_enabled"] = str(enabled).lower()
+    
+    for key, value in settings_to_update.items():
+        setting = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+        if setting:
+            setting.value = value
+            setting.updated_at = datetime.utcnow()
+        else:
+            setting = AdminSetting(
+                id=str(uuid.uuid4()),
+                key=key,
+                value=value,
+                description=f"Credit pricing setting: {key}"
+            )
+            db.add(setting)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Credit pricing settings updated",
+        "updated_settings": list(settings_to_update.keys())
     }
 
 
@@ -1351,6 +1452,77 @@ async def export_logs_csv(
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+
+
+@router.get("/settings/credit-pricing")
+async def get_credit_pricing_settings(
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get credit pricing configuration"""
+    from ..services import credit_purchase_service
+    
+    pricing = credit_purchase_service.get_credit_pricing(db)
+    return pricing
+
+
+@router.put("/settings/credit-pricing")
+async def update_credit_pricing_settings(
+    price_per_unit: Optional[float] = None,
+    purchase_steps: Optional[str] = None,  # JSON string
+    bulk_discounts: Optional[str] = None,  # JSON string
+    max_purchase: Optional[int] = None,
+    enabled: Optional[bool] = None,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Update credit pricing configuration"""
+    import json
+    
+    settings_to_update = {}
+    
+    if price_per_unit is not None:
+        settings_to_update["credit_price_per_unit"] = str(price_per_unit)
+    if purchase_steps is not None:
+        # Validate JSON
+        try:
+            json.loads(purchase_steps)
+            settings_to_update["credit_purchase_steps"] = purchase_steps
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON for purchase_steps")
+    if bulk_discounts is not None:
+        # Validate JSON
+        try:
+            json.loads(bulk_discounts)
+            settings_to_update["credit_bulk_discounts"] = bulk_discounts
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON for bulk_discounts")
+    if max_purchase is not None:
+        settings_to_update["credit_max_purchase"] = str(max_purchase)
+    if enabled is not None:
+        settings_to_update["credit_purchase_enabled"] = str(enabled).lower()
+    
+    for key, value in settings_to_update.items():
+        setting = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+        if setting:
+            setting.value = value
+            setting.updated_at = datetime.utcnow()
+        else:
+            setting = AdminSetting(
+                id=str(uuid.uuid4()),
+                key=key,
+                value=value,
+                description=f"Credit pricing setting: {key}"
+            )
+            db.add(setting)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Credit pricing settings updated",
+        "updated_settings": list(settings_to_update.keys())
+    }
 
 
 @router.get("/logs/export/json")

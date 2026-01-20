@@ -256,14 +256,19 @@ async def get_user_subscription(
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
+    # Get credit breakdown
+    from ..services import credit_service
+    breakdown = credit_service.get_credit_breakdown(db, user_id)
+    
     return {
         "plan": subscription.plan.value if hasattr(subscription.plan, 'value') else subscription.plan,
-        "credits_used": subscription.credits_used_this_month,
-        "credits_limit": subscription.credits_limit,
-        "credits_remaining": subscription.credits_limit - subscription.credits_used_this_month,
+        "credits_used": subscription.subscription_credits_used,
+        "credits_limit": subscription.subscription_credits_limit,
+        "credits_remaining": breakdown["total_available"],
+        "breakdown": breakdown,
         "billing_cycle": subscription.billing_cycle.value if subscription.billing_cycle else "monthly",
         "subscription_status": subscription.subscription_status.value if subscription.subscription_status else "active",
-        "current_period_end": subscription.current_period_end,
+        "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
         "stripe_customer_id": subscription.stripe_customer_id,
         "stripe_subscription_id": subscription.stripe_subscription_id
     }

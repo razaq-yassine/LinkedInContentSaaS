@@ -6,19 +6,29 @@ from pydantic import BaseModel
 import stripe
 
 from ..database import get_db
-from ..models import User, Subscription, SubscriptionPlanConfig
+from ..models import User, Subscription, SubscriptionPlanConfig, SubscriptionPlan
 from ..routers.auth import get_current_user
 from ..services import stripe_service, credit_service
 from ..config import get_settings
+from pydantic import BaseModel as PydanticBaseModel
 
 settings = get_settings()
 stripe.api_key = settings.stripe_secret_key
 
 router = APIRouter()
 
-class CheckoutRequest(BaseModel):
+class CheckoutRequest(PydanticBaseModel):
     plan: str
     billing_cycle: str
+
+
+class UpgradeRequest(PydanticBaseModel):
+    plan: str
+    billing_cycle: str
+
+
+class DowngradeRequest(PydanticBaseModel):
+    pass
 
 @router.get("/plans")
 async def get_public_subscription_plans(db: Session = Depends(get_db)):
@@ -86,6 +96,68 @@ async def create_checkout_session(
         "billing_cycle": request.billing_cycle
     }
 
+
+@router.post("/upgrade")
+async def upgrade_subscription(
+    request: UpgradeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Explicit upgrade endpoint - cancels old subscription and creates new one immediately"""
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == current_user.id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    if subscription.plan == SubscriptionPlan.FREE:
+        raise HTTPException(status_code=400, detail="Cannot upgrade from free plan. Use /checkout instead.")
+    
+    if subscription.plan.value == request.plan:
+        raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
+    
+    # Use upgrade handler
+    result = stripe_service.handle_upgrade(
+        db=db,
+        user=current_user,
+        new_plan_name=request.plan,
+        billing_cycle=request.billing_cycle
+    )
+    
+    return result
+
+
+@router.post("/downgrade")
+async def downgrade_subscription(
+    request: DowngradeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Schedule downgrade to free plan - keeps premium access until period end"""
+    result = stripe_service.handle_downgrade_to_free(db=db, user=current_user)
+    return result
+
+
+@router.post("/cancel")
+async def cancel_subscription(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel subscription (schedules downgrade to free at period end)"""
+    result = stripe_service.handle_downgrade_to_free(db=db, user=current_user)
+    return result
+
+
+@router.get("/credits/breakdown")
+async def get_credit_breakdown(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get detailed credit breakdown showing subscription and purchased credits"""
+    breakdown = credit_service.get_credit_breakdown(db, current_user.id)
+    return breakdown
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhook events"""
@@ -122,6 +194,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         invoice = event.data.object
         result = stripe_service.handle_invoice_failed(db, invoice)
         return {"status": "success", "event": "invoice.payment_failed", "result": result}
+    
+    elif event.type == "customer.subscription.updated":
+        subscription = event.data.object
+        result = stripe_service.handle_subscription_updated(db, subscription)
+        return {"status": "success", "event": "customer.subscription.updated", "result": result}
     
     elif event.type == "customer.subscription.deleted":
         subscription = event.data.object

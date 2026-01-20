@@ -206,6 +206,19 @@ const SETTING_CATEGORIES: SettingCategory[] = [
     description: 'Manage API keys and environment configuration',
     icon: <Key className="w-5 h-5" />,
     settings: []
+  },
+  {
+    id: 'credit_pricing',
+    title: 'Credit Pricing',
+    description: 'Configure purchased credit pricing and settings',
+    icon: <Zap className="w-5 h-5" />,
+    settings: [
+      'credit_purchase_enabled',
+      'credit_price_per_unit',
+      'credit_purchase_steps',
+      'credit_bulk_discounts',
+      'credit_max_purchase'
+    ]
   }
 ];
 
@@ -221,7 +234,8 @@ const BOOLEAN_SETTINGS = [
   'keyboard_shortcuts_enabled', 'premium_features_enabled', 'api_access_enabled', 'bulk_generation_enabled', 'export_enabled',
   'content_moderation_enabled', 'profanity_filter_enabled', 'spam_detection_enabled',
   'email_notifications_enabled', 'welcome_email_enabled', 'weekly_digest_enabled', 'tips_emails_enabled',
-  'analytics_enabled', 'error_tracking_enabled', 'performance_monitoring_enabled'
+  'analytics_enabled', 'error_tracking_enabled', 'performance_monitoring_enabled',
+  'credit_purchase_enabled'
 ];
 
 const NUMBER_SETTINGS = [
@@ -229,7 +243,8 @@ const NUMBER_SETTINGS = [
   'max_daily_generations_premium', 'max_images_per_day_free', 'max_images_per_day_premium',
   'max_conversations_stored', 'max_post_length',
   'brave_search_cost_per_1000', 'brave_free_monthly_limit',
-  'cloudflare_daily_neuron_limit', 'cloudflare_cost_per_1000_neurons'
+  'cloudflare_daily_neuron_limit', 'cloudflare_cost_per_1000_neurons',
+  'credit_price_per_unit', 'credit_max_purchase'
 ];
 
 const SELECT_SETTINGS: Record<string, { options: string[], labels: string[] }> = {
@@ -259,7 +274,8 @@ const COLOR_SETTINGS = ['public_accent_color', 'app_accent_color', 'primary_colo
 
 const TEXTAREA_SETTINGS = [
   'system_prompt', 'content_format_guidelines', 'comment_worthiness_rubric', 
-  'maintenance_message', 'custom_css', 'default_preferences', 'trending_topics', 'blocked_keywords'
+  'maintenance_message', 'custom_css', 'default_preferences', 'trending_topics', 'blocked_keywords',
+  'credit_purchase_steps', 'credit_bulk_discounts'
 ];
 
 export default function GlobalSettingsPage() {
@@ -770,6 +786,13 @@ export default function GlobalSettingsPage() {
       cloudflare_workers_ai_tier: 'Cloudflare Workers AI Tier',
       cloudflare_daily_neuron_limit: 'Daily Neuron Limit',
       cloudflare_cost_per_1000_neurons: 'Cost per 1000 Neurons',
+      
+      // Credit Pricing
+      credit_purchase_enabled: 'Enable Credit Purchases',
+      credit_price_per_unit: 'Price Per Credit (cents)',
+      credit_purchase_steps: 'Purchase Steps (JSON array)',
+      credit_bulk_discounts: 'Bulk Discounts (JSON array)',
+      credit_max_purchase: 'Max Purchase Per Transaction',
     };
     return names[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };

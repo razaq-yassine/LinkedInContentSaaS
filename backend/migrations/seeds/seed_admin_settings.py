@@ -109,6 +109,31 @@ Mix these formats regularly for algorithm optimization:
                 "key": "trending_topics",
                 "value": '["AI and automation in business", "Remote work best practices", "Career growth strategies", "Leadership lessons", "Industry-specific technical updates", "Productivity tips", "Workplace culture", "Professional development", "Tech trends", "Data-driven insights"]',
                 "description": "Sample trending topics for suggestions"
+            },
+            {
+                "key": "credit_price_per_unit",
+                "value": "10",
+                "description": "Price per credit in cents (e.g., 10 = $0.10 per credit)"
+            },
+            {
+                "key": "credit_purchase_steps",
+                "value": "[10, 25, 50, 100, 250, 500]",
+                "description": "Available credit purchase amounts (JSON array)"
+            },
+            {
+                "key": "credit_bulk_discounts",
+                "value": '[{"min": 100, "discount": 0.1}, {"min": 250, "discount": 0.15}]',
+                "description": "Bulk discount tiers - min credits required and discount percentage (JSON array)"
+            },
+            {
+                "key": "credit_max_purchase",
+                "value": "1000",
+                "description": "Maximum credits that can be purchased in a single transaction"
+            },
+            {
+                "key": "credit_purchase_enabled",
+                "value": "true",
+                "description": "Enable/disable credit purchase feature (true/false)"
             }
         ]
         

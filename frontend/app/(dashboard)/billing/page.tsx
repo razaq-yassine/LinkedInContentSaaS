@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { Check, Sparkles, Zap, Crown, Loader2, Star, TrendingUp, DollarSign, Calendar, BarChart3, Rocket, Shield, Gift, ArrowRight } from 'lucide-react';
+import { Check, Sparkles, Zap, Crown, Loader2, Star, TrendingUp, DollarSign, Calendar, BarChart3, Rocket, Shield, Gift, ArrowRight, ShoppingCart, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import UpgradeConsentModal from '@/components/modals/UpgradeConsentModal';
+import DowngradeConsentModal from '@/components/modals/DowngradeConsentModal';
+import PurchaseCreditsModal from '@/components/modals/PurchaseCreditsModal';
 
 interface SubscriptionPlan {
   id: string;
@@ -35,6 +38,17 @@ interface UserSubscription {
   billing_cycle: string;
   subscription_status: string;
   current_period_end: string | null;
+  breakdown?: {
+    subscription: {
+      limit: number;
+      used: number;
+      available: number;
+    };
+    purchased: {
+      balance: number;
+    };
+    total_available: number;
+  };
 }
 
 export default function BillingPage() {
@@ -46,6 +60,10 @@ export default function BillingPage() {
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('usage');
   const [testMode, setTestMode] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
+  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -93,11 +111,14 @@ export default function BillingPage() {
   const fetchPlansAndSubscription = async () => {
     try {
       const token = localStorage.getItem('token');
-      const [plansResponse, subscriptionResponse] = await Promise.all([
+      const [plansResponse, subscriptionResponse, breakdownResponse] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/subscription/plans`),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/user/subscription`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/subscription/credits/breakdown`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => null), // Optional, fallback if not available
       ]);
 
       const activePlans = plansResponse.data
@@ -106,7 +127,11 @@ export default function BillingPage() {
         .slice(0, 4);
 
       setPlans(activePlans);
-      setCurrentSubscription(subscriptionResponse.data);
+      const subscriptionData = subscriptionResponse.data;
+      if (breakdownResponse?.data) {
+        subscriptionData.breakdown = breakdownResponse.data;
+      }
+      setCurrentSubscription(subscriptionData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -115,6 +140,21 @@ export default function BillingPage() {
   };
 
   const handleSubscribe = async (planName: string) => {
+    // Check if this is an upgrade (user has paid plan)
+    const currentPlan = currentSubscription?.plan;
+    const isUpgrade = currentPlan && currentPlan !== 'free' && currentPlan !== planName;
+    
+    if (isUpgrade) {
+      // Show upgrade consent modal
+      setSelectedUpgradePlan(planName);
+      setUpgradeModalOpen(true);
+    } else {
+      // New subscription - proceed directly
+      await proceedWithSubscription(planName);
+    }
+  };
+
+  const proceedWithSubscription = async (planName: string) => {
     setProcessingPlan(planName);
     try {
       const token = localStorage.getItem('token');
@@ -135,8 +175,60 @@ export default function BillingPage() {
     } catch (error: any) {
       console.error('Subscription error:', error);
       alert(error.response?.data?.detail || 'Failed to start subscription process');
+      setProcessingPlan(null);
+    }
+  };
+
+  const handleUpgradeConfirm = async () => {
+    if (!selectedUpgradePlan) return;
+    
+    setUpgradeModalOpen(false);
+    setProcessingPlan(selectedUpgradePlan);
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/subscription/upgrade`,
+        {
+          plan: selectedUpgradePlan,
+          billing_cycle: billingCycle,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Refresh subscription data
+      await fetchPlansAndSubscription();
+      alert('Upgrade successful! Your new plan is now active.');
+    } catch (error: any) {
+      console.error('Upgrade error:', error);
+      alert(error.response?.data?.detail || 'Failed to upgrade subscription');
     } finally {
       setProcessingPlan(null);
+      setSelectedUpgradePlan(null);
+    }
+  };
+
+  const handleDowngradeConfirm = async () => {
+    setDowngradeModalOpen(false);
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/subscription/downgrade`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Refresh subscription data
+      await fetchPlansAndSubscription();
+      alert('Downgrade scheduled. You\'ll keep premium access until your billing period ends.');
+    } catch (error: any) {
+      console.error('Downgrade error:', error);
+      alert(error.response?.data?.detail || 'Failed to schedule downgrade');
     }
   };
 
@@ -411,7 +503,7 @@ export default function BillingPage() {
                   </CardContent>
                 </Card>
 
-                {/* Credit Usage Card */}
+                {/* Credit Usage Card with Breakdown */}
                 <Card className="bg-white/80 dark:bg-gradient-to-br dark:from-slate-800/80 dark:to-slate-800/40 border border-slate-200 dark:border-slate-700/50 backdrop-blur-xl shadow-lg dark:shadow-xl overflow-hidden relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5" />
                   <CardHeader className="pb-2 sm:pb-4 p-4 sm:p-6 relative">
@@ -422,40 +514,120 @@ export default function BillingPage() {
                   </CardHeader>
                   <CardContent className="pt-0 p-4 sm:p-6 relative">
                     <div className="space-y-4 sm:space-y-5">
+                      {/* Total Credits */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                        <span className="text-slate-600 dark:text-white font-semibold text-sm sm:text-base">Credits this month:</span>
+                        <span className="text-slate-600 dark:text-white font-semibold text-sm sm:text-base">Total Available:</span>
                         <span className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                          {currentSubscription.credits_limit === -1 
+                          {currentSubscription.breakdown?.total_available === -1 
                             ? '∞ Unlimited' 
-                            : `${Math.round(currentSubscription.credits_used * 100) / 100} / ${currentSubscription.credits_limit}`}
+                            : currentSubscription.breakdown 
+                              ? Math.round(currentSubscription.breakdown.total_available * 100) / 100
+                              : Math.round(currentSubscription.credits_remaining * 100) / 100}
                         </span>
                       </div>
-                      {currentSubscription.credits_limit === -1 ? (
-                        <div className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full h-4 sm:h-5 shadow-lg shadow-purple-500/30 relative overflow-hidden">
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent animate-pulse" />
-                        </div>
-                      ) : (
-                        <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-4 sm:h-5 overflow-hidden shadow-inner">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-700 relative overflow-hidden shadow-lg shadow-purple-500/30"
-                            style={{
-                              width: `${Math.min((currentSubscription.credits_used / currentSubscription.credits_limit) * 100, 100)}%`
-                            }}
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
+
+                      {/* Credit Breakdown */}
+                      {currentSubscription.breakdown && currentSubscription.breakdown.total_available !== -1 && (
+                        <div className="space-y-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600 dark:text-slate-400">Subscription Credits:</span>
+                            <span className="font-semibold text-slate-900 dark:text-white">
+                              {Math.round(currentSubscription.breakdown.subscription.available * 100) / 100} / {currentSubscription.breakdown.subscription.limit}
+                            </span>
                           </div>
+                          {currentSubscription.breakdown.subscription.limit !== -1 && (
+                            <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-3 overflow-hidden">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full transition-all duration-700"
+                                style={{
+                                  width: `${Math.min((currentSubscription.breakdown.subscription.available / currentSubscription.breakdown.subscription.limit) * 100, 100)}%`
+                                }}
+                              />
+                            </div>
+                          )}
+                          {currentSubscription.breakdown.purchased.balance > 0 && (
+                            <>
+                              <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200 dark:border-slate-700">
+                                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                                  <Sparkles className="w-4 h-4 text-purple-500" />
+                                  Purchased Credits:
+                                </span>
+                                <span className="font-semibold text-purple-600 dark:text-purple-400">
+                                  {Math.round(currentSubscription.breakdown.purchased.balance * 100) / 100}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Purchased credits never expire and are used after subscription credits
+                              </p>
+                            </>
+                          )}
                         </div>
                       )}
+
+                      {/* Legacy display for backward compatibility */}
+                      {!currentSubscription.breakdown && (
+                        <>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+                            <span className="text-slate-600 dark:text-white font-semibold text-sm sm:text-base">Credits this month:</span>
+                            <span className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+                              {currentSubscription.credits_limit === -1 
+                                ? '∞ Unlimited' 
+                                : `${Math.round(currentSubscription.credits_used * 100) / 100} / ${currentSubscription.credits_limit}`}
+                            </span>
+                          </div>
+                          {currentSubscription.credits_limit === -1 ? (
+                            <div className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full h-4 sm:h-5 shadow-lg shadow-purple-500/30 relative overflow-hidden">
+                              <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent animate-pulse" />
+                            </div>
+                          ) : (
+                            <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-4 sm:h-5 overflow-hidden shadow-inner">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-700 relative overflow-hidden shadow-lg shadow-purple-500/30"
+                                style={{
+                                  width: `${Math.min((currentSubscription.credits_used / currentSubscription.credits_limit) * 100, 100)}%`
+                                }}
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
                       {currentSubscription.current_period_end && (
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-300 text-center font-medium">
                           {currentSubscription.credits_limit === -1 
                             ? '✨ Unlimited credits - no reset needed' 
-                            : `🔄 Resets on ${new Date(currentSubscription.current_period_end).toLocaleDateString()}`}
+                            : `🔄 Subscription credits reset on ${new Date(currentSubscription.current_period_end).toLocaleDateString()}`}
                         </p>
                       )}
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Purchase Credits Card */}
+                {currentSubscription && currentSubscription.plan !== 'free' && (
+                  <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 border-2 border-purple-200 dark:border-purple-800 backdrop-blur-xl shadow-lg dark:shadow-xl">
+                    <CardHeader className="pb-3 p-4 sm:p-6">
+                      <CardTitle className="text-base sm:text-xl font-bold text-slate-900 dark:text-white flex items-center">
+                        <ShoppingCart className="w-5 h-5 mr-2 text-purple-500 dark:text-purple-400" />
+                        Purchase Additional Credits
+                      </CardTitle>
+                      <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                        Buy credits that never expire. Used after your subscription credits are exhausted.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0 p-4 sm:p-6">
+                      <Button
+                        onClick={() => setPurchaseModalOpen(true)}
+                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/25"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Buy Credits
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </TabsContent>
@@ -695,6 +867,18 @@ export default function BillingPage() {
                             )}
                           </Button>
                         )}
+                        
+                        {/* Downgrade button for paid plans */}
+                        {isCurrent && currentSubscription && currentSubscription.plan !== 'free' && (
+                          <Button
+                            onClick={handleDowngrade}
+                            variant="outline"
+                            className="w-full py-3 sm:py-4 text-xs sm:text-sm font-semibold border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                          >
+                            <ArrowDown className="w-4 h-4 mr-2" />
+                            Downgrade to Free
+                          </Button>
+                        )}
                       </CardFooter>
                     </Card>
                   );
@@ -733,6 +917,46 @@ export default function BillingPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Modals */}
+        {selectedUpgradePlan && (
+          <UpgradeConsentModal
+            open={upgradeModalOpen}
+            onClose={() => {
+              setUpgradeModalOpen(false);
+              setSelectedUpgradePlan(null);
+            }}
+            onConfirm={handleUpgradeConfirm}
+            currentPlan={currentSubscription?.plan || 'free'}
+            newPlan={selectedUpgradePlan}
+            currentPrice={getCurrentPlanPrice()}
+            newPrice={
+              plans.find(p => p.plan_name === selectedUpgradePlan)
+                ? (billingCycle === 'monthly'
+                    ? plans.find(p => p.plan_name === selectedUpgradePlan)!.price_monthly / 100
+                    : plans.find(p => p.plan_name === selectedUpgradePlan)!.price_yearly / 100)
+                : 0
+            }
+            billingCycle={billingCycle}
+          />
+        )}
+
+        <DowngradeConsentModal
+          open={downgradeModalOpen}
+          onClose={() => setDowngradeModalOpen(false)}
+          onConfirm={handleDowngradeConfirm}
+          currentPlan={currentSubscription?.plan || 'free'}
+          periodEndDate={currentSubscription?.current_period_end || null}
+        />
+
+        <PurchaseCreditsModal
+          open={purchaseModalOpen}
+          onClose={() => setPurchaseModalOpen(false)}
+          onSuccess={() => {
+            setPurchaseModalOpen(false);
+            fetchPlansAndSubscription();
+          }}
+        />
       </div>
     </div>
   );

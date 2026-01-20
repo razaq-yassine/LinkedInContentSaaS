@@ -9,9 +9,12 @@ import stripe
 
 from ..config import get_settings
 from ..models import User, Subscription, SubscriptionPlanConfig, SubscriptionPlan, BillingCycle, SubscriptionStatus
-from .credit_service import reset_monthly_credits
+from .credit_service import reset_subscription_credits
 from .notification_service import send_notification
+from ..logging_config import get_logger
 from fastapi import HTTPException
+
+logger = get_logger(__name__)
 
 settings = get_settings()
 
@@ -387,10 +390,28 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
     stripe_subscription_id = session.subscription
     stripe_subscription = stripe.Subscription.retrieve(stripe_subscription_id)
     
-    # Update subscription
-    subscription.plan = SubscriptionPlan(plan_name)
-    subscription.credits_limit = plan_config.credits_limit
-    subscription.credits_used_this_month = 0  # Reset credits
+    # Check if this is an upgrade (user has existing paid subscription)
+    is_upgrade = (
+        subscription.stripe_subscription_id and 
+        subscription.stripe_subscription_id != stripe_subscription_id and
+        subscription.plan != SubscriptionPlan.FREE
+    )
+    
+    old_plan_limit = subscription.subscription_credits_limit
+    old_used = subscription.subscription_credits_used
+    
+    if is_upgrade:
+        # Handle upgrade: preserve credits, add new plan credits
+        # Preserve subscription_credits_used, update limit to new plan
+        subscription.plan = SubscriptionPlan(plan_name)
+        subscription.subscription_credits_limit = plan_config.credits_limit
+        # subscription_credits_used stays the same (preserves balance)
+    else:
+        # New subscription: reset credits
+        subscription.plan = SubscriptionPlan(plan_name)
+        subscription.subscription_credits_limit = plan_config.credits_limit
+        subscription.subscription_credits_used = 0
+    
     subscription.billing_cycle = BillingCycle(billing_cycle)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     subscription.stripe_subscription_id = stripe_subscription_id
@@ -402,23 +423,35 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
     
     # Send notification
     try:
-        send_notification(
-            db=db,
-            action_code="subscription_activated",
-            user_id=user_id,
-            data={
-                "plan": plan_name,
-                "credits_limit": plan_config.credits_limit
-            }
-        )
+        if is_upgrade:
+            send_notification(
+                db=db,
+                action_code="subscription_upgraded",
+                user_id=user_id,
+                data={
+                    "old_plan": old_plan_limit,
+                    "new_plan": plan_name,
+                    "credits_limit": plan_config.credits_limit
+                }
+            )
+        else:
+            send_notification(
+                db=db,
+                action_code="subscription_activated",
+                user_id=user_id,
+                data={
+                    "plan": plan_name,
+                    "credits_limit": plan_config.credits_limit
+                }
+            )
     except Exception as e:
-        print(f"Failed to send subscription activation notification: {str(e)}")
+        print(f"Failed to send subscription notification: {str(e)}")
     
     return {
         "user_id": user_id,
         "plan": plan_name,
         "credits_limit": plan_config.credits_limit,
-        "status": "activated"
+        "status": "upgraded" if is_upgrade else "activated"
     }
 
 
@@ -446,8 +479,9 @@ def handle_invoice_paid(db: Session, invoice: stripe.Invoice) -> Dict:
     if not subscription:
         return {"status": "skipped", "reason": "Subscription not found"}
     
-    # Reset monthly credits
-    reset_monthly_credits(db, subscription.user_id)
+    # Reset subscription credits (not purchased credits)
+    from ..services.credit_service import reset_subscription_credits
+    reset_subscription_credits(db, subscription.user_id)
     
     # Update period dates from Stripe
     stripe_subscription = stripe.Subscription.retrieve(subscription_id)
@@ -527,9 +561,264 @@ def handle_invoice_failed(db: Session, invoice: stripe.Invoice) -> Dict:
     }
 
 
+def handle_upgrade(
+    db: Session,
+    user: User,
+    new_plan_name: str,
+    billing_cycle: str
+) -> Dict:
+    """
+    Handle subscription upgrade (paid → higher paid plan)
+    Cancels old subscription, creates new one, preserves credits
+    
+    Args:
+        db: Database session
+        user: User object
+        new_plan_name: New plan name
+        billing_cycle: Monthly or yearly
+    
+    Returns:
+        Dict with upgrade details
+    """
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user.id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    if subscription.plan == SubscriptionPlan.FREE:
+        raise HTTPException(status_code=400, detail="Cannot upgrade from free plan using this method")
+    
+    # Get new plan config
+    plan_config = db.query(SubscriptionPlanConfig).filter(
+        SubscriptionPlanConfig.plan_name == new_plan_name,
+        SubscriptionPlanConfig.is_active == True
+    ).first()
+    
+    if not plan_config:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    old_plan = subscription.plan
+    old_limit = subscription.subscription_credits_limit
+    old_used = subscription.subscription_credits_used
+    
+    # Cancel old Stripe subscription immediately
+    if subscription.stripe_subscription_id:
+        try:
+            stripe.Subscription.delete(subscription.stripe_subscription_id)
+        except stripe.error.StripeError as e:
+            logger.error(f"Error canceling old subscription: {str(e)}")
+    
+    # Create new Stripe subscription
+    customer_id = subscription.stripe_customer_id
+    if not customer_id:
+        customer_id = create_customer(user)
+        subscription.stripe_customer_id = customer_id
+    
+    # Get price ID for new plan
+    if billing_cycle == "monthly":
+        price_id = plan_config.stripe_price_id_monthly
+    else:
+        price_id = plan_config.stripe_price_id_yearly
+    
+    if not price_id:
+        price_id = create_or_get_stripe_price(db, plan_config, billing_cycle)
+    
+    # Create new subscription
+    new_stripe_subscription = stripe.Subscription.create(
+        customer=customer_id,
+        items=[{"price": price_id}],
+        metadata={
+            "user_id": user.id,
+            "plan_name": new_plan_name,
+            "billing_cycle": billing_cycle
+        }
+    )
+    
+    # Update subscription: preserve credits_used, update limit
+    subscription.plan = SubscriptionPlan(new_plan_name)
+    subscription.subscription_credits_limit = plan_config.credits_limit
+    # subscription_credits_used stays the same (preserves balance)
+    subscription.billing_cycle = BillingCycle(billing_cycle)
+    subscription.subscription_status = SubscriptionStatus.ACTIVE
+    subscription.stripe_subscription_id = new_stripe_subscription.id
+    subscription.current_period_start = datetime.fromtimestamp(new_stripe_subscription.current_period_start)
+    subscription.current_period_end = datetime.fromtimestamp(new_stripe_subscription.current_period_end)
+    
+    db.commit()
+    db.refresh(subscription)
+    
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="subscription_upgraded",
+            user_id=user.id,
+            data={
+                "old_plan": old_plan.value,
+                "new_plan": new_plan_name,
+                "credits_limit": plan_config.credits_limit,
+                "credits_preserved": old_limit - old_used
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to send upgrade notification: {str(e)}")
+    
+    return {
+        "user_id": user.id,
+        "old_plan": old_plan.value,
+        "new_plan": new_plan_name,
+        "credits_limit": plan_config.credits_limit,
+        "status": "upgraded"
+    }
+
+
+def handle_downgrade_to_free(db: Session, user: User) -> Dict:
+    """
+    Handle downgrade to free plan
+    Schedules downgrade at period end, keeps premium access until then
+    
+    Args:
+        db: Database session
+        user: User object
+    
+    Returns:
+        Dict with downgrade scheduling details
+    """
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user.id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    if subscription.plan == SubscriptionPlan.FREE:
+        raise HTTPException(status_code=400, detail="Already on free plan")
+    
+    # Get free plan config
+    free_plan = db.query(SubscriptionPlanConfig).filter(
+        SubscriptionPlanConfig.plan_name == "free",
+        SubscriptionPlanConfig.is_active == True
+    ).first()
+    
+    if not free_plan:
+        raise HTTPException(status_code=404, detail="Free plan not found")
+    
+    # Schedule downgrade at period end
+    subscription.scheduled_downgrade_plan = "free"
+    subscription.scheduled_downgrade_date = subscription.current_period_end
+    
+    # Cancel Stripe subscription at period end (keeps access until then)
+    if subscription.stripe_subscription_id:
+        try:
+            stripe.Subscription.modify(
+                subscription.stripe_subscription_id,
+                cancel_at_period_end=True
+            )
+        except stripe.error.StripeError as e:
+            logger.error(f"Error scheduling subscription cancellation: {str(e)}")
+    
+    db.commit()
+    db.refresh(subscription)
+    
+    # Send notification
+    try:
+        send_notification(
+            db=db,
+            action_code="subscription_downgrade_scheduled",
+            user_id=user.id,
+            data={
+                "current_plan": subscription.plan.value,
+                "scheduled_plan": "free",
+                "effective_date": subscription.current_period_end.isoformat() if subscription.current_period_end else None
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to send downgrade notification: {str(e)}")
+    
+    return {
+        "user_id": user.id,
+        "status": "downgrade_scheduled",
+        "current_plan": subscription.plan.value,
+        "scheduled_plan": "free",
+        "effective_date": subscription.current_period_end.isoformat() if subscription.current_period_end else None
+    }
+
+
+def handle_subscription_updated(db: Session, stripe_subscription: stripe.Subscription) -> Dict:
+    """
+    Handle Stripe subscription update (plan changes, period updates)
+    
+    Args:
+        db: Database session
+        stripe_subscription: Stripe Subscription object
+    
+    Returns:
+        Dict with update details
+    """
+    subscription = db.query(Subscription).filter(
+        Subscription.stripe_subscription_id == stripe_subscription.id
+    ).first()
+    
+    if not subscription:
+        return {"status": "skipped", "reason": "Subscription not found"}
+    
+    # Check if subscription was canceled at period end and period has ended
+    if stripe_subscription.cancel_at_period_end and stripe_subscription.status == "canceled":
+        # Period ended, apply scheduled downgrade
+        if subscription.scheduled_downgrade_plan:
+            # Apply downgrade
+            free_plan = db.query(SubscriptionPlanConfig).filter(
+                SubscriptionPlanConfig.plan_name == subscription.scheduled_downgrade_plan,
+                SubscriptionPlanConfig.is_active == True
+            ).first()
+            
+            if free_plan:
+                subscription.plan = SubscriptionPlan(free_plan.plan_name)
+                subscription.subscription_credits_limit = free_plan.credits_limit
+                subscription.subscription_status = SubscriptionStatus.CANCELED
+                subscription.scheduled_downgrade_plan = None
+                subscription.scheduled_downgrade_date = None
+                
+                db.commit()
+                
+                # Send notification
+                try:
+                    send_notification(
+                        db=db,
+                        action_code="subscription_downgraded",
+                        user_id=subscription.user_id,
+                        data={
+                            "plan": free_plan.plan_name,
+                            "credits_limit": free_plan.credits_limit
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send downgrade notification: {str(e)}")
+                
+                return {
+                    "user_id": subscription.user_id,
+                    "status": "downgraded",
+                    "plan": free_plan.plan_name
+                }
+    
+    # Update period dates
+    subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+    subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+    
+    db.commit()
+    
+    return {
+        "user_id": subscription.user_id,
+        "status": "updated"
+    }
+
+
 def handle_subscription_deleted(db: Session, stripe_subscription: stripe.Subscription) -> Dict:
     """
-    Handle subscription cancellation
+    Handle subscription cancellation/deletion
+    Checks if cancel_at_period_end was set - if so, applies downgrade
     
     Args:
         db: Database session
@@ -548,10 +837,48 @@ def handle_subscription_deleted(db: Session, stripe_subscription: stripe.Subscri
     if not subscription:
         return {"status": "skipped", "reason": "Subscription not found"}
     
-    # Mark as canceled and downgrade to free
+    # Check if this was a scheduled cancellation (cancel_at_period_end)
+    # If period_end has passed, apply downgrade
+    if subscription.scheduled_downgrade_plan and subscription.current_period_end:
+        if datetime.utcnow() >= subscription.current_period_end:
+            # Apply downgrade
+            free_plan = db.query(SubscriptionPlanConfig).filter(
+                SubscriptionPlanConfig.plan_name == subscription.scheduled_downgrade_plan,
+                SubscriptionPlanConfig.is_active == True
+            ).first()
+            
+            if free_plan:
+                subscription.plan = SubscriptionPlan(free_plan.plan_name)
+                subscription.subscription_credits_limit = free_plan.credits_limit
+                subscription.subscription_status = SubscriptionStatus.CANCELED
+                subscription.scheduled_downgrade_plan = None
+                subscription.scheduled_downgrade_date = None
+                
+                db.commit()
+                
+                try:
+                    send_notification(
+                        db=db,
+                        action_code="subscription_downgraded",
+                        user_id=subscription.user_id,
+                        data={
+                            "plan": free_plan.plan_name,
+                            "credits_limit": free_plan.credits_limit
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send downgrade notification: {str(e)}")
+                
+                return {
+                    "user_id": subscription.user_id,
+                    "status": "downgraded",
+                    "plan": free_plan.plan_name
+                }
+    
+    # Immediate cancellation (not scheduled)
     subscription.subscription_status = SubscriptionStatus.CANCELED
     subscription.plan = SubscriptionPlan.FREE
-    subscription.credits_limit = 5
+    subscription.subscription_credits_limit = 5
     subscription.billing_cycle = BillingCycle.MONTHLY
     
     db.commit()
@@ -567,7 +894,7 @@ def handle_subscription_deleted(db: Session, stripe_subscription: stripe.Subscri
             }
         )
     except Exception as e:
-        print(f"Failed to send subscription cancellation notification: {str(e)}")
+        logger.error(f"Failed to send subscription cancellation notification: {str(e)}")
     
     return {
         "user_id": subscription.user_id,

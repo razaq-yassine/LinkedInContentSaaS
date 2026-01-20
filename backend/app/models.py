@@ -58,6 +58,8 @@ class User(Base):
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     images = relationship("GeneratedImage", back_populates="user", cascade="all, delete-orphan")
     pdfs = relationship("GeneratedPDF", back_populates="user", cascade="all, delete-orphan")
+    credit_purchases = relationship("CreditPurchase", back_populates="user", cascade="all, delete-orphan")
+    purchased_credits = relationship("PurchasedCreditsBalance", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
@@ -229,18 +231,28 @@ class SubscriptionStatus(str, enum.Enum):
     PAST_DUE = "past_due"
 
 
+class CreditPurchaseStatus(str, enum.Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    REFUNDED = "refunded"
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
     
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     
     plan = Column(SQLEnum(SubscriptionPlan), default=SubscriptionPlan.FREE)
-    credits_used_this_month = Column(Float, default=0.0)
-    credits_limit = Column(Float, default=5.0)
+    subscription_credits_used = Column(Float, default=0.0)  # Renamed from credits_used_this_month
+    subscription_credits_limit = Column(Float, default=5.0)  # Renamed from credits_limit
     
     # Billing
     billing_cycle = Column(SQLEnum(BillingCycle), default=BillingCycle.MONTHLY, nullable=True)
     subscription_status = Column(SQLEnum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE)
+    
+    # Scheduled downgrade
+    scheduled_downgrade_plan = Column(String(100), nullable=True)  # Plan to downgrade to
+    scheduled_downgrade_date = Column(DateTime, nullable=True)  # When downgrade takes effect
     
     # Stripe integration
     stripe_customer_id = Column(String(255), nullable=True)
@@ -555,4 +567,38 @@ class NotificationLog(Base):
     # Relationships
     action = relationship("NotificationAction", back_populates="logs")
     user = relationship("User")
+
+
+class CreditPurchase(Base):
+    """Track credit purchases separate from subscriptions"""
+    __tablename__ = "credit_purchases"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    credits_purchased = Column(Float, nullable=False)
+    amount_paid_cents = Column(Integer, nullable=False)  # Stripe amount in cents
+    stripe_payment_intent_id = Column(String(255), nullable=True, index=True)
+    stripe_checkout_session_id = Column(String(255), nullable=True, index=True)
+    
+    purchase_date = Column(DateTime, default=datetime.utcnow, index=True)
+    status = Column(SQLEnum(CreditPurchaseStatus), default=CreditPurchaseStatus.PENDING, index=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="credit_purchases")
+
+
+class PurchasedCreditsBalance(Base):
+    """Track purchased credits balance per user"""
+    __tablename__ = "purchased_credits_balance"
+    
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    balance = Column(Float, default=0.0, nullable=False)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="purchased_credits")
 

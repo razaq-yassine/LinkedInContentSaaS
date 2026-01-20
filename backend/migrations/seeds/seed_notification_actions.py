@@ -41,6 +41,11 @@ def get_default_preferences(action_code: str) -> tuple[bool, bool]:
         "subscription_activated": (True, True),
         "subscription_canceled": (True, True),
         "subscription_renewed": (True, True),
+        "subscription_upgraded": (True, True),
+        "subscription_downgrade_scheduled": (True, True),
+        "subscription_downgraded": (True, True),
+        "subscription_credits_reset": (False, True),  # Email OFF, Push ON
+        "credits_purchased": (True, True),
     }
     
     return defaults.get(action_code, (True, True))  # Default to both enabled if not specified
@@ -98,6 +103,24 @@ def seed_notification_actions():
                 "description": "When a payment fails",
                 "category": "subscription"
             },
+            {
+                "action_code": "subscription_upgraded",
+                "action_name": "Subscription Upgraded",
+                "description": "When user upgrades to a higher plan",
+                "category": "subscription"
+            },
+            {
+                "action_code": "subscription_downgrade_scheduled",
+                "action_name": "Downgrade Scheduled",
+                "description": "When downgrade to free plan is scheduled",
+                "category": "subscription"
+            },
+            {
+                "action_code": "subscription_downgraded",
+                "action_name": "Subscription Downgraded",
+                "description": "When downgrade to free plan takes effect",
+                "category": "subscription"
+            },
             
             # Credits
             {
@@ -116,6 +139,18 @@ def seed_notification_actions():
                 "action_code": "credits_reset",
                 "action_name": "Credits Reset",
                 "description": "When monthly credits are reset",
+                "category": "account"
+            },
+            {
+                "action_code": "subscription_credits_reset",
+                "action_name": "Subscription Credits Reset",
+                "description": "When subscription credits reset (purchased credits unaffected)",
+                "category": "account"
+            },
+            {
+                "action_code": "credits_purchased",
+                "action_name": "Credits Purchased",
+                "description": "When user successfully purchases credits",
                 "category": "account"
             },
             
