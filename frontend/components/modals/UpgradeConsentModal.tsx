@@ -51,11 +51,11 @@ export default function UpgradeConsentModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-500" />
+          <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+            <AlertCircle className="w-5 h-5 text-amber-500 dark:text-amber-400" />
             Confirm Plan Upgrade
           </DialogTitle>
-          <DialogDescription className="pt-2">
+          <DialogDescription className="pt-2 text-slate-600 dark:text-slate-400">
             Review the key details before upgrading your plan.
           </DialogDescription>
         </DialogHeader>
@@ -78,11 +78,11 @@ export default function UpgradeConsentModal({
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
               <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Current Plan</p>
-              <p className="font-semibold capitalize text-sm">{currentPlan}</p>
+              <p className="font-semibold capitalize text-sm text-slate-900 dark:text-slate-100">{currentPlan}</p>
             </div>
             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
               <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">New Plan</p>
-              <p className="font-semibold capitalize text-sm">{newPlan}</p>
+              <p className="font-semibold capitalize text-sm text-slate-900 dark:text-slate-100">{newPlan}</p>
             </div>
           </div>
 

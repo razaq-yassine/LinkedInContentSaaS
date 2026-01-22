@@ -136,10 +136,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         router.push("/login");
         return;
       }
+      // Use helper function to get API URL with fallback
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/user/subscription`,
+        `${apiUrl}/api/user/subscription`,
         {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000,
         }
       );
       setSubscription(response.data);

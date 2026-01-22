@@ -177,6 +177,55 @@ def log_search_usage(
     return usage
 
 
+def log_onboarding_usage(
+    db: Session,
+    user_id: str,
+    input_tokens: int,
+    output_tokens: int,
+    model: str,
+    provider: str,
+    metadata: Optional[Dict] = None
+) -> UsageTracking:
+    """
+    Log onboarding usage (CV analysis and profile generation)
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        input_tokens: Number of input tokens
+        output_tokens: Number of output tokens
+        model: Model name
+        provider: Provider name (openai, gemini, claude)
+        metadata: Additional metadata (e.g., token breakdown by step)
+    
+    Returns:
+        Created UsageTracking record
+    """
+    total_tokens = input_tokens + output_tokens
+    cost = calculate_text_generation_cost(input_tokens, output_tokens, model)
+    
+    usage = UsageTracking(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        post_id=None,  # Onboarding is not associated with a post
+        service_type=ServiceType.ONBOARDING,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        estimated_cost=cost_to_cents(cost),
+        model=model,
+        provider=provider,
+        usage_metadata=metadata,
+        created_at=datetime.utcnow()
+    )
+    
+    db.add(usage)
+    db.commit()
+    db.refresh(usage)
+    
+    return usage
+
+
 def get_usage_summary(
     db: Session,
     start_date: Optional[datetime] = None,

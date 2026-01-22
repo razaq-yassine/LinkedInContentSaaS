@@ -81,6 +81,19 @@ async def create_checkout_session(
     if subscription.plan == request.plan:
         raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
     
+    # Check yearly → monthly restriction
+    can_switch, error_message, days_remaining = stripe_service.can_switch_yearly_to_monthly(
+        subscription=subscription,
+        new_billing_cycle=request.billing_cycle
+    )
+    
+    if not can_switch:
+        # Return structured error response
+        raise HTTPException(
+            status_code=400,
+            detail=error_message
+        )
+    
     # Create Stripe Checkout Session
     checkout_session = stripe_service.create_checkout_session(
         db=db,
@@ -116,6 +129,19 @@ async def upgrade_subscription(
     
     if subscription.plan.value == request.plan:
         raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
+    
+    # Check yearly → monthly restriction
+    can_switch, error_message, days_remaining = stripe_service.can_switch_yearly_to_monthly(
+        subscription=subscription,
+        new_billing_cycle=request.billing_cycle
+    )
+    
+    if not can_switch:
+        # Return structured error response
+        raise HTTPException(
+            status_code=400,
+            detail=error_message
+        )
     
     # Use upgrade handler
     result = stripe_service.handle_upgrade(

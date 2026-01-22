@@ -411,8 +411,8 @@ export default function Step5Preview({ profileData, tokenUsage, onComplete, onBa
         </CollapsibleSection>
       </div>
 
-      {/* Token Usage Display */}
-      {tokenUsage && (
+      {/* Token Usage Display - Only visible in development mode */}
+      {process.env.NODE_ENV === 'development' && tokenUsage && (
         <div className="mb-6 flex items-center gap-3 text-xs bg-[#F9F9F9] px-4 py-3 rounded-lg border border-[#E0DFDC]">
           <div className="flex items-center gap-1">
             <span className="text-[#666666] font-medium">Tokens Used:</span>

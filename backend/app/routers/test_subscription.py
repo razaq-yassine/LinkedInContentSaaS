@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from app.database import get_db
 from app.models import User, Subscription, SubscriptionPlanConfig, SubscriptionPlan, BillingCycle, SubscriptionStatus
 from app.routers.auth import get_current_user
+from app.services.credit_service import apply_plan_upgrade_credits
 
 router = APIRouter(prefix="/api/test", tags=["test"])
 
@@ -60,12 +61,23 @@ async def simulate_subscription_completion(
     
     # Store old values for response
     old_plan = subscription.plan
-    old_credits = subscription.subscription_credits_limit
+    old_credits_limit = subscription.subscription_credits_limit
+    old_credits_used = subscription.subscription_credits_used
     
-    # Update subscription (simulate what the webhook handler does)
-    subscription.plan = SubscriptionPlan(request.plan_name)
-    subscription.subscription_credits_limit = plan_config.credits_limit
-    subscription.subscription_credits_used = 0.0  # Reset credits on new subscription
+    # Check if this is an upgrade (user has existing paid subscription)
+    is_upgrade = (
+        subscription.stripe_subscription_id and
+        subscription.plan != SubscriptionPlan.FREE and
+        request.plan_name != "free"
+    )
+    
+    # Apply upgrade credit preservation logic using shared function
+    upgrade_details = apply_plan_upgrade_credits(
+        subscription=subscription,
+        new_plan_config=plan_config,
+        is_upgrade=is_upgrade
+    )
+    
     subscription.billing_cycle = BillingCycle(request.billing_cycle)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     
@@ -83,24 +95,33 @@ async def simulate_subscription_completion(
     db.commit()
     db.refresh(subscription)
     
+    # Calculate credits remaining
+    credits_remaining = (
+        subscription.subscription_credits_limit - subscription.subscription_credits_used
+        if subscription.subscription_credits_limit != -1
+        else "unlimited"
+    )
+    
     return {
         "success": True,
         "message": "Subscription activated successfully (TEST MODE)",
         "previous": {
-            "plan": old_plan,
-            "credits_limit": old_credits,
-            "old_credits_limit": old_credits
+            "plan": old_plan.value if hasattr(old_plan, 'value') else str(old_plan),
+            "credits_limit": old_credits_limit,
+            "credits_used": old_credits_used,
+            "credits_remaining": old_credits_limit - old_credits_used if old_credits_limit != -1 else "unlimited"
         },
         "current": {
-            "plan": subscription.plan,
+            "plan": subscription.plan.value if hasattr(subscription.plan, 'value') else str(subscription.plan),
             "credits_limit": subscription.subscription_credits_limit,
             "credits_used": subscription.subscription_credits_used,
-            "credits_remaining": subscription.subscription_credits_limit - subscription.subscription_credits_used if subscription.subscription_credits_limit != -1 else "unlimited",
-            "billing_cycle": subscription.billing_cycle,
-            "status": subscription.subscription_status,
-            "period_start": subscription.current_period_start.isoformat(),
-            "period_end": subscription.current_period_end.isoformat()
+            "credits_remaining": credits_remaining,
+            "billing_cycle": subscription.billing_cycle.value if hasattr(subscription.billing_cycle, 'value') else str(subscription.billing_cycle),
+            "status": subscription.subscription_status.value if hasattr(subscription.subscription_status, 'value') else str(subscription.subscription_status),
+            "period_start": subscription.current_period_start.isoformat() if subscription.current_period_start else None,
+            "period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None
         },
+        "upgrade_details": upgrade_details if is_upgrade else None,
         "stripe_test_ids": {
             "customer_id": subscription.stripe_customer_id,
             "subscription_id": subscription.stripe_subscription_id

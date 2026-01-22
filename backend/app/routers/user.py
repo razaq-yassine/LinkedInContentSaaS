@@ -268,7 +268,10 @@ async def get_user_subscription(
         "breakdown": breakdown,
         "billing_cycle": subscription.billing_cycle.value if subscription.billing_cycle else "monthly",
         "subscription_status": subscription.subscription_status.value if subscription.subscription_status else "active",
+        "current_period_start": subscription.current_period_start.isoformat() if subscription.current_period_start else None,
         "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
+        "scheduled_downgrade_plan": subscription.scheduled_downgrade_plan,
+        "scheduled_downgrade_date": subscription.scheduled_downgrade_date.isoformat() if subscription.scheduled_downgrade_date else None,
         "stripe_customer_id": subscription.stripe_customer_id,
         "stripe_subscription_id": subscription.stripe_subscription_id
     }

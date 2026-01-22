@@ -243,6 +243,37 @@ export default function UserDetailPage() {
         />
       </div>
 
+      {/* Onboarding Tokens Section */}
+      {usage.service_breakdown.onboarding && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Onboarding Tokens</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Tokens</p>
+                <p className="text-2xl font-bold">
+                  {usage.service_breakdown.onboarding.tokens?.toLocaleString() || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Cost</p>
+                <p className="text-2xl font-bold">
+                  ${(usage.service_breakdown.onboarding.cost || 0).toFixed(4)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Requests</p>
+                <p className="text-2xl font-bold">
+                  {usage.service_breakdown.onboarding.count || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TokenUsageChart

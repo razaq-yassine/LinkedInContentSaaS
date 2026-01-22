@@ -55,11 +55,11 @@ export default function DowngradeConsentModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-500" />
+          <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+            <AlertCircle className="w-5 h-5 text-amber-500 dark:text-amber-400" />
             Confirm Plan Downgrade
           </DialogTitle>
-          <DialogDescription className="pt-2">
+          <DialogDescription className="pt-2 text-slate-600 dark:text-slate-400">
             Review what will happen when you downgrade to the free plan.
           </DialogDescription>
         </DialogHeader>

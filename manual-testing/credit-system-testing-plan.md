@@ -26,6 +26,9 @@
 | TC-013  | UI/UX Consent Modals              | Medium   | ⏳ Pending |        |      |       |
 | TC-014  | Billing Page Display              | Medium   | ⏳ Pending |        |      |       |
 | TC-015  | Stripe Integration                | High     | ⏳ Pending |        |      |       |
+| TC-016  | Yearly to Monthly Restriction - Early Period | High | ⏳ Pending |        |      |       |
+| TC-017  | Yearly to Monthly Restriction - Last 30 Days | High | ⏳ Pending |        |      |       |
+| TC-018  | Yearly to Monthly Restriction - Credit Purchase Alternative | High | ⏳ Pending |        |      |       |
 
 **Legend:**
 
@@ -141,6 +144,7 @@
 - ✅ User receives "subscription_upgraded" notification
 - ✅ Next billing cycle will reset to 100 credits
 - ✅ User is charged full price for new plan
+- ✅ **Note:** If switching from yearly to monthly billing cycle, restriction applies (see TC-016, TC-017)
 
 **Actual Results:**
 
@@ -569,6 +573,23 @@
 3. Verify final state
 
 **Expected:** ✅ Final plan is Unlimited, credits preserved correctly
+
+#### TC-012g: Yearly to Monthly Restriction Edge Cases
+
+**Steps:**
+
+1. User on yearly subscription, 31 days remaining → attempt monthly switch
+2. User on yearly subscription, 30 days remaining → attempt monthly switch
+3. User on yearly subscription, 29 days remaining → attempt monthly switch
+4. User on monthly subscription → attempt monthly switch (should work)
+5. User on yearly subscription → attempt yearly switch (should work)
+
+**Expected:** 
+- ✅ 31 days: Blocked with suggestion
+- ✅ 30 days: Allowed (boundary case)
+- ✅ 29 days: Allowed
+- ✅ Monthly → Monthly: Always allowed
+- ✅ Yearly → Yearly: Always allowed
 
 **Actual Results:**
 

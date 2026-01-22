@@ -28,16 +28,78 @@ export default function ContextPage() {
       const response = await api.user.getProfile();
       const profile = response.data;
       
-      // Helper function to convert content_mix object to array format if needed
+      // Helper function to normalize target_audience data
+      const normalizeTargetAudience = (targetAudience: any): any[] => {
+        if (!targetAudience) return [];
+        if (Array.isArray(targetAudience)) {
+          // Filter out invalid entries and ensure proper structure
+          return targetAudience
+            .filter((item: any) => {
+              // Skip if it's a string that looks like code/placeholder
+              if (typeof item === 'string' && (item.includes('[') || item.includes('{'))) {
+                return false;
+              }
+              // Ensure it's an object with persona and description
+              return typeof item === 'object' && item !== null && (item.persona || item.description);
+            })
+            .map((item: any) => {
+              // If it's a string, try to parse it or create a proper object
+              if (typeof item === 'string') {
+                return { persona: item, description: '' };
+              }
+              // Ensure it has the required structure
+              return {
+                persona: item.persona || item.name || '',
+                description: item.description || ''
+              };
+            });
+        }
+        // If it's a string, try to parse it
+        if (typeof targetAudience === 'string') {
+          try {
+            const parsed = JSON.parse(targetAudience);
+            return normalizeTargetAudience(parsed);
+          } catch {
+            // If parsing fails, return empty array
+            return [];
+          }
+        }
+        return [];
+      };
+
+      // Helper function to normalize content_mix data
       const normalizeContentMix = (contentMix: any): any[] => {
         if (!contentMix) return [];
-        if (Array.isArray(contentMix)) return contentMix;
+        if (Array.isArray(contentMix)) {
+          // Filter out invalid entries
+          return contentMix
+            .filter((item: any) => {
+              // Skip if it's a string that looks like code/placeholder
+              if (typeof item === 'string' && (item.includes('[') || item.includes('{'))) {
+                return false;
+              }
+              // Ensure it's an object with category and percentage
+              return typeof item === 'object' && item !== null && (item.category || item.percentage !== undefined);
+            })
+            .map((item: any) => {
+              // Ensure it has the required structure
+              return {
+                category: item.category || item.name || '',
+                percentage: typeof item.percentage === 'number' ? item.percentage : (parseInt(item.percentage) || 0)
+              };
+            });
+        }
         if (typeof contentMix === 'object') {
           // Convert object format {category: percentage} to array format [{category, percentage}]
-          return Object.entries(contentMix).map(([category, percentage]) => ({
-            category: category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            percentage: percentage
-          }));
+          return Object.entries(contentMix)
+            .filter(([key, value]) => {
+              // Skip if key looks like code/placeholder
+              return !key.includes('[') && !key.includes('{');
+            })
+            .map(([category, percentage]) => ({
+              category: category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              percentage: typeof percentage === 'number' ? percentage : (parseInt(String(percentage)) || 0)
+            }));
         }
         return [];
       };
@@ -52,7 +114,7 @@ export default function ContextPage() {
           years_experience: profile.context_json?.years_experience || 0,
         },
         expertise: profile.context_json?.expertise || [],
-        target_audience: profile.context_json?.target_audience || [],
+        target_audience: normalizeTargetAudience(profile.context_json?.target_audience),
         content_strategy: {
           content_goals: profile.context_json?.content_goals || [],
           posting_frequency: profile.context_json?.posting_frequency || "2-3x per week",
@@ -370,12 +432,23 @@ export default function ContextPage() {
           icon={<Users className="h-5 w-5" />}
         >
           <div className="space-y-2 md:space-y-3 overflow-hidden">
-            {(context.target_audience || []).map((audience: any, index: number) => (
-              <div key={index} className="bg-[#F3F2F0] dark:bg-slate-700 p-3 md:p-4 rounded-lg overflow-hidden">
-                <p className="font-semibold text-sm md:text-base text-[#333] dark:text-white truncate">{audience.persona}</p>
-                <p className="text-[11px] md:text-sm text-[#666666] dark:text-slate-400 mt-1 leading-relaxed line-clamp-2 md:line-clamp-none">{audience.description}</p>
-              </div>
-            ))}
+            {(context.target_audience || []).map((audience: any, index: number) => {
+              // Safety check: skip invalid entries
+              if (!audience || typeof audience !== 'object' || (!audience.persona && !audience.description)) {
+                return null;
+              }
+              // Skip if it looks like code/placeholder
+              const personaStr = String(audience.persona || '');
+              if (personaStr.includes('[') || personaStr.includes('{')) {
+                return null;
+              }
+              return (
+                <div key={index} className="bg-[#F3F2F0] dark:bg-slate-700 p-3 md:p-4 rounded-lg overflow-hidden">
+                  <p className="font-semibold text-sm md:text-base text-[#333] dark:text-white truncate">{audience.persona || 'Untitled'}</p>
+                  <p className="text-[11px] md:text-sm text-[#666666] dark:text-slate-400 mt-1 leading-relaxed line-clamp-2 md:line-clamp-none">{audience.description || ''}</p>
+                </div>
+              );
+            })}
           </div>
         </CollapsibleSection>
 
@@ -413,12 +486,23 @@ export default function ContextPage() {
         >
           <div className="space-y-1.5 overflow-hidden">
             {Array.isArray(context.content_mix) && context.content_mix.length > 0 ? (
-              context.content_mix.map((mix: any, index: number) => (
-                <div key={index} className="flex justify-between items-center bg-[#F3F2F0] dark:bg-slate-700 p-2.5 md:p-3 rounded-lg min-h-[40px] overflow-hidden">
-                  <span className="text-xs md:text-sm font-medium truncate mr-2 flex-1 text-black dark:text-white">{mix.category}</span>
-                  <span className="text-xs md:text-sm text-[#0A66C2] font-bold flex-shrink-0 bg-white px-2 py-0.5 rounded-full">{mix.percentage}%</span>
-                </div>
-              ))
+              context.content_mix.map((mix: any, index: number) => {
+                // Safety check: skip invalid entries
+                if (!mix || typeof mix !== 'object' || !mix.category) {
+                  return null;
+                }
+                // Skip if it looks like code/placeholder
+                const categoryStr = String(mix.category || '');
+                if (categoryStr.includes('[') || categoryStr.includes('{')) {
+                  return null;
+                }
+                return (
+                  <div key={index} className="flex justify-between items-center bg-[#F3F2F0] dark:bg-slate-700 p-2.5 md:p-3 rounded-lg min-h-[40px] overflow-hidden">
+                    <span className="text-xs md:text-sm font-medium truncate mr-2 flex-1 text-black dark:text-white">{mix.category}</span>
+                    <span className="text-xs md:text-sm text-[#0A66C2] font-bold flex-shrink-0 bg-white px-2 py-0.5 rounded-full">{mix.percentage || 0}%</span>
+                  </div>
+                );
+              })
             ) : (
               <p className="text-xs text-[#666666] dark:text-slate-400">No content mix configured</p>
             )}

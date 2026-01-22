@@ -2,14 +2,14 @@
 Stripe integration service
 Handles all Stripe operations including checkout, subscriptions, and webhooks
 """
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime
 import stripe
 
 from ..config import get_settings
 from ..models import User, Subscription, SubscriptionPlanConfig, SubscriptionPlan, BillingCycle, SubscriptionStatus
-from .credit_service import reset_subscription_credits
+from .credit_service import reset_subscription_credits, apply_plan_upgrade_credits
 from .notification_service import send_notification
 from ..logging_config import get_logger
 from fastapi import HTTPException
@@ -43,6 +43,47 @@ def create_customer(user: User) -> str:
         return customer.id
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
+
+
+def can_switch_yearly_to_monthly(
+    subscription: Subscription,
+    new_billing_cycle: str
+) -> Tuple[bool, Optional[str], Optional[int]]:
+    """
+    Check if user can switch from yearly to monthly subscription.
+    
+    Yearly subscriptions can only be switched to monthly within the last 30 days
+    of the subscription period. This prevents users from losing paid time.
+    
+    Args:
+        subscription: Current subscription object
+        new_billing_cycle: Target billing cycle ('monthly' or 'yearly')
+    
+    Returns:
+        Tuple of (can_switch: bool, error_message: Optional[str], days_remaining: Optional[int])
+    """
+    # Only restrict yearly → monthly transitions
+    if subscription.billing_cycle == BillingCycle.YEARLY and new_billing_cycle == "monthly":
+        if not subscription.current_period_end:
+            return False, "Cannot determine subscription end date. Please contact support.", None
+        
+        # Calculate days remaining
+        days_remaining = (subscription.current_period_end - datetime.utcnow()).days
+        
+        # If period end is in the past, allow switch (edge case)
+        if days_remaining < 0:
+            return True, None, days_remaining
+        
+        # Block if more than 30 days remaining
+        if days_remaining > 30:
+            error_message = (
+                f"Yearly subscriptions cannot be switched to monthly until the last 30 days. "
+                f"Your subscription ends in {days_remaining} days. "
+                f"Consider purchasing credits instead to get immediate access."
+            )
+            return False, error_message, days_remaining
+    
+    return True, None, None
 
 
 def create_or_get_stripe_price(
@@ -397,20 +438,12 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
         subscription.plan != SubscriptionPlan.FREE
     )
     
-    old_plan_limit = subscription.subscription_credits_limit
-    old_used = subscription.subscription_credits_used
-    
-    if is_upgrade:
-        # Handle upgrade: preserve credits, add new plan credits
-        # Preserve subscription_credits_used, update limit to new plan
-        subscription.plan = SubscriptionPlan(plan_name)
-        subscription.subscription_credits_limit = plan_config.credits_limit
-        # subscription_credits_used stays the same (preserves balance)
-    else:
-        # New subscription: reset credits
-        subscription.plan = SubscriptionPlan(plan_name)
-        subscription.subscription_credits_limit = plan_config.credits_limit
-        subscription.subscription_credits_used = 0
+    # Apply upgrade credit preservation logic using shared function
+    upgrade_details = apply_plan_upgrade_credits(
+        subscription=subscription,
+        new_plan_config=plan_config,
+        is_upgrade=is_upgrade
+    )
     
     subscription.billing_cycle = BillingCycle(billing_cycle)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
@@ -429,9 +462,10 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
                 action_code="subscription_upgraded",
                 user_id=user_id,
                 data={
-                    "old_plan": old_plan_limit,
+                    "old_plan": upgrade_details["old_limit"],
                     "new_plan": plan_name,
-                    "credits_limit": plan_config.credits_limit
+                    "credits_limit": plan_config.credits_limit,
+                    "credits_preserved": upgrade_details["credits_preserved"]
                 }
             )
         else:
@@ -600,8 +634,6 @@ def handle_upgrade(
         raise HTTPException(status_code=404, detail="Plan not found")
     
     old_plan = subscription.plan
-    old_limit = subscription.subscription_credits_limit
-    old_used = subscription.subscription_credits_used
     
     # Cancel old Stripe subscription immediately
     if subscription.stripe_subscription_id:
@@ -636,10 +668,12 @@ def handle_upgrade(
         }
     )
     
-    # Update subscription: preserve credits_used, update limit
-    subscription.plan = SubscriptionPlan(new_plan_name)
-    subscription.subscription_credits_limit = plan_config.credits_limit
-    # subscription_credits_used stays the same (preserves balance)
+    # Apply upgrade credit preservation logic using shared function
+    upgrade_details = apply_plan_upgrade_credits(
+        subscription=subscription,
+        new_plan_config=plan_config,
+        is_upgrade=True  # This is always an upgrade when called from handle_upgrade
+    )
     subscription.billing_cycle = BillingCycle(billing_cycle)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     subscription.stripe_subscription_id = new_stripe_subscription.id
@@ -659,7 +693,7 @@ def handle_upgrade(
                 "old_plan": old_plan.value,
                 "new_plan": new_plan_name,
                 "credits_limit": plan_config.credits_limit,
-                "credits_preserved": old_limit - old_used
+                "credits_preserved": upgrade_details["credits_preserved"]
             }
         )
     except Exception as e:

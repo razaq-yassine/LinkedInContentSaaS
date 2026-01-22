@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UpgradeConsentModal from '@/components/modals/UpgradeConsentModal';
 import DowngradeConsentModal from '@/components/modals/DowngradeConsentModal';
 import PurchaseCreditsModal from '@/components/modals/PurchaseCreditsModal';
+import CreditPurchaseSuggestionModal from '@/components/modals/CreditPurchaseSuggestionModal';
 import { cn } from '@/lib/utils';
 
 interface SubscriptionPlan {
@@ -38,7 +39,10 @@ interface UserSubscription {
   credits_remaining: number;
   billing_cycle: string;
   subscription_status: string;
+  current_period_start: string | null;
   current_period_end: string | null;
+  scheduled_downgrade_plan: string | null;
+  scheduled_downgrade_date: string | null;
   breakdown?: {
     subscription: {
       limit: number;
@@ -64,6 +68,8 @@ export default function BillingPage() {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
+  const [creditSuggestionModalOpen, setCreditSuggestionModalOpen] = useState(false);
+  const [creditSuggestionError, setCreditSuggestionError] = useState<string>('');
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,11 +95,13 @@ export default function BillingPage() {
   const checkTestMode = async () => {
     try {
       const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       // Try to access the test endpoint to see if it's available
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/test/simulate-subscription`,
+        `${apiUrl}/api/test/simulate-subscription`,
         {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000,
         }
       );
       // If we get here without 404, test mode is available
@@ -112,13 +120,16 @@ export default function BillingPage() {
   const fetchPlansAndSubscription = async () => {
     try {
       const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const [plansResponse, subscriptionResponse, breakdownResponse] = await Promise.all([
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/subscription/plans`),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/user/subscription`, {
+        axios.get(`${apiUrl}/api/subscription/plans`, { timeout: 10000 }),
+        axios.get(`${apiUrl}/api/user/subscription`, {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000,
         }),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/subscription/credits/breakdown`, {
+        axios.get(`${apiUrl}/api/subscription/credits/breakdown`, {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000,
         }).catch(() => null), // Optional, fallback if not available
       ]);
 
@@ -175,7 +186,16 @@ export default function BillingPage() {
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
-      alert(error.response?.data?.detail || 'Failed to start subscription process');
+      const errorMessage = error.response?.data?.detail || 'Failed to start subscription process';
+      
+      // Check if it's a yearly→monthly restriction error
+      if (errorMessage.includes('Yearly subscriptions cannot be switched')) {
+        // Show credit purchase suggestion modal
+        setCreditSuggestionError(errorMessage);
+        setCreditSuggestionModalOpen(true);
+      } else {
+        alert(errorMessage);
+      }
       setProcessingPlan(null);
     }
   };
@@ -188,14 +208,16 @@ export default function BillingPage() {
     
     try {
       const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/subscription/upgrade`,
+        `${apiUrl}/api/subscription/upgrade`,
         {
           plan: selectedUpgradePlan,
           billing_cycle: billingCycle,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000,
         }
       );
 
@@ -204,7 +226,16 @@ export default function BillingPage() {
       alert('Upgrade successful! Your new plan is now active.');
     } catch (error: any) {
       console.error('Upgrade error:', error);
-      alert(error.response?.data?.detail || 'Failed to upgrade subscription');
+      const errorMessage = error.response?.data?.detail || 'Failed to upgrade subscription';
+      
+      // Check if it's a yearly→monthly restriction error
+      if (errorMessage.includes('Yearly subscriptions cannot be switched')) {
+        // Show credit purchase suggestion modal
+        setCreditSuggestionError(errorMessage);
+        setCreditSuggestionModalOpen(true);
+      } else {
+        alert(errorMessage);
+      }
     } finally {
       setProcessingPlan(null);
       setSelectedUpgradePlan(null);
@@ -241,8 +272,9 @@ export default function BillingPage() {
     setProcessingPlan(planName);
     try {
       const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/test/simulate-subscription`,
+        `${apiUrl}/api/test/simulate-subscription`,
         {
           plan_name: planName,
           billing_cycle: billingCycle,
@@ -306,6 +338,24 @@ export default function BillingPage() {
 
   const isCurrentPlan = (planName: string) => {
     return currentSubscription?.plan === planName;
+  };
+
+  const getCurrentPlan = () => {
+    if (!currentSubscription) return null;
+    return plans.find(p => p.plan_name === currentSubscription.plan);
+  };
+
+  const getNextPlan = () => {
+    const currentPlan = getCurrentPlan();
+    if (!currentPlan || !currentSubscription) return null;
+    
+    // If there's a scheduled downgrade, that's the next plan
+    if (currentSubscription.scheduled_downgrade_plan) {
+      return plans.find(p => p.plan_name === currentSubscription.scheduled_downgrade_plan) || null;
+    }
+    
+    // Otherwise, next plan is the same as current plan (continuing)
+    return currentPlan;
   };
 
   if (loading) {
@@ -444,6 +494,242 @@ export default function BillingPage() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Current Plan & Next Plan Comparison */}
+                {(() => {
+                  const currentPlan = getCurrentPlan();
+                  const nextPlan = getNextPlan();
+                  
+                  if (!currentPlan || !nextPlan || !currentSubscription) return null;
+                  
+                  const currentPlanIndex = plans.findIndex(p => p.plan_name === currentPlan.plan_name);
+                  const currentIcon = getPlanIcon(currentPlanIndex);
+                  const CurrentIcon = currentIcon;
+                  
+                  const isDowngrading = currentSubscription.scheduled_downgrade_plan !== null;
+                  const isSamePlan = nextPlan.plan_name === currentPlan.plan_name;
+                  
+                  // Calculate next period dates
+                  const currentPeriodStart = currentSubscription.current_period_start 
+                    ? new Date(currentSubscription.current_period_start)
+                    : null;
+                  const currentPeriodEnd = currentSubscription.current_period_end
+                    ? new Date(currentSubscription.current_period_end)
+                    : null;
+                  
+                  // Next period starts when current period ends
+                  const nextPeriodStart = currentPeriodEnd;
+                  // Calculate next period end based on billing cycle
+                  const nextPeriodEnd = currentPeriodEnd && currentPeriodStart
+                    ? (() => {
+                        const periodLength = currentPeriodEnd.getTime() - currentPeriodStart.getTime();
+                        return new Date(currentPeriodEnd.getTime() + periodLength);
+                      })()
+                    : null;
+                  
+                  const formatDate = (date: Date | null) => {
+                    if (!date) return 'N/A';
+                    return date.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    });
+                  };
+                  
+                  // Find the next upgrade plan (higher tier)
+                  const nextUpgradePlan = plans
+                    .filter(p => p.sort_order > currentPlan.sort_order)
+                    .sort((a, b) => a.sort_order - b.sort_order)[0];
+                  
+                  return (
+                    <div className="space-y-6">
+                      <div className="text-center">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                          Your Plan
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          {isDowngrading ? 'Plan change scheduled' : 'Current billing period'}
+                        </p>
+                      </div>
+                      
+                      <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                        {/* Current Plan Card */}
+                        <Card className="flex-1 w-full md:max-w-sm bg-white dark:bg-slate-800 border-2 border-emerald-500 dark:border-emerald-400 shadow-lg hover:shadow-xl transition-all duration-300">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <Badge className="bg-gradient-to-r from-emerald-500 to-green-500 text-white border-0 shadow-md">
+                                <Check className="w-3 h-3 mr-1" />
+                                Current
+                              </Badge>
+                              {nextUpgradePlan && (
+                                <Button
+                                  onClick={() => {
+                                    setSelectedUpgradePlan(nextUpgradePlan.plan_name);
+                                    setUpgradeModalOpen(true);
+                                  }}
+                                  size="sm"
+                                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all"
+                                >
+                                  <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
+                                  Upgrade
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-lg">
+                                <CurrentIcon className="w-6 h-6 text-white" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg font-bold text-slate-900 dark:text-white">
+                                  {currentPlan.display_name}
+                                </CardTitle>
+                                <CardDescription className="text-sm text-slate-500 dark:text-slate-400">
+                                  {currentPlan.description || 'Your current plan'}
+                                </CardDescription>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-3xl font-bold text-slate-900 dark:text-white">
+                                ${billingCycle === 'monthly' 
+                                  ? (currentPlan.price_monthly / 100).toFixed(0)
+                                  : (currentPlan.price_yearly / 100 / 12).toFixed(0)
+                                }
+                              </span>
+                              <span className="text-slate-500 dark:text-slate-400">/mo</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Zap className="w-4 h-4 text-amber-500" />
+                              <span className="font-semibold text-slate-900 dark:text-white">
+                                {currentPlan.credits_limit === -1 ? 'Unlimited' : currentPlan.credits_limit} credits/mo
+                              </span>
+                            </div>
+                            {currentPeriodStart && (
+                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Period: {formatDate(currentPeriodStart)} - {formatDate(currentPeriodEnd)}
+                                </p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* Arrow */}
+                        <>
+                          <div className="hidden md:flex items-center justify-center">
+                            <div className={cn(
+                              "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
+                              isDowngrading 
+                                ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
+                                : "bg-gradient-to-r from-blue-500 to-cyan-500"
+                            )}>
+                              <ArrowRight className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div className="md:hidden flex items-center justify-center">
+                            <div className={cn(
+                              "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
+                              isDowngrading 
+                                ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
+                                : "bg-gradient-to-r from-blue-500 to-cyan-500"
+                            )}>
+                              <ArrowDown className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                        </>
+
+                        {/* Next Plan Card */}
+                        <Card className={cn(
+                          "flex-1 w-full md:max-w-sm border-2 shadow-lg hover:shadow-xl transition-all duration-300",
+                          isDowngrading
+                            ? "bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-500 dark:border-amber-400"
+                            : "bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-500 dark:border-blue-400"
+                        )}>
+                          <CardHeader className="pb-3">
+                            <Badge className={cn(
+                              "text-white border-0 shadow-md mb-2",
+                              isDowngrading
+                                ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                                : "bg-gradient-to-r from-blue-600 to-cyan-600"
+                            )}>
+                              {isDowngrading ? (
+                                <>
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  Scheduled
+                                </>
+                              ) : (
+                                <>
+                                  <Star className="w-3 h-3 mr-1 fill-white" />
+                                  Next Period
+                                </>
+                              )}
+                            </Badge>
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center shadow-lg",
+                                isDowngrading
+                                  ? "bg-gradient-to-br from-amber-500 to-orange-500"
+                                  : "bg-gradient-to-br from-blue-500 to-cyan-500"
+                              )}>
+                                {(() => {
+                                  const nextPlanIndex = plans.findIndex(p => p.plan_name === nextPlan.plan_name);
+                                  const NextIcon = getPlanIcon(nextPlanIndex);
+                                  return <NextIcon className="w-6 h-6 text-white" />;
+                                })()}
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg font-bold text-slate-900 dark:text-white">
+                                  {nextPlan.display_name}
+                                </CardTitle>
+                                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                                  {isDowngrading 
+                                    ? 'Effective after current period'
+                                    : isSamePlan 
+                                      ? 'Continuing with same plan'
+                                      : nextPlan.description || 'Next period plan'
+                                  }
+                                </CardDescription>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex items-baseline gap-1">
+                              <span className={cn(
+                                "text-3xl font-bold bg-clip-text text-transparent",
+                                isDowngrading
+                                  ? "bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400"
+                                  : "bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400"
+                              )}>
+                                ${billingCycle === 'monthly' 
+                                  ? (nextPlan.price_monthly / 100).toFixed(0)
+                                  : (nextPlan.price_yearly / 100 / 12).toFixed(0)
+                                }
+                              </span>
+                              <span className="text-slate-500 dark:text-slate-400">/mo</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Zap className={cn(
+                                "w-4 h-4",
+                                isDowngrading ? "text-amber-500" : "text-blue-500"
+                              )} />
+                              <span className="font-semibold text-slate-900 dark:text-white">
+                                {nextPlan.credits_limit === -1 ? 'Unlimited' : nextPlan.credits_limit} credits/mo
+                              </span>
+                            </div>
+                            {nextPeriodStart && nextPeriodEnd && (
+                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Period: {formatDate(nextPeriodStart)} - {formatDate(nextPeriodEnd)}
+                                </p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Credit Usage Progress */}
                 <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-all duration-300">
@@ -830,6 +1116,25 @@ export default function BillingPage() {
             setPurchaseModalOpen(false);
             fetchPlansAndSubscription();
           }}
+        />
+
+        <CreditPurchaseSuggestionModal
+          open={creditSuggestionModalOpen}
+          onClose={() => {
+            setCreditSuggestionModalOpen(false);
+            setCreditSuggestionError('');
+          }}
+          onPurchaseCredits={() => {
+            setCreditSuggestionModalOpen(false);
+            setCreditSuggestionError('');
+            setPurchaseModalOpen(true);
+          }}
+          errorMessage={creditSuggestionError}
+          daysRemaining={(() => {
+            // Extract days remaining from error message if available
+            const match = creditSuggestionError.match(/ends in (\d+) days/);
+            return match ? parseInt(match[1], 10) : undefined;
+          })()}
         />
       </div>
     </div>

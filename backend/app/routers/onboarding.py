@@ -9,6 +9,7 @@ from ..routers.auth import get_current_user_id
 from ..services.file_processor import extract_text_from_pdf
 from ..services.profile_builder import build_user_profile, update_user_profile_in_db
 from ..services.ai_service import validate_cv_content
+from ..services.usage_tracking_service import log_onboarding_usage
 
 router = APIRouter()
 
@@ -228,6 +229,23 @@ async def process_onboarding(
         # Move to preview step
         updated_profile.onboarding_step = 5
         db.commit()
+        
+        # Track token usage for onboarding
+        token_usage = profile_data.get("token_usage")
+        if token_usage:
+            try:
+                log_onboarding_usage(
+                    db=db,
+                    user_id=user_id,
+                    input_tokens=token_usage.get("input_tokens", 0),
+                    output_tokens=token_usage.get("output_tokens", 0),
+                    model=token_usage.get("model", "unknown"),
+                    provider=token_usage.get("provider", "unknown"),
+                    metadata=token_usage.get("details")
+                )
+            except Exception as e:
+                # Don't fail onboarding if tracking fails
+                print(f"Warning: Failed to track onboarding usage: {str(e)}")
         
         # Return structured profile context (parsed from TOON)
         context_json = profile_data.get("context_json", {})

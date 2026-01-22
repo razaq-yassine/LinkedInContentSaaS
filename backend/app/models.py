@@ -364,6 +364,7 @@ class ServiceType(str, enum.Enum):
     TEXT_GENERATION = "text_generation"
     IMAGE_GENERATION = "image_generation"
     SEARCH = "search"
+    ONBOARDING = "onboarding"
 
 
 class UsageTracking(Base):

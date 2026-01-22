@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
 
-from ..models import Subscription, CreditTransaction, User, PurchasedCreditsBalance
+from ..models import Subscription, CreditTransaction, User, PurchasedCreditsBalance, SubscriptionPlan, SubscriptionPlanConfig
 from fastapi import HTTPException
 from ..logging_config import get_logger, log_credit_transaction
 from ..services.notification_service import send_notification
@@ -465,6 +465,73 @@ def reset_subscription_credits(db: Session, user_id: str) -> Dict:
         "credits_reset": True,
         "previous_used": old_used,
         "credits_available": subscription.subscription_credits_limit
+    }
+
+
+def apply_plan_upgrade_credits(
+    subscription: Subscription,
+    new_plan_config: SubscriptionPlanConfig,
+    is_upgrade: bool = False
+) -> Dict:
+    """
+    Apply plan upgrade credit preservation logic
+    
+    For upgrades (paid → higher paid):
+    - Preserves remaining credits from old plan
+    - Adds new plan's credits
+    - Formula: available = new_limit - (-old_available) = new_limit + old_available
+    
+    For new subscriptions:
+    - Resets credits to 0
+    
+    Args:
+        subscription: Subscription object to update
+        new_plan_config: New plan configuration
+        is_upgrade: Whether this is an upgrade (True) or new subscription (False)
+    
+    Returns:
+        Dict with upgrade details including old and new credit values
+    """
+    old_limit = subscription.subscription_credits_limit
+    old_used = subscription.subscription_credits_used
+    old_available = old_limit - old_used if old_limit != -1 else 0
+    
+    # Update plan and limit
+    subscription.plan = SubscriptionPlan(new_plan_config.plan_name)
+    subscription.subscription_credits_limit = new_plan_config.credits_limit
+    
+    if is_upgrade:
+        # Handle upgrade: preserve remaining credits and append new plan credits
+        # Requirement: "preserve current tokens and append new plan tokens"
+        # Example: old limit=40, used=0 (40 available) → upgrade to limit=100
+        # Expected: 40 (preserved) + 100 (new) = 140 total available
+        # To achieve this: used = -(old_limit - old_used) = old_used - old_limit
+        # So: available = new_limit - new_used = new_limit - (-old_available) = new_limit + old_available
+        if new_plan_config.credits_limit != -1:  # Not unlimited
+            # Set used to negative to preserve old_available + add new_limit
+            subscription.subscription_credits_used = -old_available
+        else:
+            # Unlimited plan: preserve old_used
+            subscription.subscription_credits_used = old_used
+    else:
+        # New subscription: reset credits
+        subscription.subscription_credits_used = 0.0
+    
+    new_available = (
+        subscription.subscription_credits_limit - subscription.subscription_credits_used
+        if subscription.subscription_credits_limit != -1
+        else float('inf')
+    )
+    
+    return {
+        "is_upgrade": is_upgrade,
+        "old_limit": old_limit,
+        "old_used": old_used,
+        "old_available": old_available,
+        "new_limit": subscription.subscription_credits_limit,
+        "new_used": subscription.subscription_credits_used,
+        "new_available": new_available,
+        "credits_preserved": old_available if is_upgrade else 0
     }
 
 

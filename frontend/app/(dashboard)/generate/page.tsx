@@ -22,7 +22,8 @@ import {
   Video,
   Globe,
   ImagePlus,
-  Trash2
+  Trash2,
+  AlertCircle
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -415,6 +416,8 @@ export default function GeneratePage() {
   const [regeneratingSlideIndex, setRegeneratingSlideIndex] = useState<Record<string, number | null>>({}); // post_id -> slide index being regenerated
   const [showSlideSelectionModal, setShowSlideSelectionModal] = useState<Record<string, boolean>>({}); // post_id -> boolean
   const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({}); // post_id -> current slide index
+  const [insufficientCreditsModalOpen, setInsufficientCreditsModalOpen] = useState(false);
+  const [insufficientCreditsMessage, setInsufficientCreditsMessage] = useState<string>("");
 
   // Uploaded images state
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
@@ -1039,9 +1042,26 @@ export default function GeneratePage() {
     } catch (error: any) {
       console.error("Inspiration generation failed:", error);
 
+      // Check for 403 status code first (insufficient credits)
+      if (error.response?.status === 403) {
+        const errorText = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         "You don't have enough credits to generate this content.";
+        setInsufficientCreditsMessage(errorText);
+        setInsufficientCreditsModalOpen(true);
+        return; // Don't add error message to chat
+      }
+
       let errorText = "Sorry, I encountered an error generating your post. Please try again.";
       if (error.response?.data?.detail) {
         errorText = error.response.data.detail;
+        // If it's an insufficient credits error, show modal instead of adding message
+        if (errorText.toLowerCase().includes("insufficient credits")) {
+          setInsufficientCreditsMessage(errorText);
+          setInsufficientCreditsModalOpen(true);
+          return; // Don't add error message to chat
+        }
         if (errorText.includes("onboarding")) {
           errorText = "Please complete onboarding first. Redirecting...";
           setTimeout(() => {
@@ -1050,6 +1070,12 @@ export default function GeneratePage() {
         }
       } else if (error.message) {
         errorText = error.message;
+        // Check if error message indicates insufficient credits
+        if (errorText.toLowerCase().includes("insufficient credits")) {
+          setInsufficientCreditsMessage(errorText);
+          setInsufficientCreditsModalOpen(true);
+          return; // Don't add error message to chat
+        }
       }
 
       const errorMessage: Message = {
@@ -1267,12 +1293,45 @@ export default function GeneratePage() {
       // Trigger subscription refresh to update credit progress bar
       window.dispatchEvent(new CustomEvent("creditsUpdated"));
     } catch (error: any) {
+      // Check for 403 status code FIRST, before any logging
+      // Check in multiple possible locations for maximum compatibility
+      const statusCode = error.response?.status || 
+                        error.status || 
+                        error.statusCode ||
+                        (error.message?.match(/status code (\d+)/)?.[1] ? parseInt(error.message.match(/status code (\d+)/)?.[1]) : null);
+      
+      const is403 = statusCode === 403 || 
+                    (error.message && typeof error.message === 'string' && error.message.toLowerCase().includes("403")) ||
+                    (error.message && typeof error.message === 'string' && error.message.includes("status code 403"));
+      
+      if (is403) {
+        const errorText = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.response?.data?.error ||
+                         (error.message && typeof error.message === 'string' && error.message.includes("insufficient credits") ? error.message : null) ||
+                         "You don't have enough credits to generate this content.";
+        
+        // Set state and return immediately - don't log or process further
+        setInsufficientCreditsMessage(errorText);
+        setInsufficientCreditsModalOpen(true);
+        setLoading(false);
+        setLoadingMessage("Crafting your post...");
+        return; // Don't add error message to chat, don't log
+      }
+      
+      // Only log non-403 errors
       console.error("Generation failed:", error);
 
       // Extract error message
       let errorText = "Sorry, I encountered an error generating your post. Please try again.";
       if (error.response?.data?.detail) {
         errorText = error.response.data.detail;
+        // If it's an insufficient credits error, show modal instead of adding message
+        if (errorText.toLowerCase().includes("insufficient credits")) {
+          setInsufficientCreditsMessage(errorText);
+          setInsufficientCreditsModalOpen(true);
+          return; // Don't add error message to chat
+        }
         // If it's an onboarding error, redirect to onboarding
         if (errorText.includes("onboarding")) {
           errorText = "Please complete onboarding first. Redirecting...";
@@ -1282,6 +1341,12 @@ export default function GeneratePage() {
         }
       } else if (error.message) {
         errorText = error.message;
+        // Check if error message indicates insufficient credits
+        if (errorText.toLowerCase().includes("insufficient credits")) {
+          setInsufficientCreditsMessage(errorText);
+          setInsufficientCreditsModalOpen(true);
+          return; // Don't add error message to chat
+        }
       }
 
       const errorMessage: Message = {
@@ -1339,8 +1404,34 @@ export default function GeneratePage() {
 
       // Trigger subscription refresh to update credit progress bar
       window.dispatchEvent(new CustomEvent("creditsUpdated"));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Regeneration failed:", error);
+
+      // Check for 403 status code first (insufficient credits)
+      if (error.response?.status === 403) {
+        const errorText = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         "You don't have enough credits to regenerate this post.";
+        setInsufficientCreditsMessage(errorText);
+        setInsufficientCreditsModalOpen(true);
+        return;
+      }
+
+      // Check if it's an insufficient credits error by message
+      let errorText = error.response?.data?.detail || error.message || "";
+      if (errorText.toLowerCase().includes("insufficient credits")) {
+        setInsufficientCreditsMessage(errorText || "You don't have enough credits to regenerate this post.");
+        setInsufficientCreditsModalOpen(true);
+      } else {
+        // For other errors, show a toast
+        addToast({
+          title: "Regeneration failed",
+          description: errorText || "Failed to regenerate post. Please try again.",
+          variant: "error",
+          duration: 5000,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -1775,7 +1866,24 @@ export default function GeneratePage() {
                                 window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 console.error("Image regeneration failed:", error);
-                                alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
+                                // Check for 403 status code first (insufficient credits)
+                                if (error.response?.status === 403) {
+                                  const errorText = error.response?.data?.detail || 
+                                                   error.response?.data?.message || 
+                                                   error.message || 
+                                                   "You don't have enough credits to generate this image.";
+                                  setInsufficientCreditsMessage(errorText);
+                                  setInsufficientCreditsModalOpen(true);
+                                } else {
+                                  const errorText = error.response?.data?.detail || error.message || "";
+                                  // Check if it's an insufficient credits error by message
+                                  if (errorText.toLowerCase().includes("insufficient credits")) {
+                                    setInsufficientCreditsMessage(errorText || "You don't have enough credits to generate this image.");
+                                    setInsufficientCreditsModalOpen(true);
+                                  } else {
+                                    alert(`Image generation failed: ${errorText}`);
+                                  }
+                                }
                               } finally {
                                 setGeneratingImages(prev => ({ ...prev, [postId]: false }));
                               }
@@ -1819,7 +1927,24 @@ export default function GeneratePage() {
                                 window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 console.error("Image generation with custom prompt failed:", error);
-                                alert(`Image generation failed: ${error.response?.data?.detail || error.message}`);
+                                // Check for 403 status code first (insufficient credits)
+                                if (error.response?.status === 403) {
+                                  const errorText = error.response?.data?.detail || 
+                                                   error.response?.data?.message || 
+                                                   error.message || 
+                                                   "You don't have enough credits to generate this image.";
+                                  setInsufficientCreditsMessage(errorText);
+                                  setInsufficientCreditsModalOpen(true);
+                                } else {
+                                  const errorText = error.response?.data?.detail || error.message || "";
+                                  // Check if it's an insufficient credits error by message
+                                  if (errorText.toLowerCase().includes("insufficient credits")) {
+                                    setInsufficientCreditsMessage(errorText || "You don't have enough credits to generate this image.");
+                                    setInsufficientCreditsModalOpen(true);
+                                  } else {
+                                    alert(`Image generation failed: ${errorText}`);
+                                  }
+                                }
                               } finally {
                                 setGeneratingImages(prev => ({ ...prev, [postId]: false }));
                               }
@@ -1947,7 +2072,24 @@ export default function GeneratePage() {
                               } catch (error: any) {
                                 clearInterval(progressInterval);
                                 console.error("PDF regeneration failed:", error);
-                                alert(`PDF regeneration failed: ${error.response?.data?.detail || error.message}`);
+                                // Check for 403 status code first (insufficient credits)
+                                if (error.response?.status === 403) {
+                                  const errorText = error.response?.data?.detail || 
+                                                   error.response?.data?.message || 
+                                                   error.message || 
+                                                   "You don't have enough credits to generate this carousel.";
+                                  setInsufficientCreditsMessage(errorText);
+                                  setInsufficientCreditsModalOpen(true);
+                                } else {
+                                  const errorText = error.response?.data?.detail || error.message || "";
+                                  // Check if it's an insufficient credits error by message
+                                  if (errorText.toLowerCase().includes("insufficient credits")) {
+                                    setInsufficientCreditsMessage(errorText || "You don't have enough credits to generate this carousel.");
+                                    setInsufficientCreditsModalOpen(true);
+                                  } else {
+                                    alert(`PDF regeneration failed: ${errorText}`);
+                                  }
+                                }
                               } finally {
                                 setGeneratingPDFs(prev => ({ ...prev, [postId]: false }));
                                 setPdfProgress(prev => ({ ...prev, [postId]: { current: promptsToRegenerate.length, total: promptsToRegenerate.length } }));
@@ -2002,7 +2144,24 @@ export default function GeneratePage() {
                                 window.dispatchEvent(new CustomEvent("creditsUpdated"));
                               } catch (error: any) {
                                 console.error("Slide regeneration failed:", error);
-                                alert(`Slide regeneration failed: ${error.response?.data?.detail || error.message}`);
+                                // Check for 403 status code first (insufficient credits)
+                                if (error.response?.status === 403) {
+                                  const errorText = error.response?.data?.detail || 
+                                                   error.response?.data?.message || 
+                                                   error.message || 
+                                                   "You don't have enough credits to regenerate this slide.";
+                                  setInsufficientCreditsMessage(errorText);
+                                  setInsufficientCreditsModalOpen(true);
+                                } else {
+                                  const errorText = error.response?.data?.detail || error.message || "";
+                                  // Check if it's an insufficient credits error by message
+                                  if (errorText.toLowerCase().includes("insufficient credits")) {
+                                    setInsufficientCreditsMessage(errorText || "You don't have enough credits to regenerate this slide.");
+                                    setInsufficientCreditsModalOpen(true);
+                                  } else {
+                                    alert(`Slide regeneration failed: ${errorText}`);
+                                  }
+                                }
                               } finally {
                                 // Clear regenerating state
                                 setRegeneratingSlideIndex(prev => ({ ...prev, [postId]: null }));
@@ -2668,7 +2827,24 @@ export default function GeneratePage() {
                   } catch (error: any) {
                     clearInterval(progressInterval);
                     console.error("PDF regeneration failed:", error);
-                    alert(`PDF regeneration failed: ${error.response?.data?.detail || error.message}`);
+                    // Check for 403 status code first (insufficient credits)
+                    if (error.response?.status === 403) {
+                      const errorText = error.response?.data?.detail || 
+                                       error.response?.data?.message || 
+                                       error.message || 
+                                       "You don't have enough credits to generate this carousel.";
+                      setInsufficientCreditsMessage(errorText);
+                      setInsufficientCreditsModalOpen(true);
+                    } else {
+                      const errorText = error.response?.data?.detail || error.message || "";
+                      // Check if it's an insufficient credits error by message
+                      if (errorText.toLowerCase().includes("insufficient credits")) {
+                        setInsufficientCreditsMessage(errorText || "You don't have enough credits to generate this carousel.");
+                        setInsufficientCreditsModalOpen(true);
+                      } else {
+                        alert(`PDF regeneration failed: ${errorText}`);
+                      }
+                    }
                   } finally {
                     setGeneratingPDFs(prev => ({ ...prev, [postId]: false }));
                     setPdfProgress(prev => ({ ...prev, [postId]: { current: promptsToRegenerate.length, total: promptsToRegenerate.length } }));
@@ -2745,6 +2921,38 @@ export default function GeneratePage() {
           }}
         />
       )}
+
+      {/* Insufficient Credits Modal */}
+      <Dialog open={insufficientCreditsModalOpen} onOpenChange={setInsufficientCreditsModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              Insufficient Credits
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              {insufficientCreditsMessage || "You don't have enough credits to generate this content."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setInsufficientCreditsModalOpen(false)}
+            >
+              Close
+            </Button>
+            <Button
+              className="bg-[#0A66C2] hover:bg-[#004182] text-white"
+              onClick={() => {
+                setInsufficientCreditsModalOpen(false);
+                router.push("/billing?tab=plans");
+              }}
+            >
+              Upgrade Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
