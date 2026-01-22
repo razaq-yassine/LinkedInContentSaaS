@@ -78,17 +78,17 @@ export default function BillingPage() {
       router.push('/login');
       return;
     }
-    
+
     // Check if URL has tab parameter
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
     if (tabParam === 'plans') {
       setActiveTab('plans');
     }
-    
+
     // Check if test mode is available (backend dev mode)
     checkTestMode();
-    
+
     fetchPlansAndSubscription();
   }, [router]);
 
@@ -155,7 +155,7 @@ export default function BillingPage() {
     // Check if this is an upgrade (user has paid plan)
     const currentPlan = currentSubscription?.plan;
     const isUpgrade = currentPlan && currentPlan !== 'free' && currentPlan !== planName;
-    
+
     if (isUpgrade) {
       // Show upgrade consent modal
       setSelectedUpgradePlan(planName);
@@ -187,7 +187,7 @@ export default function BillingPage() {
     } catch (error: any) {
       console.error('Subscription error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to start subscription process';
-      
+
       // Check if it's a yearly→monthly restriction error
       if (errorMessage.includes('Yearly subscriptions cannot be switched')) {
         // Show credit purchase suggestion modal
@@ -202,10 +202,10 @@ export default function BillingPage() {
 
   const handleUpgradeConfirm = async () => {
     if (!selectedUpgradePlan) return;
-    
+
     setUpgradeModalOpen(false);
     setProcessingPlan(selectedUpgradePlan);
-    
+
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -227,7 +227,7 @@ export default function BillingPage() {
     } catch (error: any) {
       console.error('Upgrade error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to upgrade subscription';
-      
+
       // Check if it's a yearly→monthly restriction error
       if (errorMessage.includes('Yearly subscriptions cannot be switched')) {
         // Show credit purchase suggestion modal
@@ -248,7 +248,7 @@ export default function BillingPage() {
 
   const handleDowngradeConfirm = async () => {
     setDowngradeModalOpen(false);
-    
+
     try {
       const token = localStorage.getItem('token');
       await axios.post(
@@ -340,6 +340,12 @@ export default function BillingPage() {
     return currentSubscription?.plan === planName;
   };
 
+  const isPlanScheduled = (planName: string) => {
+    if (!currentSubscription) return false;
+    // Check if this plan is scheduled for downgrade
+    return currentSubscription.scheduled_downgrade_plan === planName;
+  };
+
   const getCurrentPlan = () => {
     if (!currentSubscription) return null;
     return plans.find(p => p.plan_name === currentSubscription.plan);
@@ -348,12 +354,12 @@ export default function BillingPage() {
   const getNextPlan = () => {
     const currentPlan = getCurrentPlan();
     if (!currentPlan || !currentSubscription) return null;
-    
+
     // If there's a scheduled downgrade, that's the next plan
     if (currentSubscription.scheduled_downgrade_plan) {
       return plans.find(p => p.plan_name === currentSubscription.scheduled_downgrade_plan) || null;
     }
-    
+
     // Otherwise, next plan is the same as current plan (continuing)
     return currentPlan;
   };
@@ -376,7 +382,7 @@ export default function BillingPage() {
     const currentMonth = new Date().getMonth();
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentPrice = getCurrentPlanPrice();
-    
+
     return Array.from({ length: 6 }, (_, i) => {
       const monthIndex = (currentMonth - 5 + i + 12) % 12;
       return {
@@ -401,7 +407,7 @@ export default function BillingPage() {
             </div>
           </div>
         )}
-        
+
         {/* Header */}
         <div className="text-center mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-3">
@@ -415,15 +421,15 @@ export default function BillingPage() {
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-sm mx-auto grid-cols-2 mb-10 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-md">
-            <TabsTrigger 
-              value="usage" 
+            <TabsTrigger
+              value="usage"
               className="text-sm font-semibold rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-800 data-[state=active]:to-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg dark:data-[state=active]:from-white dark:data-[state=active]:to-slate-100 dark:data-[state=active]:text-slate-900 text-slate-600 dark:text-slate-400 transition-all duration-300"
             >
               <Activity className="w-4 h-4 mr-2" />
               Usage
             </TabsTrigger>
-            <TabsTrigger 
-              value="plans" 
+            <TabsTrigger
+              value="plans"
               className="text-sm font-semibold rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-800 data-[state=active]:to-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg dark:data-[state=active]:from-white dark:data-[state=active]:to-slate-100 dark:data-[state=active]:text-slate-900 text-slate-600 dark:text-slate-400 transition-all duration-300"
             >
               <CreditCard className="w-4 h-4 mr-2" />
@@ -449,8 +455,8 @@ export default function BillingPage() {
                         {currentSubscription.credits_limit === -1 ? '∞' : Math.round(currentSubscription.credits_remaining * 100) / 100}
                       </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        {currentSubscription.credits_limit === -1 
-                          ? 'Unlimited' 
+                        {currentSubscription.credits_limit === -1
+                          ? 'Unlimited'
                           : `of ${currentSubscription.credits_limit} this month`}
                       </p>
                     </CardContent>
@@ -484,8 +490,8 @@ export default function BillingPage() {
                         </div>
                       </div>
                       <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                        {currentSubscription.current_period_end 
-                          ? new Date(currentSubscription.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+                        {currentSubscription.current_period_end
+                          ? new Date(currentSubscription.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                           : 'N/A'}
                       </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -495,241 +501,6 @@ export default function BillingPage() {
                   </Card>
                 </div>
 
-                {/* Current Plan & Next Plan Comparison */}
-                {(() => {
-                  const currentPlan = getCurrentPlan();
-                  const nextPlan = getNextPlan();
-                  
-                  if (!currentPlan || !nextPlan || !currentSubscription) return null;
-                  
-                  const currentPlanIndex = plans.findIndex(p => p.plan_name === currentPlan.plan_name);
-                  const currentIcon = getPlanIcon(currentPlanIndex);
-                  const CurrentIcon = currentIcon;
-                  
-                  const isDowngrading = currentSubscription.scheduled_downgrade_plan !== null;
-                  const isSamePlan = nextPlan.plan_name === currentPlan.plan_name;
-                  
-                  // Calculate next period dates
-                  const currentPeriodStart = currentSubscription.current_period_start 
-                    ? new Date(currentSubscription.current_period_start)
-                    : null;
-                  const currentPeriodEnd = currentSubscription.current_period_end
-                    ? new Date(currentSubscription.current_period_end)
-                    : null;
-                  
-                  // Next period starts when current period ends
-                  const nextPeriodStart = currentPeriodEnd;
-                  // Calculate next period end based on billing cycle
-                  const nextPeriodEnd = currentPeriodEnd && currentPeriodStart
-                    ? (() => {
-                        const periodLength = currentPeriodEnd.getTime() - currentPeriodStart.getTime();
-                        return new Date(currentPeriodEnd.getTime() + periodLength);
-                      })()
-                    : null;
-                  
-                  const formatDate = (date: Date | null) => {
-                    if (!date) return 'N/A';
-                    return date.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    });
-                  };
-                  
-                  // Find the next upgrade plan (higher tier)
-                  const nextUpgradePlan = plans
-                    .filter(p => p.sort_order > currentPlan.sort_order)
-                    .sort((a, b) => a.sort_order - b.sort_order)[0];
-                  
-                  return (
-                    <div className="space-y-6">
-                      <div className="text-center">
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
-                          Your Plan
-                        </h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {isDowngrading ? 'Plan change scheduled' : 'Current billing period'}
-                        </p>
-                      </div>
-                      
-                      <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-                        {/* Current Plan Card */}
-                        <Card className="flex-1 w-full md:max-w-sm bg-white dark:bg-slate-800 border-2 border-emerald-500 dark:border-emerald-400 shadow-lg hover:shadow-xl transition-all duration-300">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <Badge className="bg-gradient-to-r from-emerald-500 to-green-500 text-white border-0 shadow-md">
-                                <Check className="w-3 h-3 mr-1" />
-                                Current
-                              </Badge>
-                              {nextUpgradePlan && (
-                                <Button
-                                  onClick={() => {
-                                    setSelectedUpgradePlan(nextUpgradePlan.plan_name);
-                                    setUpgradeModalOpen(true);
-                                  }}
-                                  size="sm"
-                                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all"
-                                >
-                                  <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-                                  Upgrade
-                                </Button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-lg">
-                                <CurrentIcon className="w-6 h-6 text-white" />
-                              </div>
-                              <div>
-                                <CardTitle className="text-lg font-bold text-slate-900 dark:text-white">
-                                  {currentPlan.display_name}
-                                </CardTitle>
-                                <CardDescription className="text-sm text-slate-500 dark:text-slate-400">
-                                  {currentPlan.description || 'Your current plan'}
-                                </CardDescription>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-3xl font-bold text-slate-900 dark:text-white">
-                                ${billingCycle === 'monthly' 
-                                  ? (currentPlan.price_monthly / 100).toFixed(0)
-                                  : (currentPlan.price_yearly / 100 / 12).toFixed(0)
-                                }
-                              </span>
-                              <span className="text-slate-500 dark:text-slate-400">/mo</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                              <Zap className="w-4 h-4 text-amber-500" />
-                              <span className="font-semibold text-slate-900 dark:text-white">
-                                {currentPlan.credits_limit === -1 ? 'Unlimited' : currentPlan.credits_limit} credits/mo
-                              </span>
-                            </div>
-                            {currentPeriodStart && (
-                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  Period: {formatDate(currentPeriodStart)} - {formatDate(currentPeriodEnd)}
-                                </p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-
-                        {/* Arrow */}
-                        <>
-                          <div className="hidden md:flex items-center justify-center">
-                            <div className={cn(
-                              "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
-                              isDowngrading 
-                                ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
-                                : "bg-gradient-to-r from-blue-500 to-cyan-500"
-                            )}>
-                              <ArrowRight className="w-6 h-6 text-white" />
-                            </div>
-                          </div>
-                          <div className="md:hidden flex items-center justify-center">
-                            <div className={cn(
-                              "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
-                              isDowngrading 
-                                ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
-                                : "bg-gradient-to-r from-blue-500 to-cyan-500"
-                            )}>
-                              <ArrowDown className="w-6 h-6 text-white" />
-                            </div>
-                          </div>
-                        </>
-
-                        {/* Next Plan Card */}
-                        <Card className={cn(
-                          "flex-1 w-full md:max-w-sm border-2 shadow-lg hover:shadow-xl transition-all duration-300",
-                          isDowngrading
-                            ? "bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-500 dark:border-amber-400"
-                            : "bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-500 dark:border-blue-400"
-                        )}>
-                          <CardHeader className="pb-3">
-                            <Badge className={cn(
-                              "text-white border-0 shadow-md mb-2",
-                              isDowngrading
-                                ? "bg-gradient-to-r from-amber-600 to-orange-600"
-                                : "bg-gradient-to-r from-blue-600 to-cyan-600"
-                            )}>
-                              {isDowngrading ? (
-                                <>
-                                  <Calendar className="w-3 h-3 mr-1" />
-                                  Scheduled
-                                </>
-                              ) : (
-                                <>
-                                  <Star className="w-3 h-3 mr-1 fill-white" />
-                                  Next Period
-                                </>
-                              )}
-                            </Badge>
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "w-12 h-12 rounded-xl flex items-center justify-center shadow-lg",
-                                isDowngrading
-                                  ? "bg-gradient-to-br from-amber-500 to-orange-500"
-                                  : "bg-gradient-to-br from-blue-500 to-cyan-500"
-                              )}>
-                                {(() => {
-                                  const nextPlanIndex = plans.findIndex(p => p.plan_name === nextPlan.plan_name);
-                                  const NextIcon = getPlanIcon(nextPlanIndex);
-                                  return <NextIcon className="w-6 h-6 text-white" />;
-                                })()}
-                              </div>
-                              <div>
-                                <CardTitle className="text-lg font-bold text-slate-900 dark:text-white">
-                                  {nextPlan.display_name}
-                                </CardTitle>
-                                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
-                                  {isDowngrading 
-                                    ? 'Effective after current period'
-                                    : isSamePlan 
-                                      ? 'Continuing with same plan'
-                                      : nextPlan.description || 'Next period plan'
-                                  }
-                                </CardDescription>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div className="flex items-baseline gap-1">
-                              <span className={cn(
-                                "text-3xl font-bold bg-clip-text text-transparent",
-                                isDowngrading
-                                  ? "bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400"
-                                  : "bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400"
-                              )}>
-                                ${billingCycle === 'monthly' 
-                                  ? (nextPlan.price_monthly / 100).toFixed(0)
-                                  : (nextPlan.price_yearly / 100 / 12).toFixed(0)
-                                }
-                              </span>
-                              <span className="text-slate-500 dark:text-slate-400">/mo</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                              <Zap className={cn(
-                                "w-4 h-4",
-                                isDowngrading ? "text-amber-500" : "text-blue-500"
-                              )} />
-                              <span className="font-semibold text-slate-900 dark:text-white">
-                                {nextPlan.credits_limit === -1 ? 'Unlimited' : nextPlan.credits_limit} credits/mo
-                              </span>
-                            </div>
-                            {nextPeriodStart && nextPeriodEnd && (
-                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  Period: {formatDate(nextPeriodStart)} - {formatDate(nextPeriodEnd)}
-                                </p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* Credit Usage Progress */}
                 <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-all duration-300">
@@ -748,9 +519,9 @@ export default function BillingPage() {
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-sm text-slate-600 dark:text-slate-400">Total Available</span>
                           <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                            {currentSubscription.breakdown?.total_available === -1 
-                              ? 'Unlimited' 
-                              : currentSubscription.breakdown 
+                            {currentSubscription.breakdown?.total_available === -1
+                              ? 'Unlimited'
+                              : currentSubscription.breakdown
                                 ? Math.round(currentSubscription.breakdown.total_available * 100) / 100
                                 : Math.round(currentSubscription.credits_remaining * 100) / 100}
                           </span>
@@ -833,6 +604,224 @@ export default function BillingPage() {
           </TabsContent>
 
           <TabsContent value="plans" className="space-y-8">
+            {/* Current Plan & Next Plan Comparison */}
+            {currentSubscription && (() => {
+              const currentPlan = getCurrentPlan();
+              const nextPlan = getNextPlan();
+
+              if (!currentPlan || !nextPlan || !currentSubscription) return null;
+
+              const currentPlanIndex = plans.findIndex(p => p.plan_name === currentPlan.plan_name);
+              const currentIcon = getPlanIcon(currentPlanIndex);
+              const CurrentIcon = currentIcon;
+
+              const isDowngrading = currentSubscription.scheduled_downgrade_plan !== null;
+              const isSamePlan = nextPlan.plan_name === currentPlan.plan_name;
+
+              // Calculate next period dates
+              const currentPeriodStart = currentSubscription.current_period_start
+                ? new Date(currentSubscription.current_period_start)
+                : null;
+              const currentPeriodEnd = currentSubscription.current_period_end
+                ? new Date(currentSubscription.current_period_end)
+                : null;
+
+              // Next period starts when current period ends
+              const nextPeriodStart = currentPeriodEnd;
+              // Calculate next period end based on billing cycle
+              const nextPeriodEnd = currentPeriodEnd && currentPeriodStart
+                ? (() => {
+                  const periodLength = currentPeriodEnd.getTime() - currentPeriodStart.getTime();
+                  return new Date(currentPeriodEnd.getTime() + periodLength);
+                })()
+                : null;
+
+              const formatDate = (date: Date | null) => {
+                if (!date) return 'N/A';
+                return date.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                });
+              };
+
+              return (
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                      Your Plan
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {isDowngrading ? 'Plan change scheduled' : 'Current billing period'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                    {/* Current Plan Card */}
+                    <Card className="flex-1 w-full md:max-w-sm bg-white dark:bg-slate-800 border-2 border-emerald-500 dark:border-emerald-400 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge className="bg-gradient-to-r from-emerald-500 to-green-500 text-white border-0 shadow-md">
+                            <Check className="w-3 h-3 mr-1" />
+                            Current
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-lg">
+                            <CurrentIcon className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg font-bold text-slate-900 dark:text-white">
+                              {currentPlan.display_name}
+                            </CardTitle>
+                            <CardDescription className="text-sm text-slate-500 dark:text-slate-400">
+                              {currentPlan.description || 'Your current plan'}
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-bold text-slate-900 dark:text-white">
+                            ${billingCycle === 'monthly'
+                              ? (currentPlan.price_monthly / 100).toFixed(0)
+                              : (currentPlan.price_yearly / 100 / 12).toFixed(0)
+                            }
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400">/mo</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Zap className="w-4 h-4 text-amber-500" />
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {currentPlan.credits_limit === -1 ? 'Unlimited' : currentPlan.credits_limit} credits/mo
+                          </span>
+                        </div>
+                        {currentPeriodStart && (
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Period: {formatDate(currentPeriodStart)} - {formatDate(currentPeriodEnd)}
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Arrow */}
+                    <>
+                      <div className="hidden md:flex items-center justify-center">
+                        <div className={cn(
+                          "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
+                          isDowngrading
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
+                            : "bg-gradient-to-r from-blue-500 to-cyan-500"
+                        )}>
+                          <ArrowRight className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                      <div className="md:hidden flex items-center justify-center">
+                        <div className={cn(
+                          "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
+                          isDowngrading
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
+                            : "bg-gradient-to-r from-blue-500 to-cyan-500"
+                        )}>
+                          <ArrowDown className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </>
+
+                    {/* Next Plan Card */}
+                    <Card className={cn(
+                      "flex-1 w-full md:max-w-sm border-2 shadow-lg hover:shadow-xl transition-all duration-300",
+                      isDowngrading
+                        ? "bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-500 dark:border-amber-400"
+                        : "bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-500 dark:border-blue-400"
+                    )}>
+                      <CardHeader className="pb-3">
+                        <Badge className={cn(
+                          "text-white border-0 shadow-md mb-2",
+                          isDowngrading
+                            ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                            : "bg-gradient-to-r from-blue-600 to-cyan-600"
+                        )}>
+                          {isDowngrading ? (
+                            <>
+                              <Calendar className="w-3 h-3 mr-1" />
+                              Scheduled
+                            </>
+                          ) : (
+                            <>
+                              <Star className="w-3 h-3 mr-1 fill-white" />
+                              Next Period
+                            </>
+                          )}
+                        </Badge>
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center shadow-lg",
+                            isDowngrading
+                              ? "bg-gradient-to-br from-amber-500 to-orange-500"
+                              : "bg-gradient-to-br from-blue-500 to-cyan-500"
+                          )}>
+                            {(() => {
+                              const nextPlanIndex = plans.findIndex(p => p.plan_name === nextPlan.plan_name);
+                              const NextIcon = getPlanIcon(nextPlanIndex);
+                              return <NextIcon className="w-6 h-6 text-white" />;
+                            })()}
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg font-bold text-slate-900 dark:text-white">
+                              {nextPlan.display_name}
+                            </CardTitle>
+                            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                              {isDowngrading
+                                ? 'Effective after current period'
+                                : isSamePlan
+                                  ? 'Continuing with same plan'
+                                  : nextPlan.description || 'Next period plan'
+                              }
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-baseline gap-1">
+                          <span className={cn(
+                            "text-3xl font-bold bg-clip-text text-transparent",
+                            isDowngrading
+                              ? "bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400"
+                              : "bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400"
+                          )}>
+                            ${billingCycle === 'monthly'
+                              ? (nextPlan.price_monthly / 100).toFixed(0)
+                              : (nextPlan.price_yearly / 100 / 12).toFixed(0)
+                            }
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400">/mo</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Zap className={cn(
+                            "w-4 h-4",
+                            isDowngrading ? "text-amber-500" : "text-blue-500"
+                          )} />
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {nextPlan.credits_limit === -1 ? 'Unlimited' : nextPlan.credits_limit} credits/mo
+                          </span>
+                        </div>
+                        {nextPeriodStart && nextPeriodEnd && (
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Period: {formatDate(nextPeriodStart)} - {formatDate(nextPeriodEnd)}
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Billing Cycle Toggle */}
             <div className="flex justify-center">
               <div className="inline-flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
@@ -878,8 +867,8 @@ export default function BillingPage() {
                     key={plan.id}
                     className={cn(
                       "relative bg-white dark:bg-slate-800 border-2 transition-all duration-300 hover:-translate-y-1 group",
-                      isPopular 
-                        ? "border-blue-500 dark:border-blue-400 shadow-xl shadow-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30" 
+                      isPopular
+                        ? "border-blue-500 dark:border-blue-400 shadow-xl shadow-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/30"
                         : isPremium
                           ? "border-purple-500 dark:border-purple-400 shadow-xl shadow-purple-500/20 hover:shadow-2xl hover:shadow-purple-500/30"
                           : "border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-xl hover:border-slate-300 dark:hover:border-slate-600",
@@ -933,10 +922,10 @@ export default function BillingPage() {
                           <span className={cn(
                             "text-4xl font-bold",
                             isPopular ? "bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent" :
-                            isPremium ? "bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent" :
-                            "text-slate-900 dark:text-white"
+                              isPremium ? "bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent" :
+                                "text-slate-900 dark:text-white"
                           )}>
-                            ${billingCycle === 'monthly' 
+                            ${billingCycle === 'monthly'
                               ? (plan.price_monthly / 100).toFixed(0)
                               : (plan.price_yearly / 100 / 12).toFixed(0)
                             }
@@ -955,8 +944,8 @@ export default function BillingPage() {
                       <div className={cn(
                         "rounded-xl py-3 px-4 mb-6 border",
                         isPopular ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" :
-                        isPremium ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800" :
-                        "bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"
+                          isPremium ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800" :
+                            "bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"
                       )}>
                         <div className="flex items-center justify-center gap-2">
                           <Zap className={cn(
@@ -991,36 +980,60 @@ export default function BillingPage() {
                     </CardContent>
 
                     <CardFooter className="flex flex-col gap-2 pt-4 pb-6 px-6">
-                      <Button
-                        onClick={() => handleSubscribe(plan.plan_name)}
-                        disabled={isCurrent || processingPlan !== null}
-                        className={cn(
-                          "w-full h-12 font-semibold transition-all duration-300 rounded-xl",
-                          isCurrent 
-                            ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-default'
-                            : theme.buttonClass
-                        )}
-                      >
-                        {processingPlan === plan.plan_name ? (
+                      {(() => {
+                        const isScheduled = isPlanScheduled(plan.plan_name);
+                        const isDisabled = isCurrent || isScheduled || processingPlan !== null;
+
+                        return (
                           <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Processing...
+                            {isScheduled && (
+                              <Badge className="w-full justify-center bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-md mb-2">
+                                <Calendar className="w-3 h-3 mr-1.5" />
+                                Scheduled for {currentSubscription?.scheduled_downgrade_date
+                                  ? new Date(currentSubscription.scheduled_downgrade_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                  : 'period end'}
+                              </Badge>
+                            )}
+                            <Button
+                              onClick={() => handleSubscribe(plan.plan_name)}
+                              disabled={isDisabled}
+                              className={cn(
+                                "w-full h-12 font-semibold transition-all duration-300 rounded-xl",
+                                isCurrent
+                                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-default'
+                                  : isScheduled
+                                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-default'
+                                    : theme.buttonClass
+                              )}
+                            >
+                              {processingPlan === plan.plan_name ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Processing...
+                                </>
+                              ) : isCurrent ? (
+                                <span className="flex items-center gap-2">
+                                  <Check className="w-4 h-4" />
+                                  Current Plan
+                                </span>
+                              ) : isScheduled ? (
+                                <span className="flex items-center gap-2">
+                                  <Calendar className="w-4 h-4" />
+                                  Already Scheduled
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-2">
+                                  Get Started
+                                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </span>
+                              )}
+                            </Button>
                           </>
-                        ) : isCurrent ? (
-                          <span className="flex items-center gap-2">
-                            <Check className="w-4 h-4" />
-                            Current Plan
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            Get Started
-                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                          </span>
-                        )}
-                      </Button>
-                      
-                      {/* Test Mode Button */}
-                      {testMode && !isCurrent && plan.plan_name !== 'free' && (
+                        );
+                      })()}
+
+                      {/* Test Mode Button - hide if plan is scheduled */}
+                      {testMode && !isCurrent && !isPlanScheduled(plan.plan_name) && plan.plan_name !== 'free' && (
                         <Button
                           onClick={() => handleTestSubscribe(plan.plan_name)}
                           disabled={processingPlan !== null}
@@ -1035,9 +1048,9 @@ export default function BillingPage() {
                           Test Subscribe
                         </Button>
                       )}
-                      
-                      {/* Downgrade button */}
-                      {isCurrent && currentSubscription && currentSubscription.plan !== 'free' && (
+
+                      {/* Downgrade button - only show if not already scheduled */}
+                      {isCurrent && currentSubscription && currentSubscription.plan !== 'free' && !isPlanScheduled('free') && (
                         <Button
                           onClick={handleDowngrade}
                           variant="ghost"
@@ -1046,6 +1059,18 @@ export default function BillingPage() {
                           <ArrowDown className="w-3 h-3 mr-1.5" />
                           Downgrade to Free
                         </Button>
+                      )}
+
+                      {/* Show scheduled message if downgrade is already scheduled */}
+                      {isCurrent && currentSubscription && isPlanScheduled('free') && (
+                        <div className="w-full text-center py-2 px-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                          <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5">
+                            <Calendar className="w-3 h-3" />
+                            Downgrade scheduled for {currentSubscription.scheduled_downgrade_date
+                              ? new Date(currentSubscription.scheduled_downgrade_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                              : 'period end'}
+                          </p>
+                        </div>
                       )}
                     </CardFooter>
                   </Card>
@@ -1067,7 +1092,7 @@ export default function BillingPage() {
                 <p className="text-slate-300 mb-8 max-w-md mx-auto">
                   Get dedicated support, custom integrations, and enterprise-grade security
                 </p>
-                <Button 
+                <Button
                   className="bg-white text-slate-900 hover:bg-slate-100 font-semibold px-8 h-12 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
                 >
                   Contact Sales
@@ -1093,8 +1118,8 @@ export default function BillingPage() {
             newPrice={
               plans.find(p => p.plan_name === selectedUpgradePlan)
                 ? (billingCycle === 'monthly'
-                    ? plans.find(p => p.plan_name === selectedUpgradePlan)!.price_monthly / 100
-                    : plans.find(p => p.plan_name === selectedUpgradePlan)!.price_yearly / 100)
+                  ? plans.find(p => p.plan_name === selectedUpgradePlan)!.price_monthly / 100
+                  : plans.find(p => p.plan_name === selectedUpgradePlan)!.price_yearly / 100)
                 : 0
             }
             billingCycle={billingCycle}
