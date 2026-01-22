@@ -25,7 +25,10 @@ class EmailService:
     @staticmethod
     def _create_smtp_connection():
         """Create SMTP connection with timeout"""
-        if settings.smtp_use_tls:
+        # Port 465 uses SSL/TLS directly, port 587 uses STARTTLS
+        if settings.smtp_port == 465:
+            server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=10)
+        elif settings.smtp_use_tls:
             server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
             server.starttls()
         else:

@@ -35,7 +35,13 @@ def test_smtp_connection():
     
     print("\n2. Testing SMTP Connection...")
     try:
-        if settings.smtp_use_tls:
+        # Port 465 uses SSL/TLS directly, port 587 uses STARTTLS
+        if settings.smtp_port == 465:
+            # Port 465 requires SMTP_SSL (direct SSL connection)
+            server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=10)
+            print(f"   ✅ Connected to {settings.smtp_host}:{settings.smtp_port} (SSL)")
+        elif settings.smtp_use_tls:
+            # Port 587 uses STARTTLS
             server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
             print(f"   ✅ Connected to {settings.smtp_host}:{settings.smtp_port}")
             
@@ -126,7 +132,10 @@ def send_test_email(to_email: str):
     msg.attach(part2)
     
     try:
-        if settings.smtp_use_tls:
+        # Port 465 uses SSL/TLS directly, port 587 uses STARTTLS
+        if settings.smtp_port == 465:
+            server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=10)
+        elif settings.smtp_use_tls:
             server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
             server.starttls()
         else:
