@@ -232,7 +232,7 @@ class LinkedInService:
             
             # Try Documents API first (separate API for documents)
             # Use REST API endpoint with LinkedIn-Version header
-            linkedin_version = "202411"  # Use a stable version
+            linkedin_version = "202601"  # Use latest active version (January 2026)
             
             # Step 1: Initialize upload using Documents API
             initialize_payload = {
@@ -406,16 +406,12 @@ class LinkedInService:
             print(f"Documents API failed ({initialize_response.status_code}), trying Assets API fallback...")
             
             # Fallback to Assets API approach
+            # Note: LinkedIn's Assets API for documents has known issues with UGC posts
+            # Try without serviceRelationships first, as it may not be required for documents
             request_payload = {
                 "registerUploadRequest": {
                     "owner": person_urn,
-                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-document"],
-                    "serviceRelationships": [
-                        {
-                            "identifier": "urn:li:userGeneratedContent",
-                            "relationshipType": "OWNER"
-                        }
-                    ]
+                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-document"]
                 }
             }
             
@@ -429,6 +425,7 @@ class LinkedInService:
                 }
             )
             
+            # If first attempt fails, try with serviceRelationships (some recipes require it)
             if register_response.status_code != 200:
                 error_text = register_response.text
                 error_details = {}
@@ -439,7 +436,44 @@ class LinkedInService:
                 except:
                     pass
                 
-                print(f"Assets API also failed:")
+                # Check if error is related to relationshipType or serviceRelationships
+                # If so, try with serviceRelationships included
+                if "relationshipType" in error_text or "serviceRelationships" in error_text.lower():
+                    print(f"Assets API failed without serviceRelationships, retrying with serviceRelationships...")
+                    request_payload_with_relationships = {
+                        "registerUploadRequest": {
+                            "owner": person_urn,
+                            "recipes": ["urn:li:digitalmediaRecipe:feedshare-document"],
+                            "serviceRelationships": [
+                                {
+                                    "identifier": "urn:li:userGeneratedContent",
+                                    "relationshipType": "OWNER"
+                                }
+                            ]
+                        }
+                    }
+                    
+                    register_response = await client.post(
+                        f"{LINKEDIN_API_BASE}/assets?action=registerUpload",
+                        json=request_payload_with_relationships,
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "X-Restli-Protocol-Version": "2.0.0",
+                            "Content-Type": "application/json"
+                        }
+                    )
+            
+            if register_response.status_code != 200:
+                error_text = register_response.text
+                error_details = {}
+                try:
+                    error_json = register_response.json()
+                    error_text = error_json.get("message", str(error_json))
+                    error_details = error_json
+                except:
+                    pass
+                
+                print(f"Assets API failed after retries:")
                 print(f"  Status: {register_response.status_code}")
                 print(f"  Response: {error_text}")
                 print(f"  Full error: {error_details}")
@@ -586,7 +620,7 @@ class LinkedInService:
             
             if use_posts_api:
                 # Try newer Posts API for documents
-                linkedin_version = "202411"
+                linkedin_version = "202601"
                 
                 # Posts API has a different structure
                 posts_api_data = {
