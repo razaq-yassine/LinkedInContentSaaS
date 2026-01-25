@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { CookieConsent } from "@/components/CookieConsent";
+import { PWAInstall } from "@/components/PWAInstall";
 
 export const metadata: Metadata = {
   title: "LinkedIn Content SaaS - AI-Powered Content Generation",
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className="antialiased" suppressHydrationWarning>
         {children}
         <CookieConsent />
+        <PWAInstall />
       </body>
     </html>
   );

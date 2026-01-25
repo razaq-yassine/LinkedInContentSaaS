@@ -171,7 +171,7 @@ async def generate_image_for_post(
         result = await generate_image_from_post(
             post_content=post.content,
             image_prompt=image_prompt,
-            post_format=post.format.value if post.format else "text"
+            post_format=str(post.format) if post.format else "TEXT"
         )
         
         # Calculate Cloudflare cost for this image generation
