@@ -20,6 +20,7 @@ class MessageResponse(BaseModel):
     content: str
     created_at: datetime
     format: Optional[str] = None  # Only for assistant messages
+    format_type: Optional[str] = None  # Format type for frontend (same as format but explicit)
     post_id: Optional[str] = None  # Post ID for assistant messages
     image_prompt: Optional[str] = None
     image_prompts: Optional[List[str]] = None  # For carousel posts

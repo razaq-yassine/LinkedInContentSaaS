@@ -2286,7 +2286,13 @@ export default function GeneratePage() {
                               // Use msg.post_id directly since currentImages is keyed by post_id
                               const postId = msg.post_id || postIdMap[msg.id] || msg.id;
                               const image = currentImages[postId];
-                              console.log("DEBUG: currentImage for msg", msg.id, "postId:", postId, "image:", image ? "exists" : "missing");
+                              if (!image) {
+                                console.log("DEBUG: currentImage MISSING for msg", msg.id, "postId:", postId);
+                                console.log("DEBUG: Available keys in currentImages:", Object.keys(currentImages));
+                                console.log("DEBUG: msg.post_id:", msg.post_id, "msg.format_type:", msg.format_type);
+                              } else {
+                                console.log("DEBUG: currentImage EXISTS for msg", msg.id, "postId:", postId, "image length:", image.length);
+                              }
                               return image;
                             })()}
                             currentPDF={(() => {
