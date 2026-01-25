@@ -2283,7 +2283,8 @@ export default function GeneratePage() {
                               handleTogglePublished(postId, published);
                             } : undefined}
                             currentImage={(() => {
-                              const postId = postIdMap[msg.id] || msg.id;
+                              // Use msg.post_id directly since currentImages is keyed by post_id
+                              const postId = msg.post_id || postIdMap[msg.id] || msg.id;
                               const image = currentImages[postId];
                               console.log("DEBUG: currentImage for msg", msg.id, "postId:", postId, "image:", image ? "exists" : "missing");
                               return image;
