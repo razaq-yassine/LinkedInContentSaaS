@@ -95,7 +95,7 @@ async def generate_carousel_pdf(
             detail="Post not found"
         )
     
-    if post.format.value != 'carousel':
+    if post.format.value.lower() != 'carousel':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Post must be a carousel type"
