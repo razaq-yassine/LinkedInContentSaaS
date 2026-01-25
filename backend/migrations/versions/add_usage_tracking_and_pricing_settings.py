@@ -52,32 +52,62 @@ def upgrade() -> None:
     # Check if settings already exist to avoid duplicate key errors
     conn = op.get_bind()
     
+    # Detect database dialect
+    is_mysql = 'mysql' in str(conn.dialect).lower()
+    
     # Brave Search pricing tier
-    conn.execute(
-        sa.text("""
-            INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
-            VALUES (:id1, 'brave_search_pricing_tier', 'free', 'Brave Search API pricing tier (free or paid)', datetime('now'))
-        """),
-        {"id1": str(uuid.uuid4())}
-    )
+    if is_mysql:
+        conn.execute(
+            sa.text("""
+                INSERT IGNORE INTO admin_settings (id, `key`, value, description, updated_at)
+                VALUES (:id1, 'brave_search_pricing_tier', 'free', 'Brave Search API pricing tier (free or paid)', NOW())
+            """),
+            {"id1": str(uuid.uuid4())}
+        )
+    else:
+        conn.execute(
+            sa.text("""
+                INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
+                VALUES (:id1, 'brave_search_pricing_tier', 'free', 'Brave Search API pricing tier (free or paid)', datetime('now'))
+            """),
+            {"id1": str(uuid.uuid4())}
+        )
     
     # Brave Search cost per 1000 searches
-    conn.execute(
-        sa.text("""
-            INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
-            VALUES (:id2, 'brave_search_cost_per_1000', '5.00', 'Cost per 1000 Brave Search API calls in USD', datetime('now'))
-        """),
-        {"id2": str(uuid.uuid4())}
-    )
+    if is_mysql:
+        conn.execute(
+            sa.text("""
+                INSERT IGNORE INTO admin_settings (id, `key`, value, description, updated_at)
+                VALUES (:id2, 'brave_search_cost_per_1000', '5.00', 'Cost per 1000 Brave Search API calls in USD', NOW())
+            """),
+            {"id2": str(uuid.uuid4())}
+        )
+    else:
+        conn.execute(
+            sa.text("""
+                INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
+                VALUES (:id2, 'brave_search_cost_per_1000', '5.00', 'Cost per 1000 Brave Search API calls in USD', datetime('now'))
+            """),
+            {"id2": str(uuid.uuid4())}
+        )
     
     # Brave Search free monthly limit
-    conn.execute(
-        sa.text("""
-            INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
-            VALUES (:id3, 'brave_free_monthly_limit', '2000', 'Free tier monthly search limit for Brave Search API', datetime('now'))
-        """),
-        {"id3": str(uuid.uuid4())}
-    )
+    if is_mysql:
+        conn.execute(
+            sa.text("""
+                INSERT IGNORE INTO admin_settings (id, `key`, value, description, updated_at)
+                VALUES (:id3, 'brave_free_monthly_limit', '2000', 'Free tier monthly search limit for Brave Search API', NOW())
+            """),
+            {"id3": str(uuid.uuid4())}
+        )
+    else:
+        conn.execute(
+            sa.text("""
+                INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
+                VALUES (:id3, 'brave_free_monthly_limit', '2000', 'Free tier monthly search limit for Brave Search API', datetime('now'))
+            """),
+            {"id3": str(uuid.uuid4())}
+        )
 
 
 def downgrade() -> None:

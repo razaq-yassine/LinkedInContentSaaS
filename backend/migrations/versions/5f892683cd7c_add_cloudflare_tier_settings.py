@@ -24,32 +24,62 @@ def upgrade() -> None:
     
     conn = op.get_bind()
     
+    # Detect database dialect
+    is_mysql = 'mysql' in str(conn.dialect).lower()
+    
     # Cloudflare Workers AI tier (free or paid)
-    conn.execute(
-        sa.text("""
-            INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
-            VALUES (:id1, 'cloudflare_workers_ai_tier', 'free', 'Cloudflare Workers AI tier (free or paid)', datetime('now'))
-        """),
-        {"id1": str(uuid.uuid4())}
-    )
+    if is_mysql:
+        conn.execute(
+            sa.text("""
+                INSERT IGNORE INTO admin_settings (id, `key`, value, description, updated_at)
+                VALUES (:id1, 'cloudflare_workers_ai_tier', 'free', 'Cloudflare Workers AI tier (free or paid)', NOW())
+            """),
+            {"id1": str(uuid.uuid4())}
+        )
+    else:
+        conn.execute(
+            sa.text("""
+                INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
+                VALUES (:id1, 'cloudflare_workers_ai_tier', 'free', 'Cloudflare Workers AI tier (free or paid)', datetime('now'))
+            """),
+            {"id1": str(uuid.uuid4())}
+        )
     
     # Daily neuron limit (10,000 free neurons per day on both tiers)
-    conn.execute(
-        sa.text("""
-            INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
-            VALUES (:id2, 'cloudflare_daily_neuron_limit', '10000', 'Free daily neuron limit for Cloudflare Workers AI', datetime('now'))
-        """),
-        {"id2": str(uuid.uuid4())}
-    )
+    if is_mysql:
+        conn.execute(
+            sa.text("""
+                INSERT IGNORE INTO admin_settings (id, `key`, value, description, updated_at)
+                VALUES (:id2, 'cloudflare_daily_neuron_limit', '10000', 'Free daily neuron limit for Cloudflare Workers AI', NOW())
+            """),
+            {"id2": str(uuid.uuid4())}
+        )
+    else:
+        conn.execute(
+            sa.text("""
+                INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
+                VALUES (:id2, 'cloudflare_daily_neuron_limit', '10000', 'Free daily neuron limit for Cloudflare Workers AI', datetime('now'))
+            """),
+            {"id2": str(uuid.uuid4())}
+        )
     
     # Cost per 1000 neurons after free tier (only applies to paid tier)
-    conn.execute(
-        sa.text("""
-            INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
-            VALUES (:id3, 'cloudflare_cost_per_1000_neurons', '0.011', 'Cost per 1000 neurons after free tier (USD, paid tier only)', datetime('now'))
-        """),
-        {"id3": str(uuid.uuid4())}
-    )
+    if is_mysql:
+        conn.execute(
+            sa.text("""
+                INSERT IGNORE INTO admin_settings (id, `key`, value, description, updated_at)
+                VALUES (:id3, 'cloudflare_cost_per_1000_neurons', '0.011', 'Cost per 1000 neurons after free tier (USD, paid tier only)', NOW())
+            """),
+            {"id3": str(uuid.uuid4())}
+        )
+    else:
+        conn.execute(
+            sa.text("""
+                INSERT OR IGNORE INTO admin_settings (id, key, value, description, updated_at)
+                VALUES (:id3, 'cloudflare_cost_per_1000_neurons', '0.011', 'Cost per 1000 neurons after free tier (USD, paid tier only)', datetime('now'))
+            """),
+            {"id3": str(uuid.uuid4())}
+        )
 
 
 def downgrade() -> None:

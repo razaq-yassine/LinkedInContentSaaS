@@ -103,35 +103,72 @@ async def get_conversation(
         }
         
         # If it's an assistant message, fetch post details
-        if msg.role.value == "assistant" and msg.post_id:
-            post = db.query(GeneratedPost).filter(GeneratedPost.id == msg.post_id).first()
-            if post:
-                message_data["format"] = post.format.value.lower() if post.format else 'text'
-                message_data["format_type"] = post.format.value.lower() if post.format else 'text'
-                message_data["post_id"] = msg.post_id  # Include post_id in response
-                message_data["published_to_linkedin"] = post.published_to_linkedin or False  # Include published status
-                # Get image_prompt/image_prompts from generation_options
-                if post.generation_options:
-                    gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
-                    message_data["image_prompt"] = gen_options.get("image_prompt")
-                    # For carousel posts, also include image_prompts array
-                    if post.format.value.lower() == 'carousel':
-                        message_data["image_prompts"] = gen_options.get("image_prompts")
-                    message_data["metadata"] = gen_options.get("metadata")
-                    # Include token_usage if available
-                    message_data["token_usage"] = gen_options.get("token_usage")
+        # Note: MessageRole enum values are uppercase ("ASSISTANT", "USER")
+        if msg.role.value == "ASSISTANT":
+            # Always include post_id if it exists, even if post lookup fails
+            if msg.post_id:
+                message_data["post_id"] = msg.post_id  # Always include post_id first
+                post = db.query(GeneratedPost).filter(GeneratedPost.id == msg.post_id).first()
+                if post:
+                    message_data["format"] = post.format.value.lower() if post.format else 'text'
+                    message_data["format_type"] = post.format.value.lower() if post.format else 'text'
+                    message_data["published_to_linkedin"] = post.published_to_linkedin or False  # Include published status
+                    # Get image_prompt/image_prompts from generation_options
+                    if post.generation_options:
+                        gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
+                        message_data["image_prompt"] = gen_options.get("image_prompt")
+                        # For carousel posts, also include image_prompts array
+                        if post.format.value.lower() == 'carousel':
+                            message_data["image_prompts"] = gen_options.get("image_prompts")
+                        message_data["metadata"] = gen_options.get("metadata")
+                        # Include token_usage if available
+                        message_data["token_usage"] = gen_options.get("token_usage")
+                    else:
+                        message_data["image_prompt"] = None
+                        if post.format.value.lower() == 'carousel':
+                            message_data["image_prompts"] = None
+                        message_data["metadata"] = None
+                        message_data["token_usage"] = None
                 else:
+                    # Post not found but message has post_id - still include post_id
+                    # Try to infer format from post_id lookup or set defaults
+                    message_data["format"] = None
+                    message_data["format_type"] = None
+                    message_data["published_to_linkedin"] = False
                     message_data["image_prompt"] = None
-                    if post.format.value.lower() == 'carousel':
-                        message_data["image_prompts"] = None
+                    message_data["image_prompts"] = None
                     message_data["metadata"] = None
                     message_data["token_usage"] = None
             else:
+                # Assistant message but no post_id
+                message_data["post_id"] = None
+                message_data["format"] = None
+                message_data["format_type"] = None
                 message_data["published_to_linkedin"] = False
         else:
+            # User message - no post_id or format
+            message_data["post_id"] = None
+            message_data["format"] = None
+            message_data["format_type"] = None
             message_data["published_to_linkedin"] = False
         
-        messages.append(MessageResponse(**message_data))
+        # Ensure all required fields are present before creating MessageResponse
+        # Pydantic will handle None values correctly, but we need to make sure they're explicitly set
+        msg_response = MessageResponse(
+            id=message_data["id"],
+            role=message_data["role"],
+            content=message_data["content"],
+            created_at=message_data["created_at"],
+            format=message_data.get("format"),
+            format_type=message_data.get("format_type"),
+            post_id=message_data.get("post_id"),
+            image_prompt=message_data.get("image_prompt"),
+            image_prompts=message_data.get("image_prompts"),
+            metadata=message_data.get("metadata"),
+            token_usage=message_data.get("token_usage"),
+            published_to_linkedin=message_data.get("published_to_linkedin", False)
+        )
+        messages.append(msg_response)
     
     return ConversationDetailResponse(
         id=conversation.id,

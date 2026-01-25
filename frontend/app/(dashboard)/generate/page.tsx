@@ -139,11 +139,6 @@ function parseJsonContent(content: string): {
   }
 
   let cleaned = content.trim();
-  console.log('🔍 parseJsonContent - Step 1 - Initial:', {
-    starts_with: cleaned.substring(0, 50),
-    length: cleaned.length,
-    has_backticks: cleaned.includes('```')
-  });
 
   // Remove markdown code blocks if present
   // Handle ```json ... ``` or ``` ... ```
@@ -156,16 +151,11 @@ function parseJsonContent(content: string): {
     cleaned = cleaned.replace(/\\"/g, '"');
     cleaned = cleaned.replace(/\\'/g, "'");
     cleaned = cleaned.trim();
-    console.log('🔍 Step 2 - After removing quotes:', {
-      starts_with: cleaned.substring(0, 50),
-      length: cleaned.length
-    });
   }
 
   if (cleaned.includes('```')) {
     // Remove opening code block marker (handle both ```json and ```)
     // Use more aggressive regex to handle various formats
-    const before = cleaned;
     cleaned = cleaned.replace(/^```json\s*\n?/i, '');
     cleaned = cleaned.replace(/^```\s*\n?/, '');
     // Remove closing code block marker (match at end, possibly with newline before)
@@ -173,12 +163,6 @@ function parseJsonContent(content: string): {
     // Also remove any trailing ``` that might be on a separate line
     cleaned = cleaned.replace(/\n```\s*$/m, '');
     cleaned = cleaned.trim();
-    console.log('🔍 Step 3 - After removing markdown:', {
-      before_length: before.length,
-      after_length: cleaned.length,
-      starts_with: cleaned.substring(0, 50),
-      still_has_backticks: cleaned.includes('```')
-    });
   }
 
   // Check if it looks like JSON - find the first { and last }
@@ -186,61 +170,28 @@ function parseJsonContent(content: string): {
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
 
-  console.log('🔍 Step 4 - Brace positions:', {
-    firstBrace,
-    lastBrace,
-    preview_before: cleaned.substring(0, 100),
-    preview_after: cleaned.substring(Math.max(0, cleaned.length - 100))
-  });
-
   if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-    console.log('⚠️ No valid JSON braces found:', {
-      firstBrace,
-      lastBrace,
-      preview: cleaned.substring(0, 100)
-    });
     return null;
   }
 
   // Extract just the JSON part (from first { to last })
   cleaned = cleaned.substring(firstBrace, lastBrace + 1);
 
-  console.log('🔍 Step 5 - Extracted JSON:', {
-    length: cleaned.length,
-    first_100: cleaned.substring(0, 100),
-    last_100: cleaned.substring(Math.max(0, cleaned.length - 100)),
-    has_post_content: cleaned.includes('"post_content"'),
-    has_format_type: cleaned.includes('"format_type"')
-  });
-
   // Check if it contains JSON-like structure
   if (!cleaned.includes('"post_content"') && !cleaned.includes('"format_type"')) {
-    console.log('⚠️ No post_content or format_type found');
     return null;
   }
 
   try {
-    console.log('🔍 Step 6 - Attempting JSON.parse...');
     const parsed = JSON.parse(cleaned);
-    console.log('✅ Step 7 - JSON parsed successfully:', {
-      has_post_content: !!parsed.post_content,
-      format_type: parsed.format_type,
-      keys: Object.keys(parsed)
-    });
 
     if (typeof parsed !== 'object' || parsed === null) {
-      console.log('⚠️ Parsed result is not an object:', typeof parsed);
       return null;
     }
 
     // Extract post_content
     const post_content = parsed.post_content;
     if (!post_content || typeof post_content !== 'string') {
-      console.log('⚠️ post_content is missing or not a string:', {
-        has_post_content: !!parsed.post_content,
-        type: typeof parsed.post_content,
-        keys: Object.keys(parsed)
-      });
       return null;
     }
 
@@ -279,31 +230,11 @@ function parseJsonContent(content: string): {
       };
     }
 
-    console.log('✅ Extracted content from JSON:', {
-      format_type: result.format_type,
-      has_image_prompts: !!result.image_prompts?.length,
-      has_metadata: !!result.metadata,
-    });
-
     return result;
   } catch (e: any) {
-    // Not valid JSON - this is expected for non-JSON content, so use warn instead of error
-    // Only log detailed info if it actually looked like JSON
-    const lookedLikeJson = cleaned.includes('"post_content"') || cleaned.includes('"format_type"');
-
-    if (lookedLikeJson) {
-      console.warn('⚠️ JSON parsing failed in parseJsonContent (will attempt fix):', {
-        error: e?.message || String(e) || 'Unknown error',
-        error_name: e?.name || 'Unknown',
-        cleaned_preview: cleaned.substring(0, 200),
-        cleaned_length: cleaned.length
-      });
-    }
-
     // Try to find and fix common JSON issues
     // The most common issue is unescaped newlines in string values
     try {
-      console.log('🔧 Attempting to fix JSON by escaping newlines in strings...');
 
       // Smart fix: escape newlines only inside string values (between quotes)
       let fixed = '';
@@ -347,11 +278,9 @@ function parseJsonContent(content: string): {
         }
       }
 
-      console.log('🔧 Fixed JSON preview:', fixed.substring(0, 300));
       const parsedFixed = JSON.parse(fixed);
 
       if (parsedFixed && parsedFixed.post_content) {
-        console.log('✅ Successfully fixed and parsed JSON!');
         return {
           post_content: parsedFixed.post_content,
           format_type: parsedFixed.format_type,
@@ -361,10 +290,7 @@ function parseJsonContent(content: string): {
         };
       }
     } catch (fixError: any) {
-      console.log('⚠️ Fix attempt failed:', {
-        error: fixError?.message || String(fixError),
-        error_name: fixError?.name
-      });
+      // Fix attempt failed, return null
     }
 
     return null;
@@ -599,6 +525,39 @@ export default function GeneratePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Load images/PDFs for messages that have post_id but images aren't loaded yet
+  useEffect(() => {
+    const loadMissingMedia = async () => {
+      const loadedPostIds = new Set([
+        ...Object.keys(currentImages),
+        ...Object.keys(currentPDFs),
+        ...Object.keys(currentPDFSlides)
+      ]);
+      
+      for (const msg of messages) {
+        if (msg.role === "assistant" && msg.post_id && !loadedPostIds.has(msg.post_id)) {
+          const formatType = msg.format_type?.toLowerCase()?.trim() || msg.format?.toLowerCase()?.trim();
+          const postId = msg.post_id;
+          
+          if (formatType === 'image') {
+            await loadCurrentImage(postId).catch(() => {});
+          } else if (formatType === 'carousel') {
+            await loadCurrentPDF(postId).catch(() => {});
+          } else if (!formatType && postId) {
+            // Try both if format_type is missing
+            await loadCurrentImage(postId).catch(() => {});
+            await loadCurrentPDF(postId).catch(() => {});
+          }
+        }
+      }
+    };
+    
+    if (messages.length > 0) {
+      loadMissingMedia();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   // Image upload handlers
   const validateImageFile = (file: File): { valid: boolean; error?: string } => {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -698,7 +657,8 @@ export default function GeneratePage() {
       const uiMessages: Message[] = conversation.messages.map((msg: any) => {
         // Safeguard: Check if content is JSON and extract all fields if needed
         let content = msg.content;
-        let formatType = msg.format;
+        // Use format_type first (explicit field from backend), then fall back to format
+        let formatType = msg.format_type || msg.format;
         let imagePrompt = msg.image_prompt;
         let imagePrompts = msg.image_prompts;
         let metadata = msg.metadata;
@@ -717,19 +677,9 @@ export default function GeneratePage() {
                 imagePrompt = parsed.image_prompt || imagePrompt;
                 imagePrompts = parsed.image_prompts || imagePrompts;
                 metadata = parsed.metadata || metadata;
-                console.log("✅ Extracted content from JSON in conversation message:", {
-                  format_type: formatType,
-                  has_image_prompts: !!imagePrompts?.length,
-                  has_metadata: !!metadata
-                });
               }
             } catch (parseError: any) {
               // If parsing fails, just use the original content
-              console.warn("⚠️ Failed to parse JSON content in loadConversation:", {
-                error: parseError?.message || String(parseError),
-                message_id: msg.id,
-                role: msg.role
-              });
             }
           }
         }
@@ -745,20 +695,22 @@ export default function GeneratePage() {
           }));
         }
 
-        return {
+        const messageObj = {
           id: msg.id,
           role: msg.role, // "user" or "assistant"
           content: content,
           post_content: msg.role === "assistant" ? content : undefined,
-          format_type: formatType,
-          image_prompt: imagePrompt,
-          image_prompts: imagePrompts, // For carousel posts
-          post_id: msg.post_id, // Post ID from backend
-          metadata: metadata,
-          token_usage: tokenUsage, // Include token_usage from backend
+          format_type: formatType || msg.format_type || msg.format || null, // Try multiple sources
+          image_prompt: imagePrompt || msg.image_prompt || null,
+          image_prompts: imagePrompts || msg.image_prompts || null, // For carousel posts
+          post_id: msg.post_id || null, // Post ID from backend - explicitly set to null if missing
+          metadata: metadata || msg.metadata || null,
+          token_usage: tokenUsage || msg.token_usage || null, // Include token_usage from backend
           attachments: attachments, // Image attachments for user messages
           published_to_linkedin: msg.published_to_linkedin || false, // Published status from backend
         };
+        
+        return messageObj;
       });
       setMessages(uiMessages);
 
@@ -774,21 +726,10 @@ export default function GeneratePage() {
             publishedPostsSet.add(msg.post_id);
           }
 
-          console.log("DEBUG: Checking message:", msg.id, "format_type:", msg.format_type, "image_prompt:", msg.image_prompt ? "exists" : "missing");
-          if (msg.format_type === 'image' && msg.image_prompt) {
-            console.log("DEBUG: Loading image for message:", msg.id);
-            await loadCurrentImage(msg.post_id);
-            await loadImageHistory(msg.post_id);
-          } else if (msg.format_type === 'carousel') {
-            // Load PDF for carousel posts (don't await - let it fail silently if no PDFs exist yet)
-            loadCurrentPDF(msg.post_id).catch(() => { });
-            loadPdfHistory(msg.post_id).catch(() => { });
-          }
+          // Load images/PDFs will happen on-demand during render
         }
       }
       setPostIdMap(newPostIdMap);
-      console.log("DEBUG: postIdMap:", newPostIdMap);
-      console.log("DEBUG: currentImages:", currentImages);
       setPublishedPosts(publishedPostsSet); // Initialize with published posts from backend
     } catch (error: any) {
       // Only log if it's not a network error (backend might be down)
@@ -801,20 +742,15 @@ export default function GeneratePage() {
 
   const loadCurrentImage = async (postId: string) => {
     try {
-      console.log("DEBUG: Loading current image for post:", postId);
       const response = await api.images.getCurrent(postId);
-      console.log("DEBUG: getCurrent response:", response);
-      if (response.data.image) {
+      if (response.data?.image) {
+        const imageDataUrl = `data:image/png;base64,${response.data.image}`;
         setCurrentImages(prev => ({
           ...prev,
-          [postId]: `data:image/png;base64,${response.data.image}`
+          [postId]: imageDataUrl
         }));
-        console.log("DEBUG: Loaded current image for post:", postId, "image length:", response.data.image.length);
-      } else {
-        console.log("DEBUG: No current image found for post:", postId);
       }
     } catch (error) {
-      console.log("DEBUG: Error loading current image for post:", postId, error);
       // No current image yet, that's okay
     }
   };
@@ -826,16 +762,13 @@ export default function GeneratePage() {
 
     try {
       const response = await api.images.generateFromPost(postId);
-      console.log("DEBUG: Image generation response:", response);
       const imageData = response.data.image;
-      console.log("DEBUG: Image data length:", imageData ? imageData.length : "undefined");
 
       // Store the current image
       setCurrentImages(prev => ({
         ...prev,
         [postId]: `data:image/png;base64,${imageData}`
       }));
-      console.log("DEBUG: Updated currentImages for post:", postId);
 
       // Load image history
       await loadImageHistory(postId);
@@ -937,13 +870,13 @@ export default function GeneratePage() {
   const loadCurrentPDF = async (postId: string) => {
     try {
       const response = await api.pdfs.getCurrent(postId);
-      if (response.data.pdf) {
+      if (response.data?.pdf) {
         setCurrentPDFs(prev => ({
           ...prev,
           [postId]: `data:application/pdf;base64,${response.data.pdf}`
         }));
       }
-      if (response.data.slide_images && response.data.slide_images.length > 0) {
+      if (response.data?.slide_images && response.data.slide_images.length > 0) {
         setCurrentPDFSlides(prev => ({
           ...prev,
           [postId]: response.data.slide_images
@@ -1251,11 +1184,9 @@ export default function GeneratePage() {
           const parsed = JSON.parse(postContent);
           if (parsed && typeof parsed === 'object' && parsed.post_content) {
             postContent = parsed.post_content;
-            console.log("Extracted post_content from JSON string in frontend");
           }
         } catch (e) {
           // If parsing fails, keep original postContent
-          console.warn("Failed to parse post_content JSON string:", e);
         }
       }
 
@@ -1741,30 +1672,14 @@ export default function GeneratePage() {
                   (trimmed.includes('"post_content"') && (trimmed.includes('"format_type"') || trimmed.includes('format_type')));
 
                 if (looksLikeJson) {
-                  console.log('🔍 Attempting to parse JSON content:', {
-                    starts_with: trimmed.substring(0, 50),
-                    length: trimmed.length
-                  });
-
                   const parsed = parseJsonContent(contentToCheck);
                   if (parsed && parsed.post_content && parsed.post_content.trim().length > 0) {
-                    console.log('✅ Successfully parsed JSON content:', {
-                      original_length: contentToCheck.length,
-                      extracted_content_length: parsed.post_content.length,
-                      format_type: parsed.format_type,
-                      has_image_prompts: !!parsed.image_prompts?.length,
-                      has_metadata: !!parsed.metadata
-                    });
                     displayContent = parsed.post_content;
                     displayFormatType = parsed.format_type || displayFormatType;
                     displayImagePrompt = parsed.image_prompt || displayImagePrompt;
                     displayImagePrompts = parsed.image_prompts || displayImagePrompts;
                     displayMetadata = parsed.metadata || displayMetadata;
                   } else {
-                    console.warn('⚠️ Failed to parse JSON content:', {
-                      starts_with: trimmed.substring(0, 100),
-                      length: trimmed.length,
-                      has_post_content_key: trimmed.includes('"post_content"'),
                       parsed_result: parsed
                     });
                   }
@@ -1844,12 +1759,6 @@ export default function GeneratePage() {
                                 }));
 
                                 // Update token usage with Cloudflare cost if provided
-                                console.log("DEBUG: Image regeneration response:", {
-                                  has_cloudflare_cost: !!response.data.cloudflare_cost,
-                                  cloudflare_cost: response.data.cloudflare_cost,
-                                  current_msg_token_usage: msg.token_usage
-                                });
-
                                 if (response.data.cloudflare_cost) {
                                   setMessages(prev => prev.map(m => {
                                     if (m.id === msg.id) {
@@ -1863,16 +1772,10 @@ export default function GeneratePage() {
                                           cloudflare_cost: response.data.cloudflare_cost
                                         }
                                       };
-                                      console.log("DEBUG: Updated message:", {
-                                        id: updated.id,
-                                        cloudflare_cost: updated.token_usage?.cloudflare_cost
-                                      });
                                       return updated;
                                     }
                                     return m;
                                   }));
-                                } else {
-                                  console.warn("DEBUG: No cloudflare_cost in response");
                                 }
 
                                 // Reload image history
@@ -2286,22 +2189,38 @@ export default function GeneratePage() {
                               // Use msg.post_id directly since currentImages is keyed by post_id
                               const postId = msg.post_id || postIdMap[msg.id] || msg.id;
                               const image = currentImages[postId];
-                              if (!image) {
-                                console.log("DEBUG: currentImage MISSING for msg", msg.id, "postId:", postId);
-                                console.log("DEBUG: Available keys in currentImages:", Object.keys(currentImages));
-                                console.log("DEBUG: msg.post_id:", msg.post_id, "msg.format_type:", msg.format_type);
-                              } else {
-                                console.log("DEBUG: currentImage EXISTS for msg", msg.id, "postId:", postId, "image length:", image.length);
+                              
+                              // If image is missing but we have post_id and format_type, try to load it
+                              if (!image && postId && msg.format_type === 'image' && msg.post_id) {
+                                // Trigger image load asynchronously
+                                loadCurrentImage(postId).catch(() => {});
                               }
+                              
                               return image;
                             })()}
                             currentPDF={(() => {
-                              const postId = postIdMap[msg.id] || msg.id;
-                              return currentPDFs[postId];
+                              const postId = msg.post_id || postIdMap[msg.id] || msg.id;
+                              const pdf = currentPDFs[postId];
+                              
+                              // If PDF is missing but we have post_id and format_type, try to load it
+                              if (!pdf && postId && msg.format_type === 'carousel' && msg.post_id) {
+                                // Trigger PDF load asynchronously
+                                loadCurrentPDF(postId).catch(() => {});
+                              }
+                              
+                              return pdf;
                             })()}
                             currentPDFSlides={(() => {
-                              const postId = postIdMap[msg.id] || msg.id;
-                              return currentPDFSlides[postId] || [];
+                              const postId = msg.post_id || postIdMap[msg.id] || msg.id;
+                              const slides = currentPDFSlides[postId] || [];
+                              
+                              // If slides are missing but we have post_id and format_type, try to load them
+                              if (slides.length === 0 && postId && msg.format_type === 'carousel' && msg.post_id) {
+                                // Trigger PDF load asynchronously
+                                loadCurrentPDF(postId).catch(() => {});
+                              }
+                              
+                              return slides;
                             })()}
                             generatingImage={(() => {
                               const postId = postIdMap[msg.id] || msg.id;

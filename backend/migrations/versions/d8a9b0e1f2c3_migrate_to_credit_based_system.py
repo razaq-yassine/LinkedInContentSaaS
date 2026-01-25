@@ -20,26 +20,33 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Add new enums for billing cycle and subscription status
-    with op.batch_alter_table('subscriptions') as batch_op:
-        # Rename old columns
-        batch_op.alter_column('posts_this_month', new_column_name='credits_used_this_month')
-        batch_op.alter_column('posts_limit', new_column_name='credits_limit')
+    conn = op.get_bind()
+    is_mysql = 'mysql' in str(conn.dialect).lower()
+    
+    if is_mysql:
+        # MySQL requires explicit type when renaming
+        op.execute('ALTER TABLE subscriptions CHANGE posts_this_month credits_used_this_month INT')
+        op.execute('ALTER TABLE subscriptions CHANGE posts_limit credits_limit INT')
+        op.execute('ALTER TABLE subscription_plan_configs CHANGE posts_limit credits_limit INT')
+    else:
+        # SQLite uses batch_alter_table
+        with op.batch_alter_table('subscriptions') as batch_op:
+            batch_op.alter_column('posts_this_month', new_column_name='credits_used_this_month')
+            batch_op.alter_column('posts_limit', new_column_name='credits_limit')
         
-        # Add new columns
+        with op.batch_alter_table('subscription_plan_configs') as batch_op:
+            batch_op.alter_column('posts_limit', new_column_name='credits_limit')
+    
+    # Add new columns to subscriptions
+    with op.batch_alter_table('subscriptions') as batch_op:
         batch_op.add_column(sa.Column('billing_cycle', sa.String(50), nullable=True))
         batch_op.add_column(sa.Column('subscription_status', sa.String(50), nullable=False, server_default='active'))
         batch_op.add_column(sa.Column('current_period_start', sa.DateTime(), nullable=True))
         batch_op.add_column(sa.Column('current_period_end', sa.DateTime(), nullable=True))
-        
-        # Rename period_end to avoid confusion (will be handled by drop)
-        # Note: SQLite doesn't support column drop directly, so we'll leave it
-        
-        # Create index on stripe_subscription_id
         batch_op.create_index('ix_subscriptions_stripe_subscription_id', ['stripe_subscription_id'])
     
-    # Update SubscriptionPlanConfig table
+    # Add new columns to SubscriptionPlanConfig
     with op.batch_alter_table('subscription_plan_configs') as batch_op:
-        batch_op.alter_column('posts_limit', new_column_name='credits_limit')
         batch_op.add_column(sa.Column('stripe_product_id', sa.String(255), nullable=True))
         batch_op.add_column(sa.Column('stripe_price_id_monthly', sa.String(255), nullable=True))
         batch_op.add_column(sa.Column('stripe_price_id_yearly', sa.String(255), nullable=True))
@@ -75,11 +82,19 @@ def downgrade() -> None:
     op.drop_table('credit_transactions')
     
     # Revert SubscriptionPlanConfig changes
+    conn = op.get_bind()
+    is_mysql = 'mysql' in str(conn.dialect).lower()
+    
     with op.batch_alter_table('subscription_plan_configs') as batch_op:
         batch_op.drop_column('stripe_price_id_yearly')
         batch_op.drop_column('stripe_price_id_monthly')
         batch_op.drop_column('stripe_product_id')
-        batch_op.alter_column('credits_limit', new_column_name='posts_limit')
+    
+    if is_mysql:
+        op.execute('ALTER TABLE subscription_plan_configs CHANGE credits_limit posts_limit INT')
+    else:
+        with op.batch_alter_table('subscription_plan_configs') as batch_op:
+            batch_op.alter_column('credits_limit', new_column_name='posts_limit')
     
     # Revert Subscription changes
     with op.batch_alter_table('subscriptions') as batch_op:
@@ -88,6 +103,12 @@ def downgrade() -> None:
         batch_op.drop_column('current_period_start')
         batch_op.drop_column('subscription_status')
         batch_op.drop_column('billing_cycle')
-        batch_op.alter_column('credits_limit', new_column_name='posts_limit')
-        batch_op.alter_column('credits_used_this_month', new_column_name='posts_this_month')
+    
+    if is_mysql:
+        op.execute('ALTER TABLE subscriptions CHANGE credits_limit posts_limit INT')
+        op.execute('ALTER TABLE subscriptions CHANGE credits_used_this_month posts_this_month INT')
+    else:
+        with op.batch_alter_table('subscriptions') as batch_op:
+            batch_op.alter_column('credits_limit', new_column_name='posts_limit')
+            batch_op.alter_column('credits_used_this_month', new_column_name='posts_this_month')
 

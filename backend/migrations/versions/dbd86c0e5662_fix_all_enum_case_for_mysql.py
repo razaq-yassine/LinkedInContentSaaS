@@ -21,8 +21,29 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Fix all enum columns to use UPPERCASE values for MySQL case-sensitivity
     
+    # First, update existing data to uppercase before changing enum definition
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    tables = inspector.get_table_names()
+    
+    # Update users.account_type data
+    if 'users' in tables:
+        op.execute("UPDATE users SET account_type = 'PERSON' WHERE account_type = 'person'")
+        op.execute("UPDATE users SET account_type = 'BUSINESS' WHERE account_type = 'business'")
+    
+    # Update subscriptions.plan data
+    if 'subscriptions' in tables:
+        op.execute("UPDATE subscriptions SET plan = 'FREE' WHERE plan = 'free'")
+        op.execute("UPDATE subscriptions SET plan = 'STARTER' WHERE plan = 'starter'")
+        op.execute("UPDATE subscriptions SET plan = 'PRO' WHERE plan = 'pro'")
+        op.execute("UPDATE subscriptions SET plan = 'UNLIMITED' WHERE plan = 'unlimited'")
+        op.execute("UPDATE subscriptions SET plan = 'AGENCY' WHERE plan = 'agency'")
+    
     # subscriptions.plan - add missing values and convert to uppercase
     op.execute("ALTER TABLE subscriptions MODIFY plan ENUM('FREE', 'STARTER', 'PRO', 'UNLIMITED', 'AGENCY') DEFAULT 'FREE'")
+    
+    # users.account_type - convert to uppercase enum
+    op.execute("ALTER TABLE users MODIFY account_type ENUM('PERSON', 'BUSINESS') DEFAULT 'PERSON'")
     
     # generated_posts.format
     op.execute("ALTER TABLE generated_posts MODIFY format ENUM('TEXT', 'CAROUSEL', 'IMAGE', 'VIDEO', 'VIDEO_SCRIPT') DEFAULT 'TEXT'")
@@ -40,14 +61,21 @@ def upgrade() -> None:
     op.execute("ALTER TABLE subscriptions MODIFY billing_cycle ENUM('MONTHLY', 'YEARLY') DEFAULT 'MONTHLY'")
     op.execute("ALTER TABLE subscriptions MODIFY subscription_status ENUM('ACTIVE', 'CANCELED', 'PAST_DUE') DEFAULT 'ACTIVE' NOT NULL")
     
-    # credit_purchases.status
-    op.execute("ALTER TABLE credit_purchases MODIFY status ENUM('PENDING', 'COMPLETED', 'REFUNDED') DEFAULT 'PENDING'")
+    # credit_purchases.status (if table exists)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    tables = inspector.get_table_names()
     
-    # system_logs.level
-    op.execute("ALTER TABLE system_logs MODIFY level ENUM('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL') NOT NULL")
+    if 'credit_purchases' in tables:
+        op.execute("ALTER TABLE credit_purchases MODIFY status ENUM('PENDING', 'COMPLETED', 'REFUNDED') DEFAULT 'PENDING'")
     
-    # error_logs.resolution_status
-    op.execute("ALTER TABLE error_logs MODIFY resolution_status ENUM('NEW', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'WONT_FIX') DEFAULT 'NEW'")
+    # system_logs.level (if table exists)
+    if 'system_logs' in tables:
+        op.execute("ALTER TABLE system_logs MODIFY level ENUM('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL') NOT NULL")
+    
+    # error_logs.resolution_status (if table exists)
+    if 'error_logs' in tables:
+        op.execute("ALTER TABLE error_logs MODIFY resolution_status ENUM('NEW', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'WONT_FIX') DEFAULT 'NEW'")
 
 
 def downgrade() -> None:

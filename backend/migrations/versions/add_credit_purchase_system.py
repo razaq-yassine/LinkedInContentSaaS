@@ -18,8 +18,17 @@ depends_on = None
 
 def upgrade() -> None:
     # Rename columns in subscriptions table
-    op.alter_column('subscriptions', 'credits_used_this_month', new_column_name='subscription_credits_used')
-    op.alter_column('subscriptions', 'credits_limit', new_column_name='subscription_credits_limit')
+    # MySQL requires explicit type when renaming
+    conn = op.get_bind()
+    is_mysql = 'mysql' in str(conn.dialect).lower()
+    
+    if is_mysql:
+        op.execute('ALTER TABLE subscriptions CHANGE credits_used_this_month subscription_credits_used FLOAT DEFAULT 0.0')
+        op.execute('ALTER TABLE subscriptions CHANGE credits_limit subscription_credits_limit FLOAT DEFAULT 5.0')
+    else:
+        with op.batch_alter_table('subscriptions') as batch_op:
+            batch_op.alter_column('credits_used_this_month', type_=sa.Float(), new_column_name='subscription_credits_used')
+            batch_op.alter_column('credits_limit', type_=sa.Float(), new_column_name='subscription_credits_limit')
     
     # Add scheduled downgrade fields
     op.add_column('subscriptions', sa.Column('scheduled_downgrade_plan', sa.String(100), nullable=True))
@@ -86,5 +95,13 @@ def downgrade() -> None:
     # Revert column renames in subscriptions table
     op.drop_column('subscriptions', 'scheduled_downgrade_date')
     op.drop_column('subscriptions', 'scheduled_downgrade_plan')
-    op.alter_column('subscriptions', 'subscription_credits_limit', new_column_name='credits_limit')
-    op.alter_column('subscriptions', 'subscription_credits_used', new_column_name='credits_used_this_month')
+    
+    conn = op.get_bind()
+    is_mysql = 'mysql' in str(conn.dialect).lower()
+    
+    if is_mysql:
+        op.execute('ALTER TABLE subscriptions CHANGE subscription_credits_limit credits_limit FLOAT DEFAULT 5.0')
+        op.execute('ALTER TABLE subscriptions CHANGE subscription_credits_used credits_used_this_month FLOAT DEFAULT 0.0')
+    else:
+        op.alter_column('subscriptions', 'subscription_credits_limit', new_column_name='credits_limit')
+        op.alter_column('subscriptions', 'subscription_credits_used', new_column_name='credits_used_this_month')

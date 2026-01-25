@@ -9,7 +9,7 @@ import secrets
 import httpx
 
 from ..database import get_db
-from ..models import User, UserProfile, Subscription, UserToken, TokenType, AdminSetting
+from ..models import User, UserProfile, Subscription, UserToken, TokenType, AdminSetting, AccountType, SubscriptionPlan
 from ..schemas.auth import (
     MockLoginRequest, LoginResponse, UserResponse,
     RegisterRequest, RegisterResponse, LoginRequest,
@@ -167,7 +167,7 @@ async def mock_login(request: MockLoginRequest, db: Session = Depends(get_db)):
             id=user_id,
             email=request.email,
             name=request.email.split("@")[0].title(),
-            account_type="person"
+            account_type=AccountType.PERSON
         )
         db.add(user)
         
@@ -182,7 +182,7 @@ async def mock_login(request: MockLoginRequest, db: Session = Depends(get_db)):
         # Create subscription
         subscription = Subscription(
             user_id=user_id,
-            plan="free",
+            plan=SubscriptionPlan.FREE,
             subscription_credits_limit=5.0
         )
         db.add(subscription)
@@ -257,7 +257,7 @@ async def register(
         password_hash=password_hash,
         name=request.name or request.email.split("@")[0].title(),
         email_verified=auto_verify,
-        account_type="person",
+        account_type=AccountType.PERSON,
         registration_provider="email"
     )
     db.add(user)
@@ -273,7 +273,7 @@ async def register(
     # Create subscription
     subscription = Subscription(
         user_id=user_id,
-        plan="free",
+        plan=SubscriptionPlan.FREE,
         subscription_credits_limit=5.0
     )
     db.add(subscription)
@@ -767,7 +767,7 @@ async def google_callback(
                     id=user_id,
                     email=google_email,
                     name=google_name,
-                    account_type="person",
+                    account_type=AccountType.PERSON,
                     email_verified=True,  # Google emails are verified
                     registration_provider="google"
                 )
@@ -784,7 +784,7 @@ async def google_callback(
                 # Create subscription
                 subscription = Subscription(
                     user_id=user_id,
-                    plan="free",
+                    plan=SubscriptionPlan.FREE,
                     subscription_credits_limit=5.0
                 )
                 db.add(subscription)
@@ -1063,7 +1063,7 @@ async def linkedin_callback(
                     id=new_user_id,
                     email=linkedin_email or f"{linkedin_id}@linkedin.user",
                     name=linkedin_name,
-                    account_type="person",
+                    account_type=AccountType.PERSON,
                     email_verified=True,  # LinkedIn emails are verified
                     registration_provider="linkedin"
                 )
@@ -1080,7 +1080,7 @@ async def linkedin_callback(
                 # Create subscription
                 subscription = Subscription(
                     user_id=new_user_id,
-                    plan="free",
+                    plan=SubscriptionPlan.FREE,
                     subscription_credits_limit=5.0
                 )
                 db.add(subscription)
