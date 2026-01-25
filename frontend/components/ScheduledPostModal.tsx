@@ -161,10 +161,10 @@ export function ScheduledPostModal({
           <div className="border rounded-lg p-4 bg-[#F9F9F9]">
             <LinkedInPostPreview
               postContent={post.content}
-              formatType={post.format}
+              formatType={post.format || 'text'}
               imagePrompt={post.generation_options?.image_prompt}
               imagePrompts={post.generation_options?.image_prompts}
-              userProfile={userProfile}
+              userProfile={userProfile || { name: 'User', headline: '', avatar: undefined }}
               currentImage={currentImage}
               currentPDFSlides={currentPDFSlides}
               className="w-full"

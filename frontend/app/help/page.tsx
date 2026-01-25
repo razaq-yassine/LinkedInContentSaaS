@@ -103,6 +103,12 @@ const popularArticles = [
 const colorClasses: Record<string, { bg: string; text: string; iconBg: string }> = {
   cyan: { bg: "hover:border-cyan-500/30", text: "text-cyan-400", iconBg: "bg-cyan-500/10 border border-cyan-500/20" },
   teal: { bg: "hover:border-teal-500/30", text: "text-teal-400", iconBg: "bg-teal-500/10 border border-teal-500/20" },
+  violet: { bg: "hover:border-violet-500/30", text: "text-violet-400", iconBg: "bg-violet-500/10 border border-violet-500/20" },
+  blue: { bg: "hover:border-blue-500/30", text: "text-blue-400", iconBg: "bg-blue-500/10 border border-blue-500/20" },
+  green: { bg: "hover:border-green-500/30", text: "text-green-400", iconBg: "bg-green-500/10 border border-green-500/20" },
+  orange: { bg: "hover:border-orange-500/30", text: "text-orange-400", iconBg: "bg-orange-500/10 border border-orange-500/20" },
+  pink: { bg: "hover:border-pink-500/30", text: "text-pink-400", iconBg: "bg-pink-500/10 border border-pink-500/20" },
+  gray: { bg: "hover:border-gray-500/30", text: "text-gray-400", iconBg: "bg-gray-500/10 border border-gray-500/20" },
 };
 
 export default function HelpPage() {
@@ -169,7 +175,7 @@ export default function HelpPage() {
 
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {categories.map((category, i) => {
-                  const colors = colorClasses[category.color];
+                  const colors = colorClasses[category.color] || colorClasses.cyan;
                   return (
                     <div
                       key={i}

@@ -396,8 +396,8 @@ export default function GeneratePage() {
   const [showPostTypeMenu, setShowPostTypeMenu] = useState(false);
   const [showMobileButtons, setShowMobileButtons] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const optionsButtonRef = useRef<HTMLButtonElement>(null);
-  const postTypeButtonRef = useRef<HTMLButtonElement>(null);
+  const optionsButtonRef = useRef<HTMLDivElement>(null);
+  const postTypeButtonRef = useRef<HTMLDivElement>(null);
 
   // Track generated images by message ID (post ID)
   const [currentImages, setCurrentImages] = useState<Record<string, string>>({}); // post_id -> base64 image
@@ -1840,10 +1840,13 @@ export default function GeneratePage() {
                                 if (response.data.cloudflare_cost) {
                                   setMessages(prev => prev.map(m => {
                                     if (m.id === msg.id) {
-                                      const updated = {
+                                      const updated: Message = {
                                         ...m,
                                         token_usage: {
-                                          ...(m.token_usage || {}),
+                                          input_tokens: m.token_usage?.input_tokens ?? 0,
+                                          output_tokens: m.token_usage?.output_tokens ?? 0,
+                                          total_tokens: m.token_usage?.total_tokens ?? 0,
+                                          ...m.token_usage,
                                           cloudflare_cost: response.data.cloudflare_cost
                                         }
                                       };
@@ -1907,11 +1910,14 @@ export default function GeneratePage() {
                                 // Update message's image_prompt with the custom prompt
                                 setMessages(prev => prev.map(m => {
                                   if (m.id === msg.id) {
-                                    const updated = {
+                                    const updated: Message = {
                                       ...m,
                                       image_prompt: customPrompt,
                                       token_usage: response.data.cloudflare_cost ? {
-                                        ...(m.token_usage || {}),
+                                        input_tokens: m.token_usage?.input_tokens ?? 0,
+                                        output_tokens: m.token_usage?.output_tokens ?? 0,
+                                        total_tokens: m.token_usage?.total_tokens ?? 0,
+                                        ...m.token_usage,
                                         cloudflare_cost: response.data.cloudflare_cost
                                       } : m.token_usage
                                     };
@@ -2052,13 +2058,17 @@ export default function GeneratePage() {
                                 if (response.data.cloudflare_cost) {
                                   setMessages(prev => prev.map(m => {
                                     if (m.id === msg.id) {
-                                      return {
+                                      const updated: Message = {
                                         ...m,
                                         token_usage: {
-                                          ...(m.token_usage || {}),
+                                          input_tokens: m.token_usage?.input_tokens ?? 0,
+                                          output_tokens: m.token_usage?.output_tokens ?? 0,
+                                          total_tokens: m.token_usage?.total_tokens ?? 0,
+                                          ...m.token_usage,
                                           cloudflare_cost: response.data.cloudflare_cost
                                         }
                                       };
+                                      return updated;
                                     }
                                     return m;
                                   }));

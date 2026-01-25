@@ -10,6 +10,7 @@ interface FullscreenCarouselViewerProps {
   onClose: () => void;
   onRegenerateSlide?: (slideIndex: number) => void;
   regeneratingSlideIndex?: number | null;
+  initialSlide?: number;
   className?: string;
 }
 

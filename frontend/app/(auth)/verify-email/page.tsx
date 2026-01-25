@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { Mail, Clock, ArrowLeft } from "lucide-react";
 
-export default function VerifyEmailPage() {
+function VerifyEmailForm() {
   const [mode, setMode] = useState<"auto" | "manual">("auto");
   const [status, setStatus] = useState<"loading" | "idle" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
@@ -294,5 +294,26 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(30,41,59,1),rgba(2,6,23,1))]" />
+        <div className="absolute top-20 left-20 w-72 h-72 bg-cyan-500/20 rounded-full blur-3xl" />
+        
+        <div className="w-full max-w-md p-8 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl relative z-10">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <h1 className="text-2xl font-bold text-white mb-2">Loading...</h1>
+            <p className="text-slate-400">Please wait</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <VerifyEmailForm />
+    </Suspense>
   );
 }

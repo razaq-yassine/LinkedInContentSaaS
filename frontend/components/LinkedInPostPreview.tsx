@@ -53,6 +53,7 @@ interface PDFHistoryItem {
   pdf: string;
   slide_count: number;
   prompts: string[];
+  slide_images?: string[];
   is_current: boolean;
   created_at: string;
 }

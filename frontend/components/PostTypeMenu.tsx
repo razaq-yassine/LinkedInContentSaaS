@@ -10,7 +10,7 @@ interface PostTypeMenuProps {
   onOpenChange: (open: boolean) => void;
   postType: string;
   setPostType: (value: string) => void;
-  triggerRef?: React.RefObject<HTMLButtonElement>;
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
 const postTypes = [

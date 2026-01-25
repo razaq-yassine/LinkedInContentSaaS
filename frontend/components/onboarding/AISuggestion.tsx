@@ -14,7 +14,7 @@ interface AISuggestionProps {
   reasoning?: string;
   alternatives?: any[];
   onSelectAlternative?: (value: any) => void;
-  onRegeneratesuggestion?: () => void;
+  onRegenerateSuggestion?: () => void;
   compact?: boolean;
 }
 

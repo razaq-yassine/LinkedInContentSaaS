@@ -1945,10 +1945,10 @@ export default function GlobalSettingsPage() {
                                             </span>
                                           )}
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-1">{grouped.selector.key}</p>
+                                        <p className="text-xs text-gray-500 mb-1">{grouped.selector?.key}</p>
                                         <select
-                                          value={getEnvValue(grouped.selector.key, grouped.selector.value)}
-                                          onChange={(e) => handleEnvChange(grouped.selector.key, e.target.value)}
+                                          value={getEnvValue(grouped.selector?.key || '', grouped.selector?.value)}
+                                          onChange={(e) => handleEnvChange(grouped.selector?.key || '', e.target.value)}
                                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                         >
                                           {grouped.selector.options?.map(opt => (
@@ -2040,7 +2040,7 @@ export default function GlobalSettingsPage() {
                                     ))}
 
                                     {/* Brave Search Section */}
-                                    {(braveVars.length > 0 || categoryId === 'brave_search') && (
+                                    {(braveVars.length > 0 || (categoryId as string) === 'brave_search') && (
                                       <div className="border border-blue-200 rounded-lg overflow-hidden bg-blue-50/30">
                                         <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50">
                                           <div className="flex items-center space-x-2">

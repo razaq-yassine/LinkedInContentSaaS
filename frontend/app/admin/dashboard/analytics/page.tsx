@@ -33,6 +33,7 @@ interface TimelineData {
   tokens: number;
   cost: number;
   requests: number;
+  [key: string]: string | number;
 }
 
 export default function AnalyticsPage() {

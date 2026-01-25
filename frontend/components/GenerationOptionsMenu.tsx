@@ -22,7 +22,7 @@ interface GenerationOptionsMenuProps {
   setLength: (value: string) => void;
   hashtagCount: number;
   setHashtagCount: (value: number) => void;
-  triggerRef?: React.RefObject<HTMLButtonElement>;
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function GenerationOptionsMenu({

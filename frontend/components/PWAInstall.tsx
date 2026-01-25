@@ -3,22 +3,6 @@
 import { useEffect, useState } from "react";
 import "@khmyznikov/pwa-install";
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      "pwa-install": React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          "manifest-url"?: string;
-          name?: string;
-          description?: string;
-          icon?: string;
-        },
-        HTMLElement
-      >;
-    }
-  }
-}
-
 export function PWAInstall() {
   const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
