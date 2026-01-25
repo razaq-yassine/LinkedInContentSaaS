@@ -25,9 +25,10 @@ module.exports = {
       args: "-m uvicorn app.main:app --host 0.0.0.0 --port 8003",
       cwd: "/home/LinkedInContentSaaS/backend",
       env: {
-        ENVIRONMENT: "production",
+        ENVIRONMENT: "development",
         PORT: 8003,
         PYTHONPATH: "/home/LinkedInContentSaaS/backend",
+        LOG_LEVEL: "DEBUG",
         FRONTEND_URL: "http://postinai.smarttechnologies.ma",
         PATH: "/home/LinkedInContentSaaS/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
       },

@@ -774,7 +774,9 @@ export default function GeneratePage() {
             publishedPostsSet.add(msg.post_id);
           }
 
+          console.log("DEBUG: Checking message:", msg.id, "format_type:", msg.format_type, "image_prompt:", msg.image_prompt ? "exists" : "missing");
           if (msg.format_type === 'image' && msg.image_prompt) {
+            console.log("DEBUG: Loading image for message:", msg.id);
             await loadCurrentImage(msg.post_id);
             await loadImageHistory(msg.post_id);
           } else if (msg.format_type === 'carousel') {
@@ -785,6 +787,8 @@ export default function GeneratePage() {
         }
       }
       setPostIdMap(newPostIdMap);
+      console.log("DEBUG: postIdMap:", newPostIdMap);
+      console.log("DEBUG: currentImages:", currentImages);
       setPublishedPosts(publishedPostsSet); // Initialize with published posts from backend
     } catch (error: any) {
       // Only log if it's not a network error (backend might be down)
@@ -797,14 +801,20 @@ export default function GeneratePage() {
 
   const loadCurrentImage = async (postId: string) => {
     try {
+      console.log("DEBUG: Loading current image for post:", postId);
       const response = await api.images.getCurrent(postId);
+      console.log("DEBUG: getCurrent response:", response);
       if (response.data.image) {
         setCurrentImages(prev => ({
           ...prev,
           [postId]: `data:image/png;base64,${response.data.image}`
         }));
+        console.log("DEBUG: Loaded current image for post:", postId, "image length:", response.data.image.length);
+      } else {
+        console.log("DEBUG: No current image found for post:", postId);
       }
     } catch (error) {
+      console.log("DEBUG: Error loading current image for post:", postId, error);
       // No current image yet, that's okay
     }
   };
@@ -816,13 +826,16 @@ export default function GeneratePage() {
 
     try {
       const response = await api.images.generateFromPost(postId);
+      console.log("DEBUG: Image generation response:", response);
       const imageData = response.data.image;
+      console.log("DEBUG: Image data length:", imageData ? imageData.length : "undefined");
 
       // Store the current image
       setCurrentImages(prev => ({
         ...prev,
         [postId]: `data:image/png;base64,${imageData}`
       }));
+      console.log("DEBUG: Updated currentImages for post:", postId);
 
       // Load image history
       await loadImageHistory(postId);
@@ -1044,10 +1057,10 @@ export default function GeneratePage() {
 
       // Check for 403 status code first (insufficient credits)
       if (error.response?.status === 403) {
-        const errorText = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
-                         "You don't have enough credits to generate this content.";
+        const errorText = error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "You don't have enough credits to generate this content.";
         setInsufficientCreditsMessage(errorText);
         setInsufficientCreditsModalOpen(true);
         return; // Don't add error message to chat
@@ -1295,22 +1308,22 @@ export default function GeneratePage() {
     } catch (error: any) {
       // Check for 403 status code FIRST, before any logging
       // Check in multiple possible locations for maximum compatibility
-      const statusCode = error.response?.status || 
-                        error.status || 
-                        error.statusCode ||
-                        (error.message?.match(/status code (\d+)/)?.[1] ? parseInt(error.message.match(/status code (\d+)/)?.[1]) : null);
-      
-      const is403 = statusCode === 403 || 
-                    (error.message && typeof error.message === 'string' && error.message.toLowerCase().includes("403")) ||
-                    (error.message && typeof error.message === 'string' && error.message.includes("status code 403"));
-      
+      const statusCode = error.response?.status ||
+        error.status ||
+        error.statusCode ||
+        (error.message?.match(/status code (\d+)/)?.[1] ? parseInt(error.message.match(/status code (\d+)/)?.[1]) : null);
+
+      const is403 = statusCode === 403 ||
+        (error.message && typeof error.message === 'string' && error.message.toLowerCase().includes("403")) ||
+        (error.message && typeof error.message === 'string' && error.message.includes("status code 403"));
+
       if (is403) {
-        const errorText = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.response?.data?.error ||
-                         (error.message && typeof error.message === 'string' && error.message.includes("insufficient credits") ? error.message : null) ||
-                         "You don't have enough credits to generate this content.";
-        
+        const errorText = error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          (error.message && typeof error.message === 'string' && error.message.includes("insufficient credits") ? error.message : null) ||
+          "You don't have enough credits to generate this content.";
+
         // Set state and return immediately - don't log or process further
         setInsufficientCreditsMessage(errorText);
         setInsufficientCreditsModalOpen(true);
@@ -1318,7 +1331,7 @@ export default function GeneratePage() {
         setLoadingMessage("Crafting your post...");
         return; // Don't add error message to chat, don't log
       }
-      
+
       // Only log non-403 errors
       console.error("Generation failed:", error);
 
@@ -1409,10 +1422,10 @@ export default function GeneratePage() {
 
       // Check for 403 status code first (insufficient credits)
       if (error.response?.status === 403) {
-        const errorText = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
-                         "You don't have enough credits to regenerate this post.";
+        const errorText = error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "You don't have enough credits to regenerate this post.";
         setInsufficientCreditsMessage(errorText);
         setInsufficientCreditsModalOpen(true);
         return;
@@ -1871,10 +1884,10 @@ export default function GeneratePage() {
                                 console.error("Image regeneration failed:", error);
                                 // Check for 403 status code first (insufficient credits)
                                 if (error.response?.status === 403) {
-                                  const errorText = error.response?.data?.detail || 
-                                                   error.response?.data?.message || 
-                                                   error.message || 
-                                                   "You don't have enough credits to generate this image.";
+                                  const errorText = error.response?.data?.detail ||
+                                    error.response?.data?.message ||
+                                    error.message ||
+                                    "You don't have enough credits to generate this image.";
                                   setInsufficientCreditsMessage(errorText);
                                   setInsufficientCreditsModalOpen(true);
                                 } else {
@@ -1935,10 +1948,10 @@ export default function GeneratePage() {
                                 console.error("Image generation with custom prompt failed:", error);
                                 // Check for 403 status code first (insufficient credits)
                                 if (error.response?.status === 403) {
-                                  const errorText = error.response?.data?.detail || 
-                                                   error.response?.data?.message || 
-                                                   error.message || 
-                                                   "You don't have enough credits to generate this image.";
+                                  const errorText = error.response?.data?.detail ||
+                                    error.response?.data?.message ||
+                                    error.message ||
+                                    "You don't have enough credits to generate this image.";
                                   setInsufficientCreditsMessage(errorText);
                                   setInsufficientCreditsModalOpen(true);
                                 } else {
@@ -2084,10 +2097,10 @@ export default function GeneratePage() {
                                 console.error("PDF regeneration failed:", error);
                                 // Check for 403 status code first (insufficient credits)
                                 if (error.response?.status === 403) {
-                                  const errorText = error.response?.data?.detail || 
-                                                   error.response?.data?.message || 
-                                                   error.message || 
-                                                   "You don't have enough credits to generate this carousel.";
+                                  const errorText = error.response?.data?.detail ||
+                                    error.response?.data?.message ||
+                                    error.message ||
+                                    "You don't have enough credits to generate this carousel.";
                                   setInsufficientCreditsMessage(errorText);
                                   setInsufficientCreditsModalOpen(true);
                                 } else {
@@ -2156,10 +2169,10 @@ export default function GeneratePage() {
                                 console.error("Slide regeneration failed:", error);
                                 // Check for 403 status code first (insufficient credits)
                                 if (error.response?.status === 403) {
-                                  const errorText = error.response?.data?.detail || 
-                                                   error.response?.data?.message || 
-                                                   error.message || 
-                                                   "You don't have enough credits to regenerate this slide.";
+                                  const errorText = error.response?.data?.detail ||
+                                    error.response?.data?.message ||
+                                    error.message ||
+                                    "You don't have enough credits to regenerate this slide.";
                                   setInsufficientCreditsMessage(errorText);
                                   setInsufficientCreditsModalOpen(true);
                                 } else {
@@ -2271,7 +2284,9 @@ export default function GeneratePage() {
                             } : undefined}
                             currentImage={(() => {
                               const postId = postIdMap[msg.id] || msg.id;
-                              return currentImages[postId];
+                              const image = currentImages[postId];
+                              console.log("DEBUG: currentImage for msg", msg.id, "postId:", postId, "image:", image ? "exists" : "missing");
+                              return image;
                             })()}
                             currentPDF={(() => {
                               const postId = postIdMap[msg.id] || msg.id;
@@ -2839,10 +2854,10 @@ export default function GeneratePage() {
                     console.error("PDF regeneration failed:", error);
                     // Check for 403 status code first (insufficient credits)
                     if (error.response?.status === 403) {
-                      const errorText = error.response?.data?.detail || 
-                                       error.response?.data?.message || 
-                                       error.message || 
-                                       "You don't have enough credits to generate this carousel.";
+                      const errorText = error.response?.data?.detail ||
+                        error.response?.data?.message ||
+                        error.message ||
+                        "You don't have enough credits to generate this carousel.";
                       setInsufficientCreditsMessage(errorText);
                       setInsufficientCreditsModalOpen(true);
                     } else {
