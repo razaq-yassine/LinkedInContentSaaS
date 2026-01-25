@@ -625,7 +625,7 @@ async def change_password(
 
 # ============== GOOGLE OAUTH ==============
 
-@router.post("/google/login")
+@router.get("/google/login")
 async def google_login(request: Request):
     """Initiate Google OAuth flow for LOGIN"""
     if not settings.google_client_id:
