@@ -1295,7 +1295,7 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         return PostGenerationResponse(
             id=post.id,
             post_content=post_content,
-            format_type=actual_format,
+            format_type=actual_format.lower() if actual_format else 'text',
             image_prompt=image_prompt,
             image_prompts=image_prompts if actual_format == 'carousel' else None,
             metadata=metadata,

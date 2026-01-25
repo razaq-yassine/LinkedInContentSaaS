@@ -106,7 +106,7 @@ async def get_conversation(
         if msg.role.value == "assistant" and msg.post_id:
             post = db.query(GeneratedPost).filter(GeneratedPost.id == msg.post_id).first()
             if post:
-                message_data["format"] = post.format.value
+                message_data["format"] = post.format.value.lower() if post.format else 'text'
                 message_data["post_id"] = msg.post_id  # Include post_id in response
                 message_data["published_to_linkedin"] = post.published_to_linkedin or False  # Include published status
                 # Get image_prompt/image_prompts from generation_options
@@ -114,14 +114,14 @@ async def get_conversation(
                     gen_options = post.generation_options if isinstance(post.generation_options, dict) else {}
                     message_data["image_prompt"] = gen_options.get("image_prompt")
                     # For carousel posts, also include image_prompts array
-                    if post.format.value == 'carousel':
+                    if post.format.value.lower() == 'carousel':
                         message_data["image_prompts"] = gen_options.get("image_prompts")
                     message_data["metadata"] = gen_options.get("metadata")
                     # Include token_usage if available
                     message_data["token_usage"] = gen_options.get("token_usage")
                 else:
                     message_data["image_prompt"] = None
-                    if post.format.value == 'carousel':
+                    if post.format.value.lower() == 'carousel':
                         message_data["image_prompts"] = None
                     message_data["metadata"] = None
                     message_data["token_usage"] = None
