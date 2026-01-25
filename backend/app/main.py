@@ -298,8 +298,8 @@ async def get_public_settings():
 if __name__ == "__main__":
     import uvicorn
     import os
-    # Use random port from environment or default to 8753
-    port = int(os.getenv("PORT", "8753"))
+    # Use port from environment or default to 8000
+    port = int(os.getenv("PORT", "8000"))
     print(f"🚀 Starting backend server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
 

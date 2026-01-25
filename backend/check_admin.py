@@ -18,6 +18,6 @@ try:
         print(f"   Code Expires: {admin.email_code_expires_at}")
     else:
         print("❌ Admin not found!")
-        print("   Run: python database/seed_admin.py")
+        print("   Run: python database/seed_database.py")
 finally:
     db.close()

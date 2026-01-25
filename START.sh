@@ -6,37 +6,19 @@ echo "🚀 Starting LinkedIn Content SaaS..."
 echo "=================================="
 
 # Colors
-RED='\033[0:31m'
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Check if MySQL is running
-echo -e "\n${YELLOW}1. Checking MySQL...${NC}"
-if ! mysql -u root -e "SELECT 1" &> /dev/null; then
-    echo -e "${RED}❌ MySQL is not running${NC}"
-    echo -e "${YELLOW}Starting MySQL...${NC}"
-    brew services start mysql || mysql.server start
-    sleep 3
-    
-    if mysql -u root -e "SELECT 1" &> /dev/null; then
-        echo -e "${GREEN}✅ MySQL started${NC}"
-    else
-        echo -e "${RED}❌ Failed to start MySQL. Please start it manually.${NC}"
-        exit 1
-    fi
-else
-    echo -e "${GREEN}✅ MySQL is running${NC}"
-fi
-
-# Initialize database if needed
-echo -e "\n${YELLOW}2. Checking database...${NC}"
+# Check if database exists (SQLite)
+echo -e "\n${YELLOW}1. Checking SQLite database...${NC}"
 cd "$(dirname "$0")"
 
-if ! mysql -u root -e "USE linkedin_content_saas" &> /dev/null; then
+if [ ! -f "backend/linkedin_content_saas.db" ]; then
     echo -e "${YELLOW}Database not found. Initializing...${NC}"
     
-    # Activate venv and run Alembic migrations
+    # Activate venv
     cd backend
     if [ ! -d "venv" ]; then
         echo -e "${YELLOW}Creating Python virtual environment...${NC}"
@@ -46,20 +28,24 @@ if ! mysql -u root -e "USE linkedin_content_saas" &> /dev/null; then
     source venv/bin/activate
     pip install -q -r requirements.txt
     
-    # Run Alembic migrations and seeds
-    python migrate.py init
+    # Create database and run seeds
+    cd ..
+    python3 database/recreate_sqlite_db.py
+    cd backend
+    python3 migrations/seeds/master_seed.py
+    cd ..
 else
-    echo -e "${GREEN}✅ Database exists${NC}"
+    echo -e "${GREEN}✅ SQLite database exists${NC}"
 fi
 
 # Check environment variables
-echo -e "\n${YELLOW}3. Checking configuration...${NC}"
+echo -e "\n${YELLOW}2. Checking configuration...${NC}"
 
 if [ ! -f "backend/.env" ]; then
     echo -e "${RED}❌ backend/.env not found${NC}"
     echo -e "${YELLOW}Creating template...${NC}"
     cat > backend/.env << EOF
-DATABASE_URL=mysql+pymysql://root@localhost:3306/linkedin_content_saas
+DATABASE_URL=sqlite:///./linkedin_content_saas.db
 OPENAI_API_KEY=sk-your-key-here
 JWT_SECRET_KEY=$(openssl rand -hex 32)
 FRONTEND_URL=http://localhost:3000
@@ -77,21 +63,21 @@ fi
 echo -e "${GREEN}✅ Configuration ready${NC}"
 
 # Start backend in background
-echo -e "\n${YELLOW}4. Starting backend...${NC}"
+echo -e "\n${YELLOW}3. Starting backend...${NC}"
 cd backend
 source venv/bin/activate
-python -m app.main &
+python3 -m app.main &
 BACKEND_PID=$!
 echo -e "${GREEN}✅ Backend started (PID: $BACKEND_PID)${NC}"
 echo "   Backend: http://localhost:8000"
 echo "   API Docs: http://localhost:8000/docs"
 
 # Wait for backend to be ready
-echo -e "\n${YELLOW}5. Waiting for backend to be ready...${NC}"
+echo -e "\n${YELLOW}4. Waiting for backend to be ready...${NC}"
 sleep 3
 
 # Start frontend in background
-echo -e "\n${YELLOW}6. Starting frontend...${NC}"
+echo -e "\n${YELLOW}5. Starting frontend...${NC}"
 cd ../frontend
 npm run dev &
 FRONTEND_PID=$!

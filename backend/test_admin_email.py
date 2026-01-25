@@ -50,7 +50,7 @@ try:
             print("   ❌ Email failed to send. Check logs above for details.")
     else:
         print("   ❌ Admin account not found!")
-        print("   Run: python database/seed_admin.py")
+        print("   Run: python database/seed_database.py")
 finally:
     db.close()
 

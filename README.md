@@ -39,8 +39,12 @@ cd /Users/yrazaq/Documents/LinkedInContentSaaS
 python3 -m venv backend/venv
 source backend/venv/bin/activate
 pip install -r backend/requirements.txt
-python database/seed_data.py
+python database/seed_database.py
 ```
+
+This script creates:
+- Database tables and subscription plans
+- **Admin account**: `postinai.inc@gmail.com` (passwordless login via email code)
 
 ### 3. Configure Environment Variables
 

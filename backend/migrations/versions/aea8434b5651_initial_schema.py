@@ -77,7 +77,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_user_created', 'conversations', ['user_id', 'created_at'])
+    op.create_index('idx_conversation_user_created', 'conversations', ['user_id', 'created_at'])
 
     # Generated posts table
     op.create_table(
@@ -154,8 +154,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_post', 'generated_pdfs', ['post_id'])
-    op.create_index('idx_user', 'generated_pdfs', ['user_id'])
+    op.create_index('idx_pdf_post', 'generated_pdfs', ['post_id'])
+    op.create_index('idx_pdf_user', 'generated_pdfs', ['user_id'])
     op.create_index('idx_post_current', 'generated_pdfs', ['post_id', 'is_current'])
 
     # Generated comments table
@@ -176,7 +176,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_user', 'generated_comments', ['user_id'])
+    op.create_index('idx_comment_user', 'generated_comments', ['user_id'])
 
     # Subscriptions table
     op.create_table(

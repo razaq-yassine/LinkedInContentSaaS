@@ -11,24 +11,10 @@ sys.path.insert(0, backend_dir)
 
 
 def run_all_seeds():
-    """Run all seed scripts"""
-    print("🌱 Running all database seeds...")
-    print("-" * 50)
-    
+    """Run all seed scripts using master_seed"""
     try:
-        # Import seed functions
-        from migrations.seeds.seed_admin_settings import seed_admin_settings
-        from migrations.seeds.seed_subscription_plans import seed_subscription_plans
-        from migrations.seeds.seed_notification_actions import seed_notification_actions
-        
-        seed_admin_settings()
-        print()
-        seed_subscription_plans()
-        print()
-        seed_notification_actions()
-        
-        print("-" * 50)
-        print("✅ All seeds completed successfully!")
+        from migrations.seeds.master_seed import run_master_seed
+        run_master_seed()
         
     except Exception as e:
         print(f"❌ Error running seeds: {e}")

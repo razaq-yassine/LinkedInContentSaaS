@@ -199,14 +199,20 @@ function OnboardingContent() {
     setLoading(true);
 
     try {
+      console.log("Step 5: Starting completion with preferences:", preferences);
+      
       // Update preferences
+      console.log("Step 5: Updating preferences...");
       await api.user.updatePreferences(preferences);
+      console.log("Step 5: Preferences updated successfully");
 
       // Clear saved profile data
       localStorage.removeItem("onboarding_profile_data");
 
       // Complete onboarding
+      console.log("Step 5: Completing onboarding...");
       await api.onboarding.complete();
+      console.log("Step 5: Onboarding completed successfully");
 
       // Update local storage
       const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -216,8 +222,28 @@ function OnboardingContent() {
       // Redirect to dashboard
       router.push("/generate");
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || error.message || "Unknown error";
       console.error("Completion error:", error);
+      console.error("Error type:", typeof error);
+      console.error("Error response:", error.response);
+      console.error("Error data:", error.response?.data);
+      console.error("Error message:", error.message);
+      
+      let errorMessage = "Unknown error";
+      
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.detail) {
+        errorMessage = error.detail;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else {
+        errorMessage = JSON.stringify(error) || "Unknown error occurred";
+      }
+      
       alert("Completion failed: " + errorMessage);
     } finally {
       setLoading(false);
