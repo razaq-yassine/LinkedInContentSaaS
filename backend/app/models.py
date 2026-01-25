@@ -9,26 +9,26 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 class AccountType(str, enum.Enum):
-    PERSON = "person"
-    BUSINESS = "business"
+    PERSON = "PERSON"
+    BUSINESS = "BUSINESS"
 
 class PostFormat(str, enum.Enum):
-    TEXT = "text"
-    CAROUSEL = "carousel"
-    IMAGE = "image"
-    VIDEO = "video"
-    VIDEO_SCRIPT = "video_script"
+    TEXT = "TEXT"
+    CAROUSEL = "CAROUSEL"
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+    VIDEO_SCRIPT = "VIDEO_SCRIPT"
 
 class SubscriptionPlan(str, enum.Enum):
-    FREE = "free"
-    STARTER = "starter"
-    PRO = "pro"
-    UNLIMITED = "unlimited"
-    AGENCY = "agency"  # Legacy, keeping for backwards compatibility
+    FREE = "FREE"
+    STARTER = "STARTER"
+    PRO = "PRO"
+    UNLIMITED = "UNLIMITED"
+    AGENCY = "AGENCY"  # Legacy, keeping for backwards compatibility
 
 class MessageRole(str, enum.Enum):
-    USER = "user"
-    ASSISTANT = "assistant"
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
 
 class User(Base):
     __tablename__ = "users"
@@ -221,20 +221,20 @@ class GeneratedComment(Base):
     user = relationship("User", back_populates="comments")
 
 class BillingCycle(str, enum.Enum):
-    MONTHLY = "monthly"
-    YEARLY = "yearly"
+    MONTHLY = "MONTHLY"
+    YEARLY = "YEARLY"
 
 
 class SubscriptionStatus(str, enum.Enum):
-    ACTIVE = "active"
-    CANCELED = "canceled"
-    PAST_DUE = "past_due"
+    ACTIVE = "ACTIVE"
+    CANCELED = "CANCELED"
+    PAST_DUE = "PAST_DUE"
 
 
 class CreditPurchaseStatus(str, enum.Enum):
-    PENDING = "pending"
-    COMPLETED = "completed"
-    REFUNDED = "refunded"
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    REFUNDED = "REFUNDED"
 
 
 class Subscription(Base):
@@ -274,8 +274,8 @@ class AdminSetting(Base):
 
 
 class TokenType(str, enum.Enum):
-    EMAIL_VERIFICATION = "email_verification"
-    PASSWORD_RESET = "password_reset"
+    EMAIL_VERIFICATION = "EMAIL_VERIFICATION"
+    PASSWORD_RESET = "PASSWORD_RESET"
 
 
 class UserToken(Base):
@@ -296,8 +296,8 @@ class UserToken(Base):
 
 
 class AdminRole(str, enum.Enum):
-    SUPER_ADMIN = "super_admin"
-    ADMIN = "admin"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    ADMIN = "ADMIN"
 
 
 class Admin(Base):
@@ -361,10 +361,10 @@ class CreditTransaction(Base):
 
 
 class ServiceType(str, enum.Enum):
-    TEXT_GENERATION = "text_generation"
-    IMAGE_GENERATION = "image_generation"
-    SEARCH = "search"
-    ONBOARDING = "onboarding"
+    TEXT_GENERATION = "TEXT_GENERATION"
+    IMAGE_GENERATION = "IMAGE_GENERATION"
+    SEARCH = "SEARCH"
+    ONBOARDING = "ONBOARDING"
 
 
 class UsageTracking(Base):
@@ -408,11 +408,11 @@ class UsageTracking(Base):
 
 class LogLevel(str, enum.Enum):
     """Log levels for system logs"""
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
 
 
 class SystemLog(Base):
@@ -449,11 +449,11 @@ class SystemLog(Base):
 
 class ErrorResolutionStatus(str, enum.Enum):
     """Error resolution status"""
-    NEW = "new"
-    ACKNOWLEDGED = "acknowledged"
-    IN_PROGRESS = "in_progress"
-    RESOLVED = "resolved"
-    WONT_FIX = "wont_fix"
+    NEW = "NEW"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    IN_PROGRESS = "IN_PROGRESS"
+    RESOLVED = "RESOLVED"
+    WONT_FIX = "WONT_FIX"
 
 
 class ErrorLog(Base):
