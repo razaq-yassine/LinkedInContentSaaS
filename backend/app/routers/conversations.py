@@ -107,6 +107,7 @@ async def get_conversation(
             post = db.query(GeneratedPost).filter(GeneratedPost.id == msg.post_id).first()
             if post:
                 message_data["format"] = post.format.value.lower() if post.format else 'text'
+                message_data["format_type"] = post.format.value.lower() if post.format else 'text'
                 message_data["post_id"] = msg.post_id  # Include post_id in response
                 message_data["published_to_linkedin"] = post.published_to_linkedin or False  # Include published status
                 # Get image_prompt/image_prompts from generation_options

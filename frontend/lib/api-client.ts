@@ -140,7 +140,7 @@ export const api = {
   
   // Conversations
   conversations: {
-    list: () => apiClient.get('/api/conversations'),
+    list: () => apiClient.get('/api/conversations/'),
     get: (id: string) => apiClient.get(`/api/conversations/${id}`),
     create: (initialMessage: string, options?: any) => 
       apiClient.post('/api/conversations', { initial_message: initialMessage, options }),
