@@ -82,9 +82,13 @@ async def get_conversation(
     messages = []
     # Get all user messages first to check against assistant messages
     user_messages_by_conversation = {}
+    user_message_contents = []  # List of all user message contents for easier checking
     for msg in conv_messages:
         if msg.role.value == "USER":
-            user_messages_by_conversation[msg.id] = msg.content.strip().lower() if msg.content else ""
+            user_content = msg.content.strip().lower() if msg.content else ""
+            user_messages_by_conversation[msg.id] = user_content
+            if user_content:
+                user_message_contents.append(user_content)
     
     for msg in conv_messages:
         # Initialize content variable - will be set below for assistant messages with posts
@@ -104,7 +108,7 @@ async def get_conversation(
         
         message_data = {
             "id": msg.id,
-            "role": msg.role.value,
+            "role": msg.role.value.lower(),  # Convert to lowercase for frontend compatibility
             "content": content,  # Will be updated for assistant messages with posts
             "created_at": msg.created_at
         }
@@ -126,42 +130,46 @@ async def get_conversation(
                         topic_clean = post.topic.strip() if post.topic else ""
                         
                         # CRITICAL: Check if content matches ANY user message in the conversation (case-insensitive)
-                        content_matches_user_prompt = False
-                        for user_msg_content in user_messages_by_conversation.values():
-                            if user_msg_content and post_content_clean.lower() == user_msg_content:
-                                content_matches_user_prompt = True
-                                break
+                        content_matches_user_prompt = post_content_clean.lower() in user_message_contents
                         
                         # Case-insensitive comparison with topic
                         if topic_clean and post_content_clean.lower() == topic_clean.lower():
                             # Post content is the same as topic (user prompt) - this is an error
                             # Check if msg.content is also wrong, if so, return error message
                             msg_content_clean = msg.content.strip().lower() if msg.content else ""
-                            if msg_content_clean == topic_clean.lower() or content_matches_user_prompt:
+                            # Check if msg.content matches ANY user message in the conversation
+                            msg_content_matches_user = msg_content_clean in user_message_contents
+                            if msg_content_clean == topic_clean.lower() or content_matches_user_prompt or msg_content_matches_user:
                                 # Both post.content and msg.content are wrong - return error
                                 content = "Error: Generated content appears to be invalid. Please regenerate this post."
                             else:
-                                # Use message content as fallback
+                                # Use message content as fallback (it's safe, doesn't match any user prompt)
                                 content = msg.content
                         elif content_matches_user_prompt:
                             # Content matches a user message but not the topic - still an error
                             msg_content_clean = msg.content.strip().lower() if msg.content else ""
-                            if msg_content_clean in user_messages_by_conversation.values():
+                            if msg_content_clean in user_message_contents:
                                 # msg.content is also wrong - return error
+                                content = "Error: Generated content appears to be invalid. Please regenerate this post."
+                            else:
+                                # Use message content as fallback (it's safe, doesn't match any user prompt)
+                                content = msg.content
+                        elif len(post_content_clean) < 10:
+                            # Post content is too short (likely an error) - check msg.content before using it
+                            msg_content_clean = msg.content.strip().lower() if msg.content else ""
+                            if msg_content_clean in user_message_contents:
+                                # msg.content matches a user prompt - return error
                                 content = "Error: Generated content appears to be invalid. Please regenerate this post."
                             else:
                                 # Use message content as fallback
                                 content = msg.content
-                        elif len(post_content_clean) < 10:
-                            # Post content is too short (likely an error) - use message content
-                            content = msg.content
                         else:
                             content = post.content
                     else:
                         # Fallback to message content if post content is missing
                         # But check if msg.content matches any user prompt
                         msg_content_clean = msg.content.strip().lower() if msg.content else ""
-                        if msg_content_clean in user_messages_by_conversation.values():
+                        if msg_content_clean in user_message_contents:
                             # msg.content matches a user prompt - return error
                             content = "Error: Generated content appears to be invalid. Please regenerate this post."
                         else:
@@ -193,7 +201,7 @@ async def get_conversation(
                     # Post not found but message has post_id - still include post_id
                     # Check if msg.content matches any user prompt
                     msg_content_clean = msg.content.strip().lower() if msg.content else ""
-                    if msg_content_clean in user_messages_by_conversation.values():
+                    if msg_content_clean in user_message_contents:
                         # msg.content matches a user prompt - return error
                         content = "Error: Generated content appears to be invalid. Please regenerate this post."
                     # Try to infer format from post_id lookup or set defaults
@@ -210,7 +218,7 @@ async def get_conversation(
                 # Assistant message but no post_id
                 # Check if content matches any user prompt
                 msg_content_clean = msg.content.strip().lower() if msg.content else ""
-                if msg_content_clean in user_messages_by_conversation.values():
+                if msg_content_clean in user_message_contents:
                     # Content matches a user prompt - return error
                     content = "Error: Generated content appears to be invalid. Please regenerate this post."
                 message_data["post_id"] = None
@@ -224,6 +232,18 @@ async def get_conversation(
             message_data["format"] = None
             message_data["format_type"] = None
             message_data["published_to_linkedin"] = False
+        
+        # FINAL SAFETY CHECK: For assistant messages, ensure content doesn't match any user message
+        # This is a last resort check to catch any edge cases we might have missed
+        if message_data["role"] == "assistant" and message_data["content"]:
+            content_final = message_data["content"].strip().lower() if isinstance(message_data["content"], str) else ""
+            # Check against all user messages
+            for user_content in user_message_contents:
+                if user_content and content_final == user_content:
+                    # Content matches a user prompt - replace with error message
+                    print(f"BLOCKED: Assistant message {message_data['id']} content '{content_final[:50]}' matches user message '{user_content[:50]}'")
+                    message_data["content"] = "Error: Generated content appears to be invalid. Please regenerate this post."
+                    break
         
         # Ensure all required fields are present before creating MessageResponse
         # Pydantic will handle None values correctly, but we need to make sure they're explicitly set
