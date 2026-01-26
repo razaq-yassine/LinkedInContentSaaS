@@ -270,9 +270,9 @@ export default function BillingPage() {
 
   const handleTestSubscribe = async (planName: string) => {
     setProcessingPlan(planName);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await axios.post(
         `${apiUrl}/api/test/simulate-subscription`,
         {
@@ -294,6 +294,7 @@ export default function BillingPage() {
       if (error.code === 'ECONNABORTED') {
         alert('Request timed out. Please try again.');
       } else if (error.message === 'Network Error' || !error.response) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
         alert(`Network Error: Could not connect to backend.\n\nPlease check:\n1. Backend is running on ${apiUrl}\n2. CORS is configured correctly\n\nError: ${error.message}`);
       } else {
         alert(error.response?.data?.detail || 'Failed to simulate subscription');

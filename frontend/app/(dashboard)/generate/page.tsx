@@ -543,7 +543,7 @@ export default function GeneratePage() {
       
       for (const msg of messages) {
         if (msg.role === "assistant" && msg.post_id && !loadedPostIds.has(msg.post_id)) {
-          const formatType = msg.format_type?.toLowerCase()?.trim() || msg.format?.toLowerCase()?.trim();
+          const formatType = msg.format_type?.toLowerCase()?.trim();
           const postId = msg.post_id;
           
           if (formatType === 'image') {
@@ -768,7 +768,7 @@ export default function GeneratePage() {
         };
         
         return messageObj;
-      }).filter((msg): msg is Message => msg !== null); // Filter out null messages
+      }).filter((msg: any): msg is Message => msg !== null); // Filter out null messages
       
       // CRITICAL: Sort messages by creation time to ensure correct order
       // Also do a final pass to filter out any assistant messages that match user prompts
@@ -1062,7 +1062,7 @@ export default function GeneratePage() {
           addToast({
             title: "Generation Error",
             description: "The generated content appears to be the same as your prompt. Please try again.",
-            variant: "destructive"
+            variant: "error"
           });
           return;
         }
@@ -1346,7 +1346,7 @@ export default function GeneratePage() {
           addToast({
             title: "Generation Error",
             description: "The generated content appears to be the same as your prompt. Please try again.",
-            variant: "destructive"
+            variant: "error"
           });
           return;
         }
