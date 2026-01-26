@@ -324,6 +324,7 @@ export default function GeneratePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const optionsButtonRef = useRef<HTMLDivElement>(null);
   const postTypeButtonRef = useRef<HTMLDivElement>(null);
+  const justAddedMessagesRef = useRef<boolean>(false);
 
   // Track generated images by message ID (post ID)
   const [currentImages, setCurrentImages] = useState<Record<string, string>>({}); // post_id -> base64 image
@@ -450,10 +451,16 @@ export default function GeneratePage() {
     checkContext();
 
     // Load conversation if ID is provided, otherwise clear messages
-    if (conversationId) {
-      loadConversation(conversationId);
-    } else {
+    // But don't reload if we just added messages locally (to prevent overwriting)
+    if (conversationId && !justAddedMessagesRef.current) {
+      // Add a small delay to ensure backend has finished saving messages
+      const timeoutId = setTimeout(() => {
+        loadConversation(conversationId);
+      }, 1000);
+      return () => clearTimeout(timeoutId);
+    } else if (!conversationId) {
       setMessages([]);
+      justAddedMessagesRef.current = false;
     }
   }, [conversationId]);
 
@@ -649,12 +656,45 @@ export default function GeneratePage() {
     return attachments;
   };
 
-  const loadConversation = async (id: string) => {
+  const loadConversation = async (id: string, preserveLocalMessages: boolean = false) => {
     try {
       const response = await api.conversations.get(id);
       const conversation = response.data;
+      
+      // If preserveLocalMessages is true and we have local messages, merge instead of replace
+      if (preserveLocalMessages && messages.length > 0) {
+        // Only load if backend has more messages than we have locally
+        // This prevents overwriting messages we just added
+        const localMessageCount = messages.filter(m => m.role === "user" || m.role === "assistant").length;
+        const backendMessageCount = conversation.messages.length;
+        
+        // If backend has the same or fewer messages, don't overwrite
+        if (backendMessageCount <= localMessageCount) {
+          return;
+        }
+      }
+      
       // Convert conversation messages to UI messages (includes both user and assistant)
-      const uiMessages: Message[] = conversation.messages.map((msg: any) => {
+      // CRITICAL: Filter out any assistant messages that have content matching user prompts (case-insensitive)
+      const filteredMessages = conversation.messages.filter((msg: any, idx: number) => {
+        if (msg.role === "assistant" && msg.content) {
+          // Check if this assistant message's content matches any user message in the conversation
+          const userMessages = conversation.messages.filter((m: any) => m.role === "user");
+          for (const userMsg of userMessages) {
+            if (msg.content && userMsg.content) {
+              // Case-insensitive comparison
+              if (msg.content.trim().toLowerCase() === userMsg.content.trim().toLowerCase()) {
+                console.warn("Backend returned assistant message with prompt as content (case-insensitive), filtering it out:", userMsg.content);
+                console.warn("Assistant message content was:", msg.content);
+                return false; // Filter out this message
+              }
+            }
+          }
+        }
+        return true; // Keep this message
+      });
+      
+      const uiMessages: Message[] = filteredMessages.map((msg: any) => {
         // Safeguard: Check if content is JSON and extract all fields if needed
         let content = msg.content;
         // Use format_type first (explicit field from backend), then fall back to format
@@ -695,6 +735,23 @@ export default function GeneratePage() {
           }));
         }
 
+        // CRITICAL: For assistant messages, double-check that content doesn't match any user message
+        // This is a final safety check after all processing
+        if (msg.role === "assistant" && content) {
+          const allUserMessagesInConversation = filteredMessages.filter((m: any) => m.role === "user");
+          for (const userMsg of allUserMessagesInConversation) {
+            if (userMsg.content && typeof content === 'string' && typeof userMsg.content === 'string') {
+              if (content.trim().toLowerCase() === userMsg.content.trim().toLowerCase()) {
+                console.error("CRITICAL: After processing, assistant message content still matches user prompt. Filtering out.");
+                console.error("User message:", userMsg.content);
+                console.error("Assistant content:", content);
+                // Don't return this message - it's invalid
+                return null;
+              }
+            }
+          }
+        }
+        
         const messageObj = {
           id: msg.id,
           role: msg.role, // "user" or "assistant"
@@ -711,8 +768,32 @@ export default function GeneratePage() {
         };
         
         return messageObj;
+      }).filter((msg): msg is Message => msg !== null); // Filter out null messages
+      
+      // CRITICAL: Sort messages by creation time to ensure correct order
+      // Also do a final pass to filter out any assistant messages that match user prompts
+      const sortedMessages = [...uiMessages].sort((a, b) => {
+        // Try to maintain order from backend, but ensure user messages come before their corresponding assistant messages
+        const aIndex = filteredMessages.findIndex((m: any) => m.id === a.id);
+        const bIndex = filteredMessages.findIndex((m: any) => m.id === b.id);
+        return aIndex - bIndex;
       });
-      setMessages(uiMessages);
+      
+      // Final safety check: remove any assistant messages whose content matches any user message
+      const finalMessages = sortedMessages.filter((msg, idx) => {
+        if (msg.role === "assistant" && msg.content) {
+          const userMessages = sortedMessages.filter(m => m.role === "user");
+          for (const userMsg of userMessages) {
+            if (userMsg.content && msg.content.trim().toLowerCase() === userMsg.content.trim().toLowerCase()) {
+              console.error("FINAL FILTER: Removing assistant message that matches user prompt:", userMsg.content);
+              return false;
+            }
+          }
+        }
+        return true;
+      });
+      
+      setMessages(finalMessages);
 
       // Build post ID mapping and load images/PDFs
       const newPostIdMap: Record<string, string> = {};
@@ -931,6 +1012,7 @@ export default function GeneratePage() {
     };
 
     setMessages((prev) => [...prev, userMessageObj]);
+    justAddedMessagesRef.current = true; // Mark that we're adding messages locally - prevent loadConversation from overwriting
     setLoading(true);
     setLoadingMessage("Crafting your post...");
 
@@ -950,11 +1032,47 @@ export default function GeneratePage() {
       );
       const data = response.data;
 
+      // Safeguard: Extract actual post_content if it's a JSON string
+      let postContent = data.post_content || data.content;
+      if (typeof postContent === 'string' && postContent.trim().startsWith('{') && postContent.includes('"post_content"')) {
+        try {
+          const parsed = JSON.parse(postContent);
+          if (parsed && typeof parsed === 'object' && parsed.post_content) {
+            postContent = parsed.post_content;
+          }
+        } catch (e) {
+          // If parsing fails, keep original postContent
+        }
+      }
+
+      // CRITICAL: Check if postContent matches the backend message (case-insensitive)
+      // The backendMessage is "Generate me a random post" - if this is returned as content, it's an error
+      if (backendMessage && typeof postContent === 'string') {
+        const postContentTrimmed = postContent.trim().toLowerCase();
+        const backendMessageTrimmed = backendMessage.trim().toLowerCase();
+        
+        if (postContentTrimmed === backendMessageTrimmed) {
+          // This is a backend error - the prompt was returned instead of generated content
+          console.error("CRITICAL: Backend returned prompt as post_content in handleInspiration:", backendMessage);
+          console.error("Post content:", postContent);
+          console.error("Response data:", data);
+          // Don't add this message at all - it's invalid
+          setLoading(false);
+          setLoadingMessage("Crafting your post...");
+          addToast({
+            title: "Generation Error",
+            description: "The generated content appears to be the same as your prompt. Please try again.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       const assistantMessage: Message = {
         id: data.id,
         role: "assistant",
-        content: data.post_content || data.content,
-        post_content: data.post_content,
+        content: postContent,
+        post_content: postContent,
         format_type: data.format_type || data.format,
         image_prompt: data.image_prompt,
         image_prompts: data.image_prompts,
@@ -982,11 +1100,30 @@ export default function GeneratePage() {
 
       // If this is a new conversation, update URL
       if (!conversationId && data.conversation_id) {
+        // Update URL but don't reload conversation immediately
+        // The messages are already in local state, so we don't need to reload
         router.push(`/generate?conversation=${data.conversation_id}`);
         window.dispatchEvent(new CustomEvent("conversationCreated"));
+        // Reset the flag after a longer delay to prevent reload during generation
+        setTimeout(() => {
+          justAddedMessagesRef.current = false;
+        }, 5000);
+      } else if (conversationId) {
+        // Existing conversation - don't reload immediately to avoid showing prompt as content
+        // The messages are already in local state
+        setTimeout(() => {
+          justAddedMessagesRef.current = false;
+        }, 5000);
+      } else {
+        // No conversation ID - reset flag
+        justAddedMessagesRef.current = false;
       }
+      
+      setLoading(false);
+      setLoadingMessage("Crafting your post...");
     } catch (error: any) {
       console.error("Inspiration generation failed:", error);
+      justAddedMessagesRef.current = false; // Reset flag on error so loadConversation can run if needed
 
       // Check for 403 status code first (insufficient credits)
       if (error.response?.status === 403) {
@@ -1122,6 +1259,7 @@ export default function GeneratePage() {
 
     setInput("");
     setMessages((prev) => [...prev, userMessageObj]);
+    justAddedMessagesRef.current = true; // Mark that we're adding messages locally
     setLoading(true);
 
     // Set initial loading message based on web search status
@@ -1190,6 +1328,30 @@ export default function GeneratePage() {
         }
       }
 
+      // CRITICAL: Check if postContent is actually the user's prompt (backend bug)
+      // If postContent matches the user's message, it means the backend returned the prompt instead of generated content
+      // Use the userMessage variable directly since we just added it
+      if (userMessage && typeof postContent === 'string') {
+        const postContentTrimmed = postContent.trim();
+        const userMessageTrimmed = userMessage.trim();
+        
+        if (postContentTrimmed === userMessageTrimmed) {
+          // This is a backend error - the prompt was returned instead of generated content
+          console.error("CRITICAL: Backend returned prompt as post_content:", userMessage);
+          console.error("Post content:", postContent);
+          console.error("Response data:", data);
+          // Don't add this message at all - it's invalid
+          setLoading(false);
+          setLoadingMessage("Crafting your post...");
+          addToast({
+            title: "Generation Error",
+            description: "The generated content appears to be the same as your prompt. Please try again.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       const assistantMessage: Message = {
         id: data.id,
         role: "assistant",
@@ -1230,9 +1392,27 @@ export default function GeneratePage() {
 
       // If this is a new conversation, update URL and notify layout
       if (!conversationId && data.conversation_id) {
+        // Update URL but don't reload conversation immediately
+        // The messages are already in local state, so we don't need to reload
         router.push(`/generate?conversation=${data.conversation_id}`);
         window.dispatchEvent(new CustomEvent("conversationCreated"));
+        // Reset the flag after a longer delay to prevent reload during generation
+        setTimeout(() => {
+          justAddedMessagesRef.current = false;
+        }, 5000);
+      } else if (conversationId) {
+        // Existing conversation - don't reload immediately to avoid showing prompt as content
+        // The messages are already in local state
+        setTimeout(() => {
+          justAddedMessagesRef.current = false;
+        }, 5000);
+      } else {
+        // No conversation ID - reset flag
+        justAddedMessagesRef.current = false;
       }
+      
+      setLoading(false);
+      setLoadingMessage("Crafting your post...");
 
       // Trigger subscription refresh to update credit progress bar
       window.dispatchEvent(new CustomEvent("creditsUpdated"));
@@ -1652,6 +1832,34 @@ export default function GeneratePage() {
             )}
 
             {messages.map((msg, idx) => {
+              // CRITICAL: Skip rendering if this is an assistant message that matches any user prompt
+              // Do this check FIRST before any processing
+              if (msg.role === "assistant" && msg.content) {
+                const allUserMessages = messages.filter(m => m.role === "user");
+                for (const userMsg of allUserMessages) {
+                  if (userMsg.content && typeof msg.content === 'string' && typeof userMsg.content === 'string') {
+                    // Case-insensitive comparison
+                    if (msg.content.trim().toLowerCase() === userMsg.content.trim().toLowerCase()) {
+                      console.error("SKIPPING RENDER: Assistant message content matches user prompt:", userMsg.content);
+                      console.error("Message ID:", msg.id, "Content:", msg.content);
+                      return null; // Don't render this message at all
+                    }
+                  }
+                }
+                // Also check post_content if it exists
+                if (msg.post_content) {
+                  for (const userMsg of allUserMessages) {
+                    if (userMsg.content && typeof msg.post_content === 'string' && typeof userMsg.content === 'string') {
+                      if (msg.post_content.trim().toLowerCase() === userMsg.content.trim().toLowerCase()) {
+                        console.error("SKIPPING RENDER: Assistant message post_content matches user prompt:", userMsg.content);
+                        console.error("Message ID:", msg.id, "Post content:", msg.post_content);
+                        return null; // Don't render this message at all
+                      }
+                    }
+                  }
+                }
+              }
+              
               // Check if content is JSON and extract data if needed
               let displayContent = msg.post_content || msg.content;
               let displayFormatType = msg.format_type;
@@ -1679,9 +1887,6 @@ export default function GeneratePage() {
                     displayImagePrompt = parsed.image_prompt || displayImagePrompt;
                     displayImagePrompts = parsed.image_prompts || displayImagePrompts;
                     displayMetadata = parsed.metadata || displayMetadata;
-                  } else {
-                      parsed_result: parsed
-                    });
                   }
                 }
               }
