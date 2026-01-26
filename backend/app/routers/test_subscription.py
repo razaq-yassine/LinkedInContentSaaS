@@ -78,7 +78,9 @@ async def simulate_subscription_completion(
         is_upgrade=is_upgrade
     )
     
-    subscription.billing_cycle = BillingCycle(request.billing_cycle)
+    # Convert billing_cycle to uppercase to match enum values
+    billing_cycle_upper = request.billing_cycle.upper()
+    subscription.billing_cycle = BillingCycle(billing_cycle_upper)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     
     # Set test Stripe IDs

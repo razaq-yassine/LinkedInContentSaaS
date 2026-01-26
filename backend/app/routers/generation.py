@@ -654,6 +654,13 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 image_attachments=image_attachments if image_attachments else None
             )
             
+            # CRITICAL: Check if raw_response equals user prompt BEFORE any processing
+            if raw_response and raw_response.strip() == request.message.strip():
+                raise HTTPException(
+                    status_code=500,
+                    detail="The AI returned your prompt instead of generating content. Please try again."
+                )
+            
             # Track main generation tokens
             total_input_tokens += main_token_usage.get("input_tokens", 0)
             total_output_tokens += main_token_usage.get("output_tokens", 0)
@@ -665,6 +672,8 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 "output_tokens": main_token_usage.get("output_tokens", 0),
                 "total_tokens": main_token_usage.get("total_tokens", 0)
             }
+        except HTTPException:
+            raise
         except Exception as e:
             error_trace = traceback.format_exc()
             print(f"AI generation error: {str(e)}")
@@ -691,7 +700,20 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             
             # Handle case where response_data might be the post_content directly
             if isinstance(response_data, dict):
-                post_content = response_data.get("post_content", raw_response)
+                post_content = response_data.get("post_content")
+                # CRITICAL: If post_content is missing, don't fallback to raw_response immediately
+                # raw_response might be the user's prompt if JSON parsing failed
+                if not post_content:
+                    # Try to find post_content in nested structure or use raw_response as last resort
+                    # But first check if raw_response equals user prompt
+                    if raw_response.strip() == request.message.strip():
+                        # Don't use raw_response - it's the user's prompt
+                        raise HTTPException(
+                            status_code=500,
+                            detail="The AI response was invalid and matched your prompt. Please try again."
+                        )
+                    else:
+                        post_content = raw_response
                 
                 # CRITICAL: If post_content contains JSON-like structure, try to parse it
                 if isinstance(post_content, str) and post_content.strip().startswith('{'):
@@ -884,7 +906,12 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 metadata_dict["hashtags"] = response_data.get("hashtags", [])
         except json.JSONDecodeError:
             # Fallback to plain text response
-            post_content = raw_response
+            # CRITICAL: Check if raw_response equals user prompt before using it
+            if raw_response.strip() == request.message.strip():
+                # Don't use raw_response - it's the user's prompt, not generated content
+                post_content = "Error: Failed to generate content. The AI response was invalid. Please try again."
+            else:
+                post_content = raw_response
             post_title = None  # No title available in fallback case
             if post_type == 'image':
                 format_type = 'image'
@@ -976,9 +1003,15 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             if not post_content.startswith('**HEADER**') and not post_content.startswith('*SCRIPT*'):
                 post_content = format_video_script_string(post_content)
         
-        # CRITICAL: Final check before saving - ensure post_content is never JSON
+        # CRITICAL: Final check before saving - ensure post_content is never JSON and never equals user's prompt
         if isinstance(post_content, str):
             post_content_clean = post_content.strip()
+            user_message_clean = request.message.strip()
+            
+            # CRITICAL: If post_content equals the user's prompt, this is an error - the AI didn't generate content
+            if post_content_clean == user_message_clean:
+                post_content = "Error: The generated content appears to be the same as your prompt. Please try regenerating."
+            
             # If it looks like JSON (starts with { and contains JSON-like structure), try to extract content
             if post_content_clean.startswith('{') and ('"post_content"' in post_content_clean or '"format_type"' in post_content_clean):
                 try:
@@ -986,8 +1019,11 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                     if isinstance(parsed_check, dict):
                         extracted = parsed_check.get("post_content")
                         if isinstance(extracted, str) and len(extracted.strip()) > 0:
-                            print("CRITICAL: Final extraction - post_content was JSON, extracted actual content")
-                            post_content = extracted
+                            # Also check if extracted content equals user prompt
+                            if extracted.strip() == user_message_clean:
+                                post_content = "Error: The generated content appears to be the same as your prompt. Please try regenerating."
+                            else:
+                                post_content = extracted
                         else:
                             # Last resort: if we can't extract, log error and use a placeholder
                             print("CRITICAL ERROR: post_content is JSON but no valid content found. Using error message.")
@@ -1110,6 +1146,17 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                     conversation.title = post_title.strip()
                     db.flush()
         
+        # CRITICAL: Final validation before saving to database
+        # Ensure post_content never equals the user's prompt
+        user_message_clean = request.message.strip()
+        post_content_clean = post_content.strip() if isinstance(post_content, str) else ""
+        
+        if post_content_clean.lower() == user_message_clean.lower():
+            raise HTTPException(
+                status_code=500,
+                detail="The generated content appears to be identical to your prompt. This is an error. Please try again."
+            )
+        
         # Save to database
         post_id = str(uuid.uuid4())
         post = GeneratedPost(
@@ -1177,6 +1224,16 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
         
         # Save conversation messages (user prompt + AI response)
         if conversation_id:
+            # CRITICAL: Final check before saving - ensure post_content never equals user prompt
+            user_message_clean = request.message.strip()
+            post_content_clean = post_content.strip() if isinstance(post_content, str) else ""
+            
+            if post_content_clean.lower() == user_message_clean.lower():
+                raise HTTPException(
+                    status_code=500,
+                    detail="The generated content appears to be identical to your prompt. This is an error. Please try again."
+                )
+            
             # Save user message with attachments if present
             user_message = ConversationMessage(
                 id=str(uuid.uuid4()),
@@ -1250,10 +1307,9 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                         post_content = post_content.rstrip() + '\n\n' + hashtags_text
                     else:
                         post_content = post_content.rstrip() + hashtags_text
-                    print(f"Appended {len(hashtags_from_metadata)} hashtags to post_content: {hashtags_text}")
             else:
-                # If no hashtags at all, log a warning
-                print(f"WARNING: No hashtags found in metadata or content. Requested: {hashtag_count_requested}")
+                # If no hashtags at all, that's okay - user can add them manually
+                pass
         
         # Build metadata for response (hashtags only - tone and estimated_engagement removed)
         metadata = PostMetadata(
@@ -1291,6 +1347,20 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
                 cloudflare_cost=cloudflare_cost_for_storage,
                 cloudflare_model=cloudflare_settings.cloudflare_image_model if (cloudflare_cost_for_storage and cloudflare_settings) else None
             )
+        
+        # FINAL VALIDATION: Ensure post_content is never the user's prompt (case-insensitive)
+        user_message_clean = request.message.strip()
+        post_content_clean = post_content.strip() if isinstance(post_content, str) else ""
+        
+        # Case-insensitive comparison
+        if post_content_clean.lower() == user_message_clean.lower():
+            # Return an error message instead
+            post_content = "Error: The AI response appears to be identical to your prompt. Please try regenerating with a different prompt or try again."
+        
+        # Log what we're returning for debugging
+        print(f"Returning post_content (first 100 chars): {post_content[:100] if isinstance(post_content, str) else 'NOT A STRING'}")
+        print(f"User prompt was: {user_message_clean[:100]}")
+        print(f"Are they equal (case-insensitive)? {post_content_clean.lower() == user_message_clean.lower()}")
         
         return PostGenerationResponse(
             id=post.id,
@@ -2015,7 +2085,6 @@ Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
             if isinstance(prompts, list) and len(prompts) > 0:
                 # CRITICAL: Limit to 15 slides maximum (even if AI generated more)
                 if len(prompts) > 15:
-                    print(f"WARNING: AI generated {len(prompts)} prompts, limiting to 15")
                     prompts = prompts[:15]
                 
                 # Ensure we have the right number of prompts (within 4-15 range)

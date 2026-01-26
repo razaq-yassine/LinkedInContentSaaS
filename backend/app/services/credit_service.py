@@ -497,7 +497,9 @@ def apply_plan_upgrade_credits(
     old_available = old_limit - old_used if old_limit != -1 else 0
     
     # Update plan and limit
-    subscription.plan = SubscriptionPlan(new_plan_config.plan_name)
+    # Convert plan_name to uppercase to match enum values (e.g., "starter" -> "STARTER")
+    plan_name_upper = new_plan_config.plan_name.upper()
+    subscription.plan = SubscriptionPlan(plan_name_upper)
     subscription.subscription_credits_limit = new_plan_config.credits_limit
     
     if is_upgrade:

@@ -445,7 +445,9 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
         is_upgrade=is_upgrade
     )
     
-    subscription.billing_cycle = BillingCycle(billing_cycle)
+    # Convert billing_cycle to uppercase to match enum values
+    billing_cycle_upper = billing_cycle.upper()
+    subscription.billing_cycle = BillingCycle(billing_cycle_upper)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     subscription.stripe_subscription_id = stripe_subscription_id
     subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
@@ -674,7 +676,9 @@ def handle_upgrade(
         new_plan_config=plan_config,
         is_upgrade=True  # This is always an upgrade when called from handle_upgrade
     )
-    subscription.billing_cycle = BillingCycle(billing_cycle)
+    # Convert billing_cycle to uppercase to match enum values
+    billing_cycle_upper = billing_cycle.upper()
+    subscription.billing_cycle = BillingCycle(billing_cycle_upper)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     subscription.stripe_subscription_id = new_stripe_subscription.id
     subscription.current_period_start = datetime.fromtimestamp(new_stripe_subscription.current_period_start)

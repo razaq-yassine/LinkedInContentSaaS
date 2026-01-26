@@ -281,6 +281,7 @@ export default function BillingPage() {
         },
         {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 30000, // 30 second timeout
         }
       );
 
@@ -290,7 +291,13 @@ export default function BillingPage() {
       }
     } catch (error: any) {
       console.error('Test subscription error:', error);
-      alert(error.response?.data?.detail || 'Failed to simulate subscription');
+      if (error.code === 'ECONNABORTED') {
+        alert('Request timed out. Please try again.');
+      } else if (error.message === 'Network Error' || !error.response) {
+        alert(`Network Error: Could not connect to backend.\n\nPlease check:\n1. Backend is running on ${apiUrl}\n2. CORS is configured correctly\n\nError: ${error.message}`);
+      } else {
+        alert(error.response?.data?.detail || 'Failed to simulate subscription');
+      }
     } finally {
       setProcessingPlan(null);
     }

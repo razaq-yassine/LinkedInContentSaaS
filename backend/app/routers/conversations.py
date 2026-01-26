@@ -81,8 +81,10 @@ async def get_conversation(
     
     messages = []
     for msg in conv_messages:
-        # Safeguard: Check if content is JSON and extract post_content if needed
+        # Initialize content variable - will be set below for assistant messages with posts
         content = msg.content
+        
+        # Safeguard: Check if content is JSON and extract post_content if needed (for user messages or fallback)
         if isinstance(content, str) and content.strip().startswith('{') and '"post_content"' in content:
             try:
                 import json
@@ -98,7 +100,7 @@ async def get_conversation(
         message_data = {
             "id": msg.id,
             "role": msg.role.value,
-            "content": content,
+            "content": content,  # Will be updated for assistant messages with posts
             "created_at": msg.created_at
         }
         
@@ -110,6 +112,27 @@ async def get_conversation(
                 message_data["post_id"] = msg.post_id  # Always include post_id first
                 post = db.query(GeneratedPost).filter(GeneratedPost.id == msg.post_id).first()
                 if post:
+                    # CRITICAL: Use post.content instead of msg.content for assistant messages
+                    # This ensures we always get the correct generated content, not the user's prompt
+                    if post.content and isinstance(post.content, str) and len(post.content.strip()) > 0:
+                        # Additional safety check: if post.content equals the topic (user's prompt), use message content instead
+                        # This prevents showing the user's prompt as the assistant message
+                        post_content_clean = post.content.strip()
+                        topic_clean = post.topic.strip() if post.topic else ""
+                        
+                        # Case-insensitive comparison
+                        if topic_clean and post_content_clean.lower() == topic_clean.lower():
+                            # Post content is the same as topic (user prompt) - this is an error
+                            # Use message content instead, which should have the correct generated content
+                            content = msg.content
+                        elif len(post_content_clean) < 10:
+                            # Post content is too short (likely an error) - use message content
+                            content = msg.content
+                        else:
+                            content = post.content
+                    else:
+                        content = msg.content  # Fallback to message content if post content is missing
+                    
                     message_data["format"] = post.format.value.lower() if post.format else 'text'
                     message_data["format_type"] = post.format.value.lower() if post.format else 'text'
                     message_data["published_to_linkedin"] = post.published_to_linkedin or False  # Include published status
@@ -129,6 +152,9 @@ async def get_conversation(
                             message_data["image_prompts"] = None
                         message_data["metadata"] = None
                         message_data["token_usage"] = None
+                    
+                    # Update content with post content
+                    message_data["content"] = content
                 else:
                     # Post not found but message has post_id - still include post_id
                     # Try to infer format from post_id lookup or set defaults
@@ -139,6 +165,7 @@ async def get_conversation(
                     message_data["image_prompts"] = None
                     message_data["metadata"] = None
                     message_data["token_usage"] = None
+                    # Keep original content from message
             else:
                 # Assistant message but no post_id
                 message_data["post_id"] = None
