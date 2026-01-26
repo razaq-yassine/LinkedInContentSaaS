@@ -9,6 +9,13 @@ function CallbackContent() {
 
   useEffect(() => {
     const dataParam = searchParams.get("data");
+    const errorParam = searchParams.get("error");
+    
+    // Check for error first
+    if (errorParam) {
+      router.push(`/login?error=${encodeURIComponent(errorParam)}`);
+      return;
+    }
     
     if (dataParam) {
       try {
@@ -26,10 +33,10 @@ function CallbackContent() {
         }
       } catch (error) {
         console.error("Failed to parse login callback data:", error);
-        router.push("/login?error=callback_failed");
+        router.push("/login?error=Authentication%20failed.%20Please%20try%20again.");
       }
     } else {
-      router.push("/login?error=no_data");
+      router.push("/login?error=Authentication%20failed.%20Please%20try%20again.");
     }
   }, [searchParams, router]);
 

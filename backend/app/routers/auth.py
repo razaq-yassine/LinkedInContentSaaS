@@ -710,7 +710,22 @@ async def google_callback(
     db: Session = Depends(get_db)
 ):
     """Handle Google OAuth callback"""
+    # Helper function to redirect to login with error
+    def redirect_to_login_with_error(error_message: str):
+        import urllib.parse
+        frontend_url = settings.frontend_url
+        error_encoded = urllib.parse.quote(error_message)
+        redirect_url = f"{frontend_url}/login?error={error_encoded}"
+        return RedirectResponse(url=redirect_url, status_code=302)
+    
+    # Get redirect_context early if state exists
+    redirect_context = "login"  # Default
+    if state in google_oauth_states:
+        redirect_context = google_oauth_states[state].get("redirect_context", "login")
+    
     if state not in google_oauth_states:
+        if redirect_context == "login":
+            return redirect_to_login_with_error("Token expired. Please try again.")
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     
     state_data = google_oauth_states.pop(state)
@@ -719,6 +734,8 @@ async def google_callback(
     redirect_uri = state_data.get("redirect_uri", settings.google_redirect_uri)
     
     if datetime.utcnow() - state_data["created_at"] > timedelta(minutes=5):
+        if redirect_context == "login":
+            return redirect_to_login_with_error("Token expired. Please try again.")
         raise HTTPException(status_code=400, detail="State expired")
     
     try:
@@ -862,6 +879,22 @@ async def google_callback(
         # For settings context, return popup error response
         if redirect_context == "settings":
             return create_popup_response(False, "google-oauth-error", str(e))
+        
+        # For login context, redirect to login page with error message
+        if redirect_context == "login":
+            import urllib.parse
+            error_message = str(e)
+            # Check if it's a token expiration error
+            if "expired" in error_message.lower() or "invalid_grant" in error_message.lower() or "token" in error_message.lower():
+                error_message = "Token expired. Please try again."
+            else:
+                error_message = "Authentication failed. Please try again."
+            
+            frontend_url = settings.frontend_url
+            error_encoded = urllib.parse.quote(error_message)
+            redirect_url = f"{frontend_url}/login?error={error_encoded}"
+            return RedirectResponse(url=redirect_url, status_code=302)
+        
         raise HTTPException(status_code=500, detail=f"Google login failed: {str(e)}")
 
 
@@ -999,12 +1032,23 @@ async def linkedin_callback(
     if state and state in oauth_states:
         redirect_context = oauth_states[state].get("redirect_context", "login")
     
+    # Helper function to redirect to login with error
+    def redirect_to_login_with_error(error_message: str):
+        import urllib.parse
+        frontend_url = settings.frontend_url
+        error_encoded = urllib.parse.quote(error_message)
+        redirect_url = f"{frontend_url}/login?error={error_encoded}"
+        return RedirectResponse(url=redirect_url, status_code=302)
+    
     # Check for LinkedIn error responses first
     if error:
         error_msg = error_description or error
         if redirect_context == "settings":
             return create_popup_response(False, "linkedin-oauth-error", f"LinkedIn OAuth error: {error_msg}")
-        raise HTTPException(status_code=400, detail=f"LinkedIn OAuth error: {error_msg}")
+        # Check if it's a token expiration error
+        if "expired" in error_msg.lower() or "token" in error_msg.lower():
+            return redirect_to_login_with_error("Token expired. Please try again.")
+        return redirect_to_login_with_error("Authentication failed. Please try again.")
     
     # Check if code is missing
     if not code:
@@ -1013,20 +1057,20 @@ async def linkedin_callback(
         error_msg = f"Missing authorization code. Query parameters received: {all_params}. Please verify that the redirect URI in your LinkedIn app matches exactly: {settings.linkedin_redirect_uri}"
         if redirect_context == "settings":
             return create_popup_response(False, "linkedin-oauth-error", error_msg)
-        raise HTTPException(status_code=400, detail=error_msg)
+        return redirect_to_login_with_error("Authentication failed. Please try again.")
     
     # Check if state is missing
     if not state:
         error_msg = f"Missing state parameter. This may indicate a redirect URI mismatch. Expected redirect URI: {settings.linkedin_redirect_uri}"
         if redirect_context == "settings":
             return create_popup_response(False, "linkedin-oauth-error", error_msg)
-        raise HTTPException(status_code=400, detail=error_msg)
+        return redirect_to_login_with_error("Authentication failed. Please try again.")
     
     if state not in oauth_states:
         error_msg = "Invalid state parameter. The OAuth session may have expired. Please try again."
         if redirect_context == "settings":
             return create_popup_response(False, "linkedin-oauth-error", error_msg)
-        raise HTTPException(status_code=400, detail=error_msg)
+        return redirect_to_login_with_error("Token expired. Please try again.")
     
     state_data = oauth_states.pop(state)
     user_id = state_data.get("user_id")
@@ -1036,7 +1080,7 @@ async def linkedin_callback(
         error_msg = "State expired. Please try again."
         if redirect_context == "settings":
             return create_popup_response(False, "linkedin-oauth-error", error_msg)
-        raise HTTPException(status_code=400, detail=error_msg)
+        return redirect_to_login_with_error("Token expired. Please try again.")
     
     try:
         token_data = await LinkedInService.exchange_code_for_token(code)
@@ -1187,6 +1231,22 @@ async def linkedin_callback(
         # For settings context, return popup error response
         if redirect_context == "settings":
             return create_popup_response(False, "linkedin-oauth-error", str(e))
+        
+        # For login context, redirect to login page with error message
+        if redirect_context == "login":
+            import urllib.parse
+            error_message = str(e)
+            # Check if it's a token expiration error
+            if "expired" in error_message.lower() or "invalid_grant" in error_message.lower() or "token" in error_message.lower():
+                error_message = "Token expired. Please try again."
+            else:
+                error_message = "Authentication failed. Please try again."
+            
+            frontend_url = settings.frontend_url
+            error_encoded = urllib.parse.quote(error_message)
+            redirect_url = f"{frontend_url}/login?error={error_encoded}"
+            return RedirectResponse(url=redirect_url, status_code=302)
+        
         raise HTTPException(status_code=500, detail=f"LinkedIn connection failed: {str(e)}")
 
 @router.post("/linkedin/disconnect")

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +28,18 @@ export default function LoginPage() {
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [appName, setAppName] = useState("PostInAi");
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
+    // Check for error in URL parameters
+    const errorParam = searchParams?.get("error");
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+      // Clean up URL by removing error parameter
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+    }
+
     // Check maintenance mode and app settings
     const fetchSettings = async () => {
       try {
@@ -58,7 +68,7 @@ export default function LoginPage() {
         router.push("/onboarding");
       }
     }
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
