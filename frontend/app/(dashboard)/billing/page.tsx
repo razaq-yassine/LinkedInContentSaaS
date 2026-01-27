@@ -213,9 +213,24 @@ export default function BillingPage() {
     setUpgradeModalOpen(false);
     setProcessingPlan(selectedUpgradePlan);
 
+    // Check if user is on free plan - if so, use checkout flow instead
+    if (currentSubscription?.plan === 'free') {
+      console.log('User is on free plan, redirecting to checkout flow');
+      await proceedWithSubscription(selectedUpgradePlan);
+      setSelectedUpgradePlan(null);
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      console.log('Attempting upgrade with:', {
+        currentPlan: currentSubscription?.plan,
+        newPlan: selectedUpgradePlan,
+        billingCycle: billingCycle,
+      });
+      
       await axios.post(
         `${apiUrl}/api/subscription/upgrade`,
         {
@@ -233,7 +248,15 @@ export default function BillingPage() {
       alert('Upgrade successful! Your new plan is now active.');
     } catch (error: any) {
       console.error('Upgrade error:', error);
+      console.error('Error response:', error.response?.data);
       const errorMessage = error.response?.data?.detail || 'Failed to upgrade subscription';
+
+      // Check if it's the "free plan" error - redirect to checkout
+      if (typeof errorMessage === 'string' && errorMessage.includes('Cannot upgrade from free plan')) {
+        console.log('Backend rejected upgrade from free plan, using checkout flow');
+        await proceedWithSubscription(selectedUpgradePlan);
+        return;
+      }
 
       // Check if payment method is required (redirect to checkout)
       if (typeof errorMessage === 'string' && errorMessage.startsWith('PAYMENT_METHOD_REQUIRED:')) {
@@ -250,7 +273,8 @@ export default function BillingPage() {
         setCreditSuggestionError(errorMessage);
         setCreditSuggestionModalOpen(true);
       } else {
-        alert(errorMessage);
+        // Show the actual error message for debugging
+        alert(`Upgrade failed: ${errorMessage}\n\nCurrent plan: ${currentSubscription?.plan}\nNew plan: ${selectedUpgradePlan}`);
       }
     } finally {
       setProcessingPlan(null);
