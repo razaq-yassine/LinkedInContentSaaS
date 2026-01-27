@@ -291,6 +291,9 @@ async def get_public_settings():
             "google_analytics_id": get_setting("google_analytics_id", ""),
             "error_tracking_enabled": get_setting("error_tracking_enabled", "true"),
             "performance_monitoring_enabled": get_setting("performance_monitoring_enabled", "false"),
+            
+            # Development
+            "dev_mode": str(settings.dev_mode).lower(),
         }
     finally:
         db.close()

@@ -26,6 +26,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { api } from "@/lib/api-client";
+import axios from "axios";
 import {
   Select,
   SelectContent,
@@ -325,6 +326,8 @@ export default function GeneratePage() {
   const optionsButtonRef = useRef<HTMLDivElement>(null);
   const postTypeButtonRef = useRef<HTMLDivElement>(null);
   const justAddedMessagesRef = useRef<boolean>(false);
+  const promptAreaRef = useRef<HTMLDivElement>(null);
+  const [promptAreaHeight, setPromptAreaHeight] = useState(0);
 
   // Track generated images by message ID (post ID)
   const [currentImages, setCurrentImages] = useState<Record<string, string>>({}); // post_id -> base64 image
@@ -418,6 +421,7 @@ export default function GeneratePage() {
   const [internetSearch, setInternetSearch] = useState(savedOptions.internetSearch);
   const [contextTone, setContextTone] = useState<string | null>(null);
   const [tokenUsage, setTokenUsage] = useState<any>(null);
+  const [devMode, setDevMode] = useState<boolean>(false);
 
   // Save options to localStorage whenever they change
   useEffect(() => {
@@ -446,6 +450,20 @@ export default function GeneratePage() {
     if (userData) {
       setUser(JSON.parse(userData));
     }
+
+    // Check dev mode from public settings
+    const checkDevMode = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await axios.get(`${apiUrl}/api/public/settings`);
+        const isDevMode = response.data.dev_mode === 'true' || response.data.dev_mode === true;
+        setDevMode(isDevMode);
+      } catch (error) {
+        // Default to false if we can't fetch settings
+        setDevMode(false);
+      }
+    };
+    checkDevMode();
 
     // Check if user has context
     checkContext();
@@ -531,6 +549,31 @@ export default function GeneratePage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Measure prompt area height dynamically
+  useEffect(() => {
+    if (!promptAreaRef.current) return;
+
+    const updateHeight = () => {
+      if (promptAreaRef.current) {
+        setPromptAreaHeight(promptAreaRef.current.offsetHeight);
+      }
+    };
+
+    // Initial measurement
+    updateHeight();
+
+    // Use ResizeObserver to track height changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    resizeObserver.observe(promptAreaRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [imagePreviews, input]); // Re-measure when images or input changes
 
   // Load images/PDFs for messages that have post_id but images aren't loaded yet
   useEffect(() => {
@@ -1700,12 +1743,12 @@ export default function GeneratePage() {
 
   return (
     <>
-      <TokenUsage tokenUsage={tokenUsage} />
-      <div className="min-h-screen bg-[#F3F2F0] dark:bg-slate-900">
+      {devMode && <TokenUsage tokenUsage={tokenUsage} />}
+      <div className="bg-[#F3F2F0] dark:bg-slate-900 h-full flex flex-col">
         {/* Top Banner - Only show when no conversation */}
         {messages.length === 0 && (
           <div className="bg-white dark:bg-slate-800 border-b border-[#E0DFDC] dark:border-slate-700 py-2 sm:py-3 px-3 sm:px-4">
-            <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
+            <div className="w-full max-w-5xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#0A66C2] flex-shrink-0" />
               <span className="text-xs sm:text-base font-medium text-[#666666] dark:text-slate-300">
                 Trained on posts of top LinkedIn creators
@@ -1725,9 +1768,10 @@ export default function GeneratePage() {
         )}
 
         {/* Main Content */}
-        <div className={`max-w-4xl mx-auto px-3 sm:px-4 ${messages.length === 0 ? 'h-[calc(100vh-60px)] sm:h-[calc(100vh-80px)]' : 'h-[calc(100vh-40px)] sm:h-[calc(100vh-60px)]'} flex flex-col`}>
+        <div className={`w-full px-3 sm:px-4 flex-1 flex flex-col relative bg-[#F3F2F0] dark:bg-slate-900`}>
           {/* Messages - Scrollable Area */}
-          <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 py-4 sm:py-8 pb-4 scrollbar-right">
+          <div className="flex-1 overflow-y-auto space-y-6 sm:space-y-8 py-4 sm:py-6 scrollbar-right">
+            <div className="max-w-5xl mx-auto">
             {messages.length === 0 && (
               <div className="text-center py-10 sm:py-20 px-2">
                 <div className="max-w-2xl mx-auto">
@@ -1892,7 +1936,7 @@ export default function GeneratePage() {
               }
 
               return (
-                <div key={msg.id}>
+                <div key={msg.id} className="mb-4 sm:mb-6">
                   {msg.role === "user" ? (
                     <div className="flex justify-end">
                       <div className="max-w-[85%] sm:max-w-[600px] flex flex-col items-end gap-2">
@@ -2504,8 +2548,8 @@ export default function GeneratePage() {
                           </div>
                         )}
 
-                        {/* Token Usage Display */}
-                        {msg.token_usage && (
+                        {/* Token Usage Display - Only visible in dev mode */}
+                        {msg.token_usage && devMode && (
                           <div className="space-y-2">
                             {/* Main Generation Tokens */}
                             <div className="flex items-center gap-3 text-xs bg-[#F9F9F9] px-3 py-2 rounded-lg border border-[#E0DFDC]">
@@ -2637,10 +2681,14 @@ export default function GeneratePage() {
             )}
 
             <div ref={messagesEndRef} />
+            {/* Spacer to prevent content from being hidden behind fixed prompt area */}
+            <div style={{ height: `${Math.max(promptAreaHeight + 5, 120)}px`, minHeight: `${Math.max(promptAreaHeight + 5, 120)}px` }}></div>
+            </div>
           </div>
 
           {/* Input Area - Fixed at Bottom */}
-          <div className="flex-shrink-0 pt-4 sm:pt-6 pb-1 sm:pb-2 z-10 bg-[#F3F2F0] dark:bg-slate-900">
+          <div ref={promptAreaRef} className="fixed bottom-0 left-0 right-0 pt-0.5 pb-2 z-10 bg-[#F3F2F0] dark:bg-slate-900 lg:left-[280px]">
+            <div className="max-w-6xl mx-auto px-3 sm:px-4">
             {/* Image Preview Area */}
             {imagePreviews.length > 0 && (
               <div className="bg-white dark:bg-slate-800 rounded-t-xl sm:rounded-t-2xl border border-b-0 border-[#E0DFDC] dark:border-slate-700 p-3 sm:p-4">
@@ -2825,22 +2873,75 @@ export default function GeneratePage() {
                     </Button>
                   </div>
                 </div>
-                {/* Mobile: show post type indicator only */}
-                <div className="sm:hidden flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
-                    {(() => {
-                      const iconMap: Record<string, typeof FileText> = {
-                        auto: Zap,
-                        image: Image,
-                        text: FileText,
-                        carousel: Layers,
-                        video_script: Video,
-                      };
-                      const IconComponent = iconMap[postType] || FileText;
-                      return <IconComponent className="w-3.5 h-3.5 text-purple-500" />;
-                    })()}
-                    {postType === "auto" ? "Auto" : postType === "text" ? "Text" : postType === "carousel" ? "Carousel" : postType === "image" ? "Image" : "Video"}
-                  </span>
+                {/* Mobile: compact buttons */}
+                <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowContextModal(true)}
+                    className={`${hasContext ? 'bg-green-50 text-green-700' : 'text-[#666666]'} text-xs px-2 h-7 flex-shrink-0`}
+                    title="Context"
+                  >
+                    <CheckCircle2 className={`w-3 h-3 ${hasContext ? 'text-green-600' : 'text-gray-400'}`} />
+                  </Button>
+                  <div ref={postTypeButtonRef} className="inline-block flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPostTypeMenu(!showPostTypeMenu)}
+                      className="text-[#666666] text-xs px-2 h-7"
+                      title={postType === "auto" ? "Choose for me" : postType === "text" ? "Text Only" : postType === "carousel" ? "Carousel" : postType === "image" ? "Text + Image" : "Video script"}
+                    >
+                      {(() => {
+                        const iconMap: Record<string, typeof FileText> = {
+                          auto: Zap,
+                          image: Image,
+                          text: FileText,
+                          carousel: Layers,
+                          video_script: Video,
+                        };
+                        const IconComponent = iconMap[postType] || FileText;
+                        return <IconComponent className="w-3 h-3" />;
+                      })()}
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const newTrendingState = !useTrendingTopic;
+                      setUseTrendingTopic(newTrendingState);
+                      if (newTrendingState) {
+                        setInternetSearch(true);
+                      }
+                    }}
+                    className={`${useTrendingTopic ? "text-orange-600 bg-orange-50" : "text-[#666666]"} text-xs px-2 h-7 flex-shrink-0 flex items-center gap-1`}
+                    title="Trending"
+                  >
+                    <TrendingUp className="w-3 h-3" />
+                    <span>Trending</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setInternetSearch(!internetSearch)}
+                    className={`${internetSearch ? "text-green-600 bg-green-50" : "text-[#666666]"} text-xs px-2 h-7 flex-shrink-0 flex items-center gap-1`}
+                    title="Web Search"
+                  >
+                    <Globe className="w-3 h-3" />
+                    <span>Web</span>
+                  </Button>
+                  <div ref={optionsButtonRef} className="inline-block flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowOptions(!showOptions)}
+                      className={`${areOptionsChanged ? "text-purple-600 bg-purple-50" : "text-[#666666]"} text-xs px-2 h-7`}
+                      title="Options"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
                 <Button
                   onClick={handleSend}
@@ -2851,6 +2952,7 @@ export default function GeneratePage() {
                   Generate
                 </Button>
               </div>
+            </div>
             </div>
           </div>
 
@@ -2876,25 +2978,7 @@ export default function GeneratePage() {
             triggerRef={optionsButtonRef}
           />
 
-          {/* Mobile Action Menu FAB */}
-          <MobileActionMenu
-            hasContext={hasContext}
-            onContextClick={() => setShowContextModal(true)}
-            postType={postType}
-            onPostTypeClick={() => setShowPostTypeMenu(true)}
-            useTrendingTopic={useTrendingTopic}
-            onTrendingClick={() => {
-              const newTrendingState = !useTrendingTopic;
-              setUseTrendingTopic(newTrendingState);
-              if (newTrendingState) {
-                setInternetSearch(true);
-              }
-            }}
-            internetSearch={internetSearch}
-            onWebSearchClick={() => setInternetSearch(!internetSearch)}
-            areOptionsChanged={areOptionsChanged}
-            onOptionsClick={() => setShowOptions(true)}
-          />
+          {/* Mobile Action Menu FAB - Removed, options now shown inline */}
         </div>
 
         {/* Context Configuration Modal */}

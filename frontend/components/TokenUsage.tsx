@@ -27,6 +27,24 @@ export default function TokenUsage({ tokenUsage, className = "" }: TokenUsagePro
   const [expanded, setExpanded] = useState(false);
   const [visible, setVisible] = useState(true);
   const [hovered, setHovered] = useState(false);
+  const [devMode, setDevMode] = useState<boolean>(false);
+
+  // Check dev mode from public settings
+  useEffect(() => {
+    const checkDevMode = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/public/settings`);
+        const data = await response.json();
+        const isDevMode = data.dev_mode === 'true' || data.dev_mode === true;
+        setDevMode(isDevMode);
+      } catch (error) {
+        // Default to false if we can't fetch settings
+        setDevMode(false);
+      }
+    };
+    checkDevMode();
+  }, []);
 
   // Auto-hide after 30 seconds (increased from 10), but keep visible if hovered
   useEffect(() => {
@@ -47,7 +65,8 @@ export default function TokenUsage({ tokenUsage, className = "" }: TokenUsagePro
     }
   }, [tokenUsage]);
 
-  if (!tokenUsage) return null;
+  // Don't render if not in dev mode or no token usage
+  if (!devMode || !tokenUsage) return null;
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();

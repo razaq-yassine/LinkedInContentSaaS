@@ -460,7 +460,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Main Content */}
-        <main className="main-content flex-1 lg:ml-[280px] pt-4 lg:pt-0 dark:bg-slate-900">{children}</main>
+        <main className="main-content flex-1 lg:ml-[280px] pt-4 lg:pt-0 dark:bg-slate-900 h-screen">{children}</main>
 
         {/* Upgrade Modal for Free Users */}
         {subscription && (

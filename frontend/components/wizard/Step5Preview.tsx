@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, Briefcase, Users, Target, Lightbulb } from "lucide-react";
 import CollapsibleSection, { Field } from "@/components/onboarding/CollapsibleSection";
@@ -41,6 +41,24 @@ export default function Step5Preview({ profileData, tokenUsage, onComplete, onBa
       hashtag_count: 4,
     }
   );
+  const [devMode, setDevMode] = useState<boolean>(false);
+
+  // Check dev mode from public settings
+  useEffect(() => {
+    const checkDevMode = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/public/settings`);
+        const data = await response.json();
+        const isDevMode = data.dev_mode === 'true' || data.dev_mode === true;
+        setDevMode(isDevMode);
+      } catch (error) {
+        // Default to false if we can't fetch settings
+        setDevMode(false);
+      }
+    };
+    checkDevMode();
+  }, []);
 
   const aiGeneratedFields = context.ai_generated_fields || [];
 
@@ -411,8 +429,8 @@ export default function Step5Preview({ profileData, tokenUsage, onComplete, onBa
         </CollapsibleSection>
       </div>
 
-      {/* Token Usage Display - Only visible in development mode */}
-      {process.env.NODE_ENV === 'development' && tokenUsage && (
+      {/* Token Usage Display - Only visible in dev mode */}
+      {devMode && tokenUsage && (
         <div className="mb-6 flex items-center gap-3 text-xs bg-[#F9F9F9] px-4 py-3 rounded-lg border border-[#E0DFDC]">
           <div className="flex items-center gap-1">
             <span className="text-[#666666] font-medium">Tokens Used:</span>
