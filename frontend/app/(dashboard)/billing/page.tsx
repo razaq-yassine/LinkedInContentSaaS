@@ -152,8 +152,15 @@ export default function BillingPage() {
   };
 
   const handleSubscribe = async (planName: string) => {
-    // Check if this is an upgrade (user has paid plan)
     const currentPlan = currentSubscription?.plan;
+    
+    // If switching to free plan, use downgrade endpoint (no Stripe needed)
+    if (planName === 'free') {
+      handleDowngrade();
+      return;
+    }
+    
+    // Check if this is an upgrade (user has paid plan and selecting another paid plan)
     const isUpgrade = currentPlan && currentPlan !== 'free' && currentPlan !== planName;
 
     if (isUpgrade) {
@@ -161,7 +168,7 @@ export default function BillingPage() {
       setSelectedUpgradePlan(planName);
       setUpgradeModalOpen(true);
     } else {
-      // New subscription - proceed directly
+      // New subscription from free plan - proceed directly to checkout
       await proceedWithSubscription(planName);
     }
   };
@@ -228,8 +235,17 @@ export default function BillingPage() {
       console.error('Upgrade error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to upgrade subscription';
 
+      // Check if payment method is required (redirect to checkout)
+      if (typeof errorMessage === 'string' && errorMessage.startsWith('PAYMENT_METHOD_REQUIRED:')) {
+        const checkoutUrl = errorMessage.split('PAYMENT_METHOD_REQUIRED:')[1];
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
+          return;
+        }
+      }
+
       // Check if it's a yearly→monthly restriction error
-      if (errorMessage.includes('Yearly subscriptions cannot be switched')) {
+      if (typeof errorMessage === 'string' && errorMessage.includes('Yearly subscriptions cannot be switched')) {
         // Show credit purchase suggestion modal
         setCreditSuggestionError(errorMessage);
         setCreditSuggestionModalOpen(true);
@@ -991,6 +1007,27 @@ export default function BillingPage() {
                       {(() => {
                         const isScheduled = isPlanScheduled(plan.plan_name);
                         const isDisabled = isCurrent || isScheduled || processingPlan !== null;
+                        const currentPlan = currentSubscription?.plan;
+                        const isFreePlan = plan.plan_name === 'free';
+                        const isPaidToPaid = currentPlan && currentPlan !== 'free' && plan.plan_name !== 'free' && currentPlan !== plan.plan_name;
+                        const isFreeToPaid = currentPlan === 'free' && plan.plan_name !== 'free';
+
+                        // Determine button text
+                        let buttonText = 'Get Started';
+                        if (isCurrent) {
+                          buttonText = 'Current';
+                        } else if (isScheduled) {
+                          buttonText = 'Already Scheduled';
+                        } else if (isFreePlan) {
+                          // Switching to free plan (from any plan)
+                          buttonText = 'Switch to Free';
+                        } else if (isPaidToPaid) {
+                          // Switching between paid plans
+                          buttonText = 'Upgrade';
+                        } else if (isFreeToPaid) {
+                          // Switching from free to paid
+                          buttonText = 'Get Started';
+                        }
 
                         return (
                           <>
@@ -1022,17 +1059,17 @@ export default function BillingPage() {
                               ) : isCurrent ? (
                                 <span className="flex items-center gap-2">
                                   <Check className="w-4 h-4" />
-                                  Current Plan
+                                  {buttonText}
                                 </span>
                               ) : isScheduled ? (
                                 <span className="flex items-center gap-2">
                                   <Calendar className="w-4 h-4" />
-                                  Already Scheduled
+                                  {buttonText}
                                 </span>
                               ) : (
                                 <span className="flex items-center gap-2">
-                                  Get Started
-                                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                  {buttonText}
+                                  {!isFreePlan && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                                 </span>
                               )}
                             </Button>

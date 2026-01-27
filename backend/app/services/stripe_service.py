@@ -637,6 +637,19 @@ def handle_upgrade(
     
     old_plan = subscription.plan
     
+    # Retrieve old subscription's payment method before deleting (if exists)
+    old_payment_method = None
+    if subscription.stripe_subscription_id:
+        try:
+            old_stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+            # Get default payment method from the subscription
+            if old_stripe_subscription.default_payment_method:
+                old_payment_method = old_stripe_subscription.default_payment_method
+            elif old_stripe_subscription.default_source:
+                old_payment_method = old_stripe_subscription.default_source
+        except stripe.error.StripeError as e:
+            logger.warning(f"Could not retrieve old subscription to get payment method: {str(e)}")
+    
     # Cancel old Stripe subscription immediately
     if subscription.stripe_subscription_id:
         try:
@@ -644,11 +657,85 @@ def handle_upgrade(
         except stripe.error.StripeError as e:
             logger.error(f"Error canceling old subscription: {str(e)}")
     
-    # Create new Stripe subscription
-    customer_id = subscription.stripe_customer_id
-    if not customer_id:
-        customer_id = create_customer(user)
+    # Get or create Stripe customer, handling case where customer doesn't exist in Stripe
+    customer_id = None
+    customer_obj = None
+    if subscription.stripe_customer_id:
+        # Verify customer exists in Stripe
+        try:
+            customer_obj = stripe.Customer.retrieve(subscription.stripe_customer_id)
+            customer_id = subscription.stripe_customer_id
+        except stripe.error.InvalidRequestError:
+            # Customer doesn't exist in Stripe, create a new one
+            logger.warning(f"Customer {subscription.stripe_customer_id} not found in Stripe, creating new customer")
+            customer_obj = stripe.Customer.create(
+                email=user.email,
+                name=user.name,
+                metadata={"user_id": user.id}
+            )
+            customer_id = customer_obj.id
+            subscription.stripe_customer_id = customer_id
+            db.commit()
+    else:
+        # No customer ID stored, create one
+        customer_obj = stripe.Customer.create(
+            email=user.email,
+            name=user.name,
+            metadata={"user_id": user.id}
+        )
+        customer_id = customer_obj.id
         subscription.stripe_customer_id = customer_id
+        db.commit()
+    
+    # Check if customer has a default payment method
+    has_payment_method = False
+    if customer_obj:
+        # Refresh customer object to get latest payment methods
+        customer_obj = stripe.Customer.retrieve(customer_id, expand=['invoice_settings.default_payment_method'])
+        if customer_obj.invoice_settings.default_payment_method:
+            has_payment_method = True
+        elif customer_obj.default_source:
+            has_payment_method = True
+        else:
+            # Check if customer has any payment methods attached
+            payment_methods = stripe.PaymentMethod.list(customer=customer_id, type='card')
+            if payment_methods and len(payment_methods.data) > 0:
+                # Set the first payment method as default
+                default_pm = payment_methods.data[0]
+                stripe.Customer.modify(
+                    customer_id,
+                    invoice_settings={"default_payment_method": default_pm.id}
+                )
+                has_payment_method = True
+    
+    # If no payment method and we have one from old subscription, attach it
+    if not has_payment_method and old_payment_method:
+        try:
+            # Attach payment method to customer
+            if isinstance(old_payment_method, str):
+                # It's a payment method ID
+                stripe.PaymentMethod.attach(
+                    old_payment_method,
+                    customer=customer_id
+                )
+                # Set as default
+                stripe.Customer.modify(
+                    customer_id,
+                    invoice_settings={"default_payment_method": old_payment_method}
+                )
+                has_payment_method = True
+        except stripe.error.StripeError as e:
+            logger.warning(f"Could not attach old payment method: {str(e)}")
+    
+    # If still no payment method, we need to use checkout session instead
+    if not has_payment_method:
+        logger.warning(f"Customer {customer_id} has no payment method, redirecting to checkout")
+        # Create checkout session for upgrade
+        checkout_session = create_checkout_session(db, user, new_plan_name, billing_cycle)
+        raise HTTPException(
+            status_code=402,  # Payment Required
+            detail=f"PAYMENT_METHOD_REQUIRED:{checkout_session['checkout_url']}"
+        )
     
     # Get price ID for new plan
     if billing_cycle == "monthly":
@@ -659,16 +746,30 @@ def handle_upgrade(
     if not price_id:
         price_id = create_or_get_stripe_price(db, plan_config, billing_cycle)
     
-    # Create new subscription
-    new_stripe_subscription = stripe.Subscription.create(
-        customer=customer_id,
-        items=[{"price": price_id}],
-        metadata={
-            "user_id": user.id,
-            "plan_name": new_plan_name,
-            "billing_cycle": billing_cycle
-        }
-    )
+    # Create new subscription with proper error handling
+    try:
+        new_stripe_subscription = stripe.Subscription.create(
+            customer=customer_id,
+            items=[{"price": price_id}],
+            metadata={
+                "user_id": user.id,
+                "plan_name": new_plan_name,
+                "billing_cycle": billing_cycle
+            }
+        )
+    except stripe.error.StripeError as e:
+        logger.error(f"Error creating Stripe subscription: {str(e)}")
+        # If it's a payment method error, redirect to checkout
+        if "payment" in str(e).lower() or "payment_method" in str(e).lower():
+            checkout_session = create_checkout_session(db, user, new_plan_name, billing_cycle)
+            raise HTTPException(
+                status_code=402,  # Payment Required
+                detail=f"PAYMENT_METHOD_REQUIRED:{checkout_session['checkout_url']}"
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create subscription: {str(e)}"
+        )
     
     # Apply upgrade credit preservation logic using shared function
     upgrade_details = apply_plan_upgrade_credits(

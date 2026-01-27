@@ -135,9 +135,22 @@ def create_credit_purchase_checkout(
         pricing["bulk_discounts"]
     )
     
-    # Get or create Stripe customer
-    customer_id = subscription.stripe_customer_id
-    if not customer_id:
+    # Get or create Stripe customer, handling case where customer doesn't exist in Stripe
+    customer_id = None
+    if subscription.stripe_customer_id:
+        # Verify customer exists in Stripe
+        try:
+            stripe.Customer.retrieve(subscription.stripe_customer_id)
+            customer_id = subscription.stripe_customer_id
+        except stripe.error.InvalidRequestError:
+            # Customer doesn't exist in Stripe, create a new one
+            logger.warning(f"Customer {subscription.stripe_customer_id} not found in Stripe, creating new customer")
+            from ..services.stripe_service import create_customer
+            customer_id = create_customer(user)
+            subscription.stripe_customer_id = customer_id
+            db.commit()
+    else:
+        # No customer ID stored, create one
         from ..services.stripe_service import create_customer
         customer_id = create_customer(user)
         subscription.stripe_customer_id = customer_id

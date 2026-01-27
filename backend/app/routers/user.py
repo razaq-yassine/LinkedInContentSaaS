@@ -249,12 +249,8 @@ async def get_user_subscription(
     """
     Get user's current subscription details
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+    from ..services.credit_service import ensure_subscription_exists
+    subscription = ensure_subscription_exists(db, user_id)
     
     # Get credit breakdown
     from ..services import credit_service

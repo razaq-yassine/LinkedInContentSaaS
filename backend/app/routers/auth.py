@@ -585,7 +585,7 @@ async def set_password(
         raise HTTPException(status_code=404, detail="User not found")
     
     if user.password_hash:
-        raise HTTPException(
+        raise HTTPException(bui
             status_code=400,
             detail="Password already set. Use change-password endpoint to update it."
         )

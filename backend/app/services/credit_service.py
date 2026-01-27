@@ -8,12 +8,58 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
 
-from ..models import Subscription, CreditTransaction, User, PurchasedCreditsBalance, SubscriptionPlan, SubscriptionPlanConfig
+from ..models import Subscription, CreditTransaction, User, PurchasedCreditsBalance, SubscriptionPlan, SubscriptionPlanConfig, BillingCycle, SubscriptionStatus
 from fastapi import HTTPException
 from ..logging_config import get_logger, log_credit_transaction
 from ..services.notification_service import send_notification
 
 logger = get_logger(__name__)
+
+
+def ensure_subscription_exists(db: Session, user_id: str) -> Subscription:
+    """
+    Ensure user has a subscription, creating a free plan if missing.
+    This is a fallback for users who might not have a subscription assigned.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+    
+    Returns:
+        Subscription object (existing or newly created)
+    """
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user_id
+    ).first()
+    
+    if not subscription:
+        logger.warning(f"User {user_id} has no subscription, creating free plan fallback")
+        
+        # Get free plan config for credits limit
+        free_plan = db.query(SubscriptionPlanConfig).filter(
+            SubscriptionPlanConfig.plan_name == "free",
+            SubscriptionPlanConfig.is_active == True
+        ).first()
+        
+        credits_limit = 5.0  # Default free plan credits
+        if free_plan:
+            credits_limit = free_plan.credits_limit
+        
+        # Create free subscription
+        subscription = Subscription(
+            user_id=user_id,
+            plan=SubscriptionPlan.FREE,
+            subscription_credits_limit=credits_limit,
+            subscription_credits_used=0.0,
+            billing_cycle=BillingCycle.MONTHLY,
+            subscription_status=SubscriptionStatus.ACTIVE
+        )
+        db.add(subscription)
+        db.commit()
+        db.refresh(subscription)
+        logger.info(f"Created free plan subscription for user {user_id}")
+    
+    return subscription
 
 
 def get_purchased_credits_balance(db: Session, user_id: str) -> PurchasedCreditsBalance:
@@ -47,12 +93,7 @@ def get_total_credits(db: Session, user_id: str) -> float:
     Returns:
         Total credits available
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+    subscription = ensure_subscription_exists(db, user_id)
     
     # Unlimited credits
     if subscription.subscription_credits_limit == -1:
@@ -71,12 +112,7 @@ def get_credit_breakdown(db: Session, user_id: str) -> Dict:
     Returns:
         Dict with subscription and purchased credit details
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+    subscription = ensure_subscription_exists(db, user_id)
     
     purchased_balance = get_purchased_credits_balance(db, user_id)
     
@@ -131,12 +167,7 @@ def check_sufficient_credits(db: Session, user_id: str, required_credits: float)
     Returns:
         True if user has sufficient credits, False otherwise
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        return False
+    subscription = ensure_subscription_exists(db, user_id)
     
     # Unlimited credits
     if subscription.subscription_credits_limit == -1:
@@ -171,12 +202,7 @@ def deduct_credits_v2(
     Raises:
         HTTPException: If insufficient credits
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+    subscription = ensure_subscription_exists(db, user_id)
     
     # Unlimited credits - no deduction needed
     if subscription.subscription_credits_limit == -1:
@@ -345,12 +371,7 @@ def add_credits(
     Returns:
         Dict with transaction details
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+    subscription = ensure_subscription_exists(db, user_id)
     
     credits_before = subscription.subscription_credits_limit - subscription.subscription_credits_used
     
@@ -425,6 +446,11 @@ def admin_grant_credits(
 
 def reset_subscription_credits(db: Session, user_id: str) -> Dict:
     """
+    Reset subscription credits for a user (monthly reset)
+    Ensures subscription exists before resetting
+    """
+    subscription = ensure_subscription_exists(db, user_id)
+    """
     Reset subscription credits at period renewal (does not affect purchased credits)
     
     Args:
@@ -434,12 +460,7 @@ def reset_subscription_credits(db: Session, user_id: str) -> Dict:
     Returns:
         Dict with reset details
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == user_id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+    subscription = ensure_subscription_exists(db, user_id)
     
     old_used = subscription.subscription_credits_used
     subscription.subscription_credits_used = 0.0
