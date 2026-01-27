@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,8 +27,11 @@ export default function ForgotPasswordPage() {
     try {
       await api.auth.forgotPassword(email);
       setSubmitted(true);
-    } catch (error: any) {
-      setError(error.detail || "Failed to send reset email. Please try again.");
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' && 'detail' in error 
+        ? (error as { detail?: string }).detail 
+        : undefined;
+      setError(errorMessage || "Failed to send reset email. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -47,10 +51,10 @@ export default function ForgotPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
             <p className="text-slate-400 mb-6">
-              If an account exists with <strong className="text-white">{email}</strong>, we've sent a password reset link. Please check your inbox.
+              If an account exists with <strong className="text-white">{email}</strong>, we&apos;ve sent a password reset link. Please check your inbox.
             </p>
             <p className="text-sm text-slate-500 mb-6">
-              Didn't receive the email? Check your spam folder or{" "}
+              Didn&apos;t receive the email? Check your spam folder or{" "}
               <button
                 onClick={() => {
                   setSubmitted(false);
@@ -98,9 +102,11 @@ export default function ForgotPasswordPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <img 
+            <Image 
               src="/logo-dark-sm.png" 
               alt="PostInAi" 
+              width={40}
+              height={40}
               className="h-10 w-auto"
             />
           </Link>
@@ -110,7 +116,7 @@ export default function ForgotPasswordPage() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Reset your password</h1>
           <p className="text-slate-400">
-            Enter your email address and we'll send you a link to reset your password.
+            Enter your email address and we&apos;ll send you a link to reset your password.
           </p>
         </div>
 

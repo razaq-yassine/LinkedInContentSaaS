@@ -3,11 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
-import { ArrowLeft, Check, Wrench } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import axios from "axios";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
@@ -26,7 +27,6 @@ function LoginPageContent() {
   const [error, setError] = useState("");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [appName, setAppName] = useState("PostInAi");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -50,7 +50,6 @@ function LoginPageContent() {
         const isMaintenanceMode = data.maintenance_mode === 'true' || data.maintenance_mode === true;
         setMaintenanceMode(isMaintenanceMode);
         setMaintenanceMessage(data.maintenance_message || '');
-        setAppName(data.app_name || 'PostInAi');
       } catch (error) {
         console.error('Failed to fetch settings:', error);
       }
@@ -89,8 +88,11 @@ function LoginPageContent() {
       } else {
         router.push("/onboarding");
       }
-    } catch (error: any) {
-      setError(error.detail || "Login failed. Please check your credentials.");
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' && 'detail' in error 
+        ? (error as { detail?: string }).detail 
+        : undefined;
+      setError(errorMessage || "Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -102,8 +104,11 @@ function LoginPageContent() {
     try {
       const response = await api.auth.linkedInLogin();
       window.location.href = response.data.authorization_url;
-    } catch (error: any) {
-      setError("Failed to initiate LinkedIn login: " + (error.detail || error.message || "Unknown error"));
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' 
+        ? ('detail' in error ? (error as { detail?: string }).detail : 'message' in error ? (error as { message?: string }).message : undefined)
+        : undefined;
+      setError("Failed to initiate LinkedIn login: " + (errorMessage || "Unknown error"));
       setLinkedInLoading(false);
     }
   };
@@ -114,8 +119,11 @@ function LoginPageContent() {
     try {
       const response = await api.auth.googleLogin();
       window.location.href = response.data.authorization_url;
-    } catch (error: any) {
-      setError(error.detail || "Google login is not configured");
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' && 'detail' in error 
+        ? (error as { detail?: string }).detail 
+        : undefined;
+      setError(errorMessage || "Google login is not configured");
       setGoogleLoading(false);
     }
   };
@@ -144,9 +152,11 @@ function LoginPageContent() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img 
+            <Image 
               src="/logo-dark.png" 
               alt="PostInAi" 
+              width={120}
+              height={40}
               className="h-10 w-auto"
             />
           </Link>
@@ -211,9 +221,11 @@ function LoginPageContent() {
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8">
               <Link href="/" className="inline-flex items-center gap-2">
-                <img 
+                <Image 
                   src="/logo-dark-sm.png" 
                   alt="PostInAi" 
+                  width={40}
+                  height={40}
                   className="h-10 w-auto"
                 />
               </Link>

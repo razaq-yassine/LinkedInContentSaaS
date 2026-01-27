@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { LogOut, AlertCircle, FileX } from "lucide-react";
+import { LogOut, FileX } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,12 +26,22 @@ function OnboardingContent() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  const [accountType, setAccountType] = useState("");
   const [styleChoice, setStyleChoice] = useState("");
-  const [posts, setPosts] = useState<string[]>([]);
-  const [cvFile, setCvFile] = useState<File | null>(null);
-  const [profileData, setProfileData] = useState<any>(null);
-  const [tokenUsage, setTokenUsage] = useState<any>(null);
+  const [profileData, setProfileData] = useState<Record<string, unknown> | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<{
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    model?: string;
+    provider?: string;
+    details?: {
+      [key: string]: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+      };
+    };
+  } | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({ 
     open: false, 
     title: "", 
@@ -98,8 +108,8 @@ function OnboardingContent() {
     }
   }, [searchParams]);
 
-  const handleStep1 = (type: string) => {
-    setAccountType(type);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleStep1 = (_type: string) => {
     setStep(2);
   };
 
@@ -110,7 +120,6 @@ function OnboardingContent() {
   };
 
   const handleStep3 = async (file: File) => {
-    setCvFile(file);
     // Directly process CV and go to preview (no posts import step)
     await handleProcessing(file, []);
   };
@@ -151,22 +160,39 @@ function OnboardingContent() {
         // Save to localStorage for persistence
         localStorage.setItem("onboarding_profile_data", JSON.stringify(profileDataFromResponse));
         setStep(4);
-      } catch (processError: any) {
+      } catch (processError: unknown) {
         console.warn("Profile processing failed:", processError);
-        const errorDetail = processError?.response?.data?.detail || processError?.detail || processError?.message || "Unknown error";
-        alert(`Profile processing failed: ${errorDetail}\n\nPlease try again or contact support if the issue persists.`);
+        const errorDetail = processError && typeof processError === 'object'
+          ? ('response' in processError && processError.response && typeof processError.response === 'object' && 'data' in processError.response && processError.response.data && typeof processError.response.data === 'object' && 'detail' in processError.response.data
+              ? (processError.response.data as { detail?: string }).detail
+              : 'detail' in processError
+              ? (processError as { detail?: string }).detail
+              : 'message' in processError
+              ? (processError as { message?: string }).message
+              : undefined)
+          : undefined;
+        alert(`Profile processing failed: ${errorDetail || "Unknown error"}\n\nPlease try again or contact support if the issue persists.`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Processing error:", error);
       
       // Extract error message from various possible locations
-      const errorMessage = 
-        error?.detail || 
-        error?.message || 
-        error?.error || 
-        (typeof error === 'string' ? error : '') ||
-        JSON.stringify(error) || 
-        "";
+      let errorMessage = "";
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        if ('detail' in error) {
+          errorMessage = String((error as { detail?: unknown }).detail || "");
+        } else if ('message' in error) {
+          errorMessage = String((error as { message?: unknown }).message || "");
+        } else if ('error' in error) {
+          errorMessage = String((error as { error?: unknown }).error || "");
+        } else {
+          errorMessage = JSON.stringify(error) || "";
+        }
+      } else {
+        errorMessage = String(error) || "";
+      }
       
       console.log("Extracted error message:", errorMessage);
       
@@ -195,7 +221,18 @@ function OnboardingContent() {
     }
   };
 
-  const handleStep5 = async (preferences: any) => {
+  interface UserPreferences {
+    post_type_distribution?: {
+      text_only?: number;
+      text_with_image?: number;
+      carousel?: number;
+      video?: number;
+    };
+    hashtag_count?: number;
+    [key: string]: unknown;
+  }
+
+  const handleStep5 = async (preferences: UserPreferences) => {
     setLoading(true);
 
     try {
@@ -221,27 +258,25 @@ function OnboardingContent() {
 
       // Redirect to dashboard
       router.push("/generate");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Completion error:", error);
       console.error("Error type:", typeof error);
-      console.error("Error response:", error.response);
-      console.error("Error data:", error.response?.data);
-      console.error("Error message:", error.message);
       
       let errorMessage = "Unknown error";
       
       if (typeof error === 'string') {
         errorMessage = error;
-      } else if (error?.detail) {
-        errorMessage = error.detail;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else {
-        errorMessage = JSON.stringify(error) || "Unknown error occurred";
+      } else if (error && typeof error === 'object') {
+        if ('response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+          const responseData = error.response.data as Record<string, unknown>;
+          errorMessage = (responseData.detail as string) || (responseData.message as string) || "Unknown error occurred";
+        } else if ('detail' in error) {
+          errorMessage = (error as { detail?: string }).detail || "Unknown error occurred";
+        } else if ('message' in error) {
+          errorMessage = (error as { message?: string }).message || "Unknown error occurred";
+        } else {
+          errorMessage = JSON.stringify(error) || "Unknown error occurred";
+        }
       }
       
       alert("Completion failed: " + errorMessage);
@@ -249,8 +284,6 @@ function OnboardingContent() {
       setLoading(false);
     }
   };
-
-  const progress = (step / 4) * 100;
 
   if (initializing) {
     return (

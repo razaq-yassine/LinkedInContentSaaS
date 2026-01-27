@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
-import { ArrowLeft, Check, Zap, Sparkles, FileText, Mail, CreditCard } from "lucide-react";
+import { ArrowLeft, Zap, Sparkles, FileText, Mail, CreditCard } from "lucide-react";
 import axios from "axios";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
@@ -29,7 +30,6 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [appName, setAppName] = useState("PostInAi");
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const router = useRouter();
 
@@ -43,7 +43,6 @@ export default function RegisterPage() {
         const isMaintenanceMode = data.maintenance_mode === 'true' || data.maintenance_mode === true;
         setMaintenanceMode(isMaintenanceMode);
         setMaintenanceMessage(data.maintenance_message || '');
-        setAppName(data.app_name || 'PostInAi');
         setRegistrationEnabled(data.registration_enabled !== 'false' && data.registration_enabled !== false);
       } catch (error) {
         console.error('Failed to fetch settings:', error);
@@ -84,13 +83,16 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await api.auth.register(email, password, name || undefined);
-      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
-    } catch (error: any) {
-      if (error.detail) {
-        if (Array.isArray(error.detail)) {
-          setError(error.detail.map((e: any) => e.msg).join(", "));
+      setSuccess(true);
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'detail' in error) {
+        const detail = (error as { detail?: unknown }).detail;
+        if (Array.isArray(detail)) {
+          setError(detail.map((e: { msg?: string }) => e.msg || "").filter(Boolean).join(", "));
+        } else if (typeof detail === 'string') {
+          setError(detail);
         } else {
-          setError(error.detail);
+          setError("Registration failed. Please try again.");
         }
       } else {
         setError("Registration failed. Please try again.");
@@ -138,17 +140,20 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
             <p className="text-slate-400 mb-6">
-              We've sent a verification link to <strong className="text-white">{email}</strong>. Please check your inbox and click the link to activate your account.
+              We&apos;ve sent a verification link to <strong className="text-white">{email}</strong>. Please check your inbox and click the link to activate your account.
             </p>
             <p className="text-sm text-slate-500 mb-6">
-              Didn't receive the email? Check your spam folder or{" "}
+              Didn&apos;t receive the email? Check your spam folder or{" "}
               <button
                 onClick={async () => {
                   try {
                     await api.auth.resendVerification(email);
                     alert("Verification email sent!");
-                  } catch (e: any) {
-                    alert(e.detail || "Failed to resend email");
+                  } catch (e: unknown) {
+                    const errorMessage = e && typeof e === 'object' && 'detail' in e 
+                      ? (e as { detail?: string }).detail 
+                      : undefined;
+                    alert(errorMessage || "Failed to resend email");
                   }
                 }}
                 className="text-violet-400 hover:underline"
@@ -185,9 +190,11 @@ export default function RegisterPage() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img 
+            <Image 
               src="/logo-dark.png" 
               alt="PostInAi" 
+              width={120}
+              height={40}
               className="h-10 w-auto"
             />
           </Link>
@@ -257,9 +264,11 @@ export default function RegisterPage() {
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8">
               <Link href="/" className="inline-flex items-center gap-2">
-                <img 
+                <Image 
                   src="/logo-dark-sm.png" 
                   alt="PostInAi" 
+                  width={40}
+                  height={40}
                   className="h-10 w-auto"
                 />
               </Link>

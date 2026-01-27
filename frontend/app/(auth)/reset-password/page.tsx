@@ -56,8 +56,11 @@ function ResetPasswordForm() {
     try {
       await api.auth.resetPassword(token, password);
       setSuccess(true);
-    } catch (error: any) {
-      setError(error.detail || "Failed to reset password. The link may be expired.");
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' && 'detail' in error 
+        ? (error as { detail?: string }).detail 
+        : undefined;
+      setError(errorMessage || "Failed to reset password. The link may be expired.");
     } finally {
       setLoading(false);
     }
