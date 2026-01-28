@@ -256,14 +256,19 @@ async def get_user_subscription(
     from ..services import credit_service
     breakdown = credit_service.get_credit_breakdown(db, user_id)
     
+    # Return enum values directly (now uppercase, matching plan_name in SubscriptionPlanConfig)
+    plan_value = subscription.plan.value if hasattr(subscription.plan, 'value') else subscription.plan
+    billing_cycle_value = subscription.billing_cycle.value if subscription.billing_cycle and hasattr(subscription.billing_cycle, 'value') else (subscription.billing_cycle if subscription.billing_cycle else "MONTHLY")
+    status_value = subscription.subscription_status.value if subscription.subscription_status and hasattr(subscription.subscription_status, 'value') else (subscription.subscription_status if subscription.subscription_status else "ACTIVE")
+    
     return {
-        "plan": subscription.plan.value if hasattr(subscription.plan, 'value') else subscription.plan,
+        "plan": plan_value,
         "credits_used": subscription.subscription_credits_used,
         "credits_limit": subscription.subscription_credits_limit,
         "credits_remaining": breakdown["total_available"],
         "breakdown": breakdown,
-        "billing_cycle": subscription.billing_cycle.value if subscription.billing_cycle else "monthly",
-        "subscription_status": subscription.subscription_status.value if subscription.subscription_status else "active",
+        "billing_cycle": billing_cycle_value,
+        "subscription_status": status_value,
         "current_period_start": subscription.current_period_start.isoformat() if subscription.current_period_start else None,
         "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
         "scheduled_downgrade_plan": subscription.scheduled_downgrade_plan,

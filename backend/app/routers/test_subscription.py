@@ -68,7 +68,7 @@ async def simulate_subscription_completion(
     is_upgrade = (
         subscription.stripe_subscription_id and
         subscription.plan != SubscriptionPlan.FREE and
-        request.plan_name != "free"
+        request.plan_name != "FREE"
     )
     
     # Apply upgrade credit preservation logic using shared function
@@ -151,7 +151,7 @@ async def reset_to_free_plan(
     
     # Get free plan config
     free_plan = db.query(SubscriptionPlanConfig).filter(
-        SubscriptionPlanConfig.plan_name == "free"
+        SubscriptionPlanConfig.plan_name == "FREE"
     ).first()
     
     if not free_plan:

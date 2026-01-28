@@ -63,8 +63,11 @@ async def create_checkout_session(
     db: Session = Depends(get_db)
 ):
     """Create a checkout session for subscription upgrade"""
+    # Normalize plan name to uppercase to match enum values and SubscriptionPlanConfig.plan_name
+    plan_name_upper = request.plan.upper()
+    
     plan_config = db.query(SubscriptionPlanConfig).filter(
-        SubscriptionPlanConfig.plan_name == request.plan,
+        SubscriptionPlanConfig.plan_name == plan_name_upper,
         SubscriptionPlanConfig.is_active == True
     ).first()
     
@@ -78,7 +81,8 @@ async def create_checkout_session(
     if not subscription:
         raise HTTPException(status_code=404, detail="User subscription not found")
     
-    if subscription.plan == request.plan:
+    # Compare enum value (uppercase) with normalized plan name
+    if subscription.plan.value == plan_name_upper:
         raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
     
     # Check yearly → monthly restriction
@@ -98,14 +102,14 @@ async def create_checkout_session(
     checkout_session = stripe_service.create_checkout_session(
         db=db,
         user=current_user,
-        plan_name=request.plan,
+        plan_name=plan_name_upper,
         billing_cycle=request.billing_cycle
     )
     
     return {
         "checkout_url": checkout_session["checkout_url"],
         "session_id": checkout_session.get("session_id"),
-        "plan": request.plan,
+        "plan": plan_name_upper,
         "billing_cycle": request.billing_cycle
     }
 
@@ -117,41 +121,70 @@ async def upgrade_subscription(
     db: Session = Depends(get_db)
 ):
     """Explicit upgrade endpoint - cancels old subscription and creates new one immediately"""
-    subscription = db.query(Subscription).filter(
-        Subscription.user_id == current_user.id
-    ).first()
-    
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
-    
-    if subscription.plan == SubscriptionPlan.FREE:
-        raise HTTPException(status_code=400, detail="Cannot upgrade from free plan. Use /checkout instead.")
-    
-    if subscription.plan.value == request.plan:
-        raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
-    
-    # Check yearly → monthly restriction
-    can_switch, error_message, days_remaining = stripe_service.can_switch_yearly_to_monthly(
-        subscription=subscription,
-        new_billing_cycle=request.billing_cycle
-    )
-    
-    if not can_switch:
-        # Return structured error response
-        raise HTTPException(
-            status_code=400,
-            detail=error_message
+    try:
+        # Normalize plan name to uppercase to match enum values and SubscriptionPlanConfig.plan_name
+        plan_name_upper = request.plan.upper()
+        
+        subscription = db.query(Subscription).filter(
+            Subscription.user_id == current_user.id
+        ).first()
+        
+        if not subscription:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+        
+        if subscription.plan == SubscriptionPlan.FREE:
+            raise HTTPException(status_code=400, detail="Cannot upgrade from free plan. Use /checkout instead.")
+        
+        # Compare enum value (uppercase) with normalized plan name
+        if subscription.plan.value == plan_name_upper:
+            raise HTTPException(status_code=400, detail="You are already subscribed to this plan")
+        
+        # Verify plan exists before proceeding
+        plan_config = db.query(SubscriptionPlanConfig).filter(
+            SubscriptionPlanConfig.plan_name == plan_name_upper,
+            SubscriptionPlanConfig.is_active == True
+        ).first()
+        
+        if not plan_config:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Plan '{plan_name_upper}' not found or is not active. Available plans: {', '.join([p.plan_name for p in db.query(SubscriptionPlanConfig).filter(SubscriptionPlanConfig.is_active == True).all()])}"
+            )
+        
+        # Check yearly → monthly restriction
+        can_switch, error_message, days_remaining = stripe_service.can_switch_yearly_to_monthly(
+            subscription=subscription,
+            new_billing_cycle=request.billing_cycle
         )
-    
-    # Use upgrade handler
-    result = stripe_service.handle_upgrade(
-        db=db,
-        user=current_user,
-        new_plan_name=request.plan,
-        billing_cycle=request.billing_cycle
-    )
-    
-    return result
+        
+        if not can_switch:
+            # Return structured error response
+            raise HTTPException(
+                status_code=400,
+                detail=error_message
+            )
+        
+        # Use upgrade handler
+        result = stripe_service.handle_upgrade(
+            db=db,
+            user=current_user,
+            new_plan_name=plan_name_upper,
+            billing_cycle=request.billing_cycle
+        )
+        
+        return result
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Log unexpected errors and return a proper error message
+        import traceback
+        print(f"Unexpected error in upgrade_subscription: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 
 @router.post("/downgrade")

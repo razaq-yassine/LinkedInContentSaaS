@@ -148,7 +148,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       setSubscription(response.data);
 
       // Show upgrade modal for free users on login
-      if (response.data.plan === 'free') {
+      if (response.data.plan === 'FREE') {
         setShowUpgradeModal(true);
       }
     } catch (error: any) {
@@ -345,7 +345,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   )}
 
                   {/* Upgrade Button for Free Users or Low Credits */}
-                  {subscription.credits_limit !== -1 && (subscription.plan === 'free' || subscription.credits_remaining <= 2) && (
+                  {subscription.credits_limit !== -1 && (subscription.plan === 'FREE' || subscription.credits_remaining <= 2) && (
                     <button
                       onClick={() => router.push('/billing?tab=plans')}
                       className="w-full mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1 shadow-sm hover:shadow-md hover:scale-105 animate-pulse hover:animate-none"

@@ -371,7 +371,7 @@ def sync_subscription_from_stripe(
         raise HTTPException(status_code=404, detail="Subscription not found")
     
     # Get plan name from metadata
-    plan_name = stripe_subscription.metadata.get("plan_name", "pro")
+    plan_name = stripe_subscription.metadata.get("plan_name", "PRO")
     
     # Update subscription
     subscription.stripe_subscription_id = stripe_subscription.id
@@ -837,7 +837,7 @@ def handle_downgrade_to_free(db: Session, user: User) -> Dict:
     
     # Get free plan config
     free_plan = db.query(SubscriptionPlanConfig).filter(
-        SubscriptionPlanConfig.plan_name == "free",
+        SubscriptionPlanConfig.plan_name == "FREE",
         SubscriptionPlanConfig.is_active == True
     ).first()
     
@@ -845,7 +845,7 @@ def handle_downgrade_to_free(db: Session, user: User) -> Dict:
         raise HTTPException(status_code=404, detail="Free plan not found")
     
     # Schedule downgrade at period end
-    subscription.scheduled_downgrade_plan = "free"
+    subscription.scheduled_downgrade_plan = "FREE"
     subscription.scheduled_downgrade_date = subscription.current_period_end
     
     # Cancel Stripe subscription at period end (keeps access until then)

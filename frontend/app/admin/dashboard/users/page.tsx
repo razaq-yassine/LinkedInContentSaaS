@@ -279,13 +279,13 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.subscription?.plan === 'agency'
+                      user.subscription?.plan === 'AGENCY'
                         ? 'bg-purple-100 text-purple-800'
-                        : user.subscription?.plan === 'pro'
+                        : user.subscription?.plan === 'PRO'
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {user.subscription?.plan || 'free'}
+                      {user.subscription?.plan || 'FREE'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -381,7 +381,7 @@ export default function UsersPage() {
                     <div>
                       <p className="text-sm text-gray-500">Current Plan</p>
                       <p className="text-lg font-bold text-gray-900 capitalize">
-                        {selectedUser.subscription?.plan || 'free'}
+                        {selectedUser.subscription?.plan || 'FREE'}
                       </p>
                     </div>
                     <div>
@@ -393,19 +393,19 @@ export default function UsersPage() {
                   </div>
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleUpdateSubscription(selectedUser.id, 'free')}
+                      onClick={() => handleUpdateSubscription(selectedUser.id, 'FREE')}
                       className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                     >
                       Set Free
                     </button>
                     <button
-                      onClick={() => handleUpdateSubscription(selectedUser.id, 'pro')}
+                      onClick={() => handleUpdateSubscription(selectedUser.id, 'PRO')}
                       className="px-3 py-1 text-sm bg-blue-200 text-blue-700 rounded hover:bg-blue-300"
                     >
                       Set Pro
                     </button>
                     <button
-                      onClick={() => handleUpdateSubscription(selectedUser.id, 'agency')}
+                      onClick={() => handleUpdateSubscription(selectedUser.id, 'AGENCY')}
                       className="px-3 py-1 text-sm bg-purple-200 text-purple-700 rounded hover:bg-purple-300"
                     >
                       Set Agency

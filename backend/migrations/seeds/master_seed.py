@@ -162,7 +162,7 @@ def seed_subscription_plans(db):
     
     plans_data = [
         {
-            "plan_name": "free",
+            "plan_name": "FREE",
             "display_name": "Free Plan",
             "description": "Perfect for getting started with LinkedIn content generation",
             "price_monthly": 0,
@@ -176,7 +176,7 @@ def seed_subscription_plans(db):
             "sort_order": 1
         },
         {
-            "plan_name": "starter",
+            "plan_name": "STARTER",
             "display_name": "Starter Plan",
             "description": "Perfect for professionals getting started",
             "price_monthly": 1200,
@@ -190,7 +190,7 @@ def seed_subscription_plans(db):
             "sort_order": 2
         },
         {
-            "plan_name": "pro",
+            "plan_name": "PRO",
             "display_name": "Pro Plan",
             "description": "For creators who post frequently",
             "price_monthly": 2500,

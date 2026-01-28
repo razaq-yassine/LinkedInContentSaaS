@@ -37,7 +37,7 @@ def ensure_subscription_exists(db: Session, user_id: str) -> Subscription:
         
         # Get free plan config for credits limit
         free_plan = db.query(SubscriptionPlanConfig).filter(
-            SubscriptionPlanConfig.plan_name == "free",
+            SubscriptionPlanConfig.plan_name == "FREE",
             SubscriptionPlanConfig.is_active == True
         ).first()
         
@@ -518,9 +518,8 @@ def apply_plan_upgrade_credits(
     old_available = old_limit - old_used if old_limit != -1 else 0
     
     # Update plan and limit
-    # Convert plan_name to uppercase to match enum values (e.g., "starter" -> "STARTER")
-    plan_name_upper = new_plan_config.plan_name.upper()
-    subscription.plan = SubscriptionPlan(plan_name_upper)
+    # plan_name is now uppercase in SubscriptionPlanConfig, matching enum values
+    subscription.plan = SubscriptionPlan(new_plan_config.plan_name)
     subscription.subscription_credits_limit = new_plan_config.credits_limit
     
     if is_upgrade:

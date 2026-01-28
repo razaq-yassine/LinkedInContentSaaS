@@ -22,7 +22,7 @@ try:
     plans = [
         {
             "id": str(uuid.uuid4()),
-            "plan_name": "free",
+            "plan_name": "FREE",
             "display_name": "Free Plan",
             "description": "Perfect for getting started with LinkedIn content generation",
             "price_monthly": 0,
@@ -39,7 +39,7 @@ try:
         },
         {
             "id": str(uuid.uuid4()),
-            "plan_name": "pro",
+            "plan_name": "PRO",
             "display_name": "Pro Plan",
             "description": "For professionals who want to scale their LinkedIn presence",
             "price_monthly": 2900,  # $29.00
@@ -58,7 +58,7 @@ try:
         },
         {
             "id": str(uuid.uuid4()),
-            "plan_name": "agency",
+            "plan_name": "AGENCY",
             "display_name": "Agency Plan",
             "description": "For agencies managing multiple clients",
             "price_monthly": 9900,  # $99.00

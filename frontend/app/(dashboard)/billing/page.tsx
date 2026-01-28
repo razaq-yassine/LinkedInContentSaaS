@@ -155,13 +155,13 @@ export default function BillingPage() {
     const currentPlan = currentSubscription?.plan;
     
     // If switching to free plan, use downgrade endpoint (no Stripe needed)
-    if (planName === 'free') {
+    if (planName === 'FREE') {
       handleDowngrade();
       return;
     }
     
     // Check if this is an upgrade (user has paid plan and selecting another paid plan)
-    const isUpgrade = currentPlan && currentPlan !== 'free' && currentPlan !== planName;
+    const isUpgrade = currentPlan && currentPlan !== 'FREE' && currentPlan !== planName;
 
     if (isUpgrade) {
       // Show upgrade consent modal
@@ -174,13 +174,15 @@ export default function BillingPage() {
   };
 
   const proceedWithSubscription = async (planName: string) => {
-    setProcessingPlan(planName);
+    // Normalize plan name to uppercase (backend expects uppercase)
+    const normalizedPlan = planName.toUpperCase();
+    setProcessingPlan(normalizedPlan);
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/subscription/checkout`,
         {
-          plan: planName,
+          plan: normalizedPlan,
           billing_cycle: billingCycle,
         },
         {
@@ -213,10 +215,13 @@ export default function BillingPage() {
     setUpgradeModalOpen(false);
     setProcessingPlan(selectedUpgradePlan);
 
+    // Normalize plan name to uppercase (backend expects uppercase)
+    const normalizedPlan = selectedUpgradePlan.toUpperCase();
+
     // Check if user is on free plan - if so, use checkout flow instead
-    if (currentSubscription?.plan === 'free') {
+    if (currentSubscription?.plan === 'FREE') {
       console.log('User is on free plan, redirecting to checkout flow');
-      await proceedWithSubscription(selectedUpgradePlan);
+      await proceedWithSubscription(normalizedPlan);
       setSelectedUpgradePlan(null);
       return;
     }
@@ -227,14 +232,15 @@ export default function BillingPage() {
       
       console.log('Attempting upgrade with:', {
         currentPlan: currentSubscription?.plan,
-        newPlan: selectedUpgradePlan,
+        newPlan: normalizedPlan,
+        originalPlan: selectedUpgradePlan,
         billingCycle: billingCycle,
       });
       
       await axios.post(
         `${apiUrl}/api/subscription/upgrade`,
         {
-          plan: selectedUpgradePlan,
+          plan: normalizedPlan,
           billing_cycle: billingCycle,
         },
         {
@@ -249,12 +255,14 @@ export default function BillingPage() {
     } catch (error: any) {
       console.error('Upgrade error:', error);
       console.error('Error response:', error.response?.data);
-      const errorMessage = error.response?.data?.detail || 'Failed to upgrade subscription';
+      console.error('Error status:', error.response?.status);
+      console.error('Full error:', JSON.stringify(error.response?.data, null, 2));
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to upgrade subscription';
 
       // Check if it's the "free plan" error - redirect to checkout
       if (typeof errorMessage === 'string' && errorMessage.includes('Cannot upgrade from free plan')) {
         console.log('Backend rejected upgrade from free plan, using checkout flow');
-        await proceedWithSubscription(selectedUpgradePlan);
+        await proceedWithSubscription(selectedUpgradePlan.toUpperCase());
         return;
       }
 
@@ -274,7 +282,7 @@ export default function BillingPage() {
         setCreditSuggestionModalOpen(true);
       } else {
         // Show the actual error message for debugging
-        alert(`Upgrade failed: ${errorMessage}\n\nCurrent plan: ${currentSubscription?.plan}\nNew plan: ${selectedUpgradePlan}`);
+        alert(`Upgrade failed: ${errorMessage}\n\nCurrent plan: ${currentSubscription?.plan}\nNew plan: ${selectedUpgradePlan.toUpperCase()}`);
       }
     } finally {
       setProcessingPlan(null);
@@ -396,6 +404,7 @@ export default function BillingPage() {
 
   const getCurrentPlan = () => {
     if (!currentSubscription) return null;
+    // plan_name and subscription.plan are now both uppercase
     return plans.find(p => p.plan_name === currentSubscription.plan);
   };
 
@@ -619,7 +628,7 @@ export default function BillingPage() {
                 </Card>
 
                 {/* Purchase Credits */}
-                {currentSubscription.plan !== 'free' && (
+                {currentSubscription.plan !== 'FREE' && (
                   <Card className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 border-0 shadow-xl shadow-slate-900/30 overflow-hidden relative">
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-cyan-600/10" />
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full -mr-16 -mt-16 blur-2xl" />
@@ -1032,9 +1041,9 @@ export default function BillingPage() {
                         const isScheduled = isPlanScheduled(plan.plan_name);
                         const isDisabled = isCurrent || isScheduled || processingPlan !== null;
                         const currentPlan = currentSubscription?.plan;
-                        const isFreePlan = plan.plan_name === 'free';
-                        const isPaidToPaid = currentPlan && currentPlan !== 'free' && plan.plan_name !== 'free' && currentPlan !== plan.plan_name;
-                        const isFreeToPaid = currentPlan === 'free' && plan.plan_name !== 'free';
+                        const isFreePlan = plan.plan_name === 'FREE';
+                        const isPaidToPaid = currentPlan && currentPlan !== 'FREE' && plan.plan_name !== 'FREE' && currentPlan !== plan.plan_name;
+                        const isFreeToPaid = currentPlan === 'FREE' && plan.plan_name !== 'FREE';
 
                         // Determine button text
                         let buttonText = 'Get Started';
@@ -1102,7 +1111,7 @@ export default function BillingPage() {
                       })()}
 
                       {/* Test Mode Button - hide if plan is scheduled */}
-                      {testMode && !isCurrent && !isPlanScheduled(plan.plan_name) && plan.plan_name !== 'free' && (
+                      {testMode && !isCurrent && !isPlanScheduled(plan.plan_name) && plan.plan_name !== 'FREE' && (
                         <Button
                           onClick={() => handleTestSubscribe(plan.plan_name)}
                           disabled={processingPlan !== null}
@@ -1119,7 +1128,7 @@ export default function BillingPage() {
                       )}
 
                       {/* Downgrade button - only show if not already scheduled */}
-                      {isCurrent && currentSubscription && currentSubscription.plan !== 'free' && !isPlanScheduled('free') && (
+                      {isCurrent && currentSubscription && currentSubscription.plan !== 'FREE' && !isPlanScheduled('FREE') && (
                         <Button
                           onClick={handleDowngrade}
                           variant="ghost"
@@ -1131,7 +1140,7 @@ export default function BillingPage() {
                       )}
 
                       {/* Show scheduled message if downgrade is already scheduled */}
-                      {isCurrent && currentSubscription && isPlanScheduled('free') && (
+                      {isCurrent && currentSubscription && isPlanScheduled('FREE') && (
                         <div className="w-full text-center py-2 px-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                           <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5">
                             <Calendar className="w-3 h-3" />
@@ -1181,7 +1190,7 @@ export default function BillingPage() {
               setSelectedUpgradePlan(null);
             }}
             onConfirm={handleUpgradeConfirm}
-            currentPlan={currentSubscription?.plan || 'free'}
+            currentPlan={currentSubscription?.plan || 'FREE'}
             newPlan={selectedUpgradePlan}
             currentPrice={getCurrentPlanPrice()}
             newPrice={
@@ -1199,7 +1208,7 @@ export default function BillingPage() {
           open={downgradeModalOpen}
           onClose={() => setDowngradeModalOpen(false)}
           onConfirm={handleDowngradeConfirm}
-          currentPlan={currentSubscription?.plan || 'free'}
+          currentPlan={currentSubscription?.plan || 'FREE'}
           periodEndDate={currentSubscription?.current_period_end || null}
         />
 

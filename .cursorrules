@@ -45,6 +45,41 @@
 - Implement fully before showing results
 - Clean up temporary files when done
 
+## Plan Values and Enum Consistency
+
+### Subscription Plan Values
+**ALWAYS use UPPERCASE** for subscription plan values throughout the codebase:
+- ✅ Correct: `'FREE'`, `'PRO'`, `'STARTER'`, `'UNLIMITED'`, `'AGENCY'`
+- ❌ Wrong: `'free'`, `'pro'`, `'starter'`, `'unlimited'`, `'agency'`
+
+### Rules:
+1. **Database**: `SubscriptionPlanConfig.plan_name` stores uppercase values (e.g., `'FREE'`, `'PRO'`)
+2. **Enums**: `SubscriptionPlan` enum values are uppercase (e.g., `SubscriptionPlan.FREE`)
+3. **API Requests**: Normalize incoming plan values to uppercase in backend endpoints
+4. **Frontend Comparisons**: Always compare against uppercase values (e.g., `plan === 'FREE'`)
+5. **Default Values**: Use uppercase for defaults (e.g., `plan || 'FREE'`)
+
+### Backend Pattern:
+```python
+# Normalize incoming plan values to uppercase
+plan_name_upper = request.plan.upper()
+plan_config = db.query(SubscriptionPlanConfig).filter(
+    SubscriptionPlanConfig.plan_name == plan_name_upper
+).first()
+```
+
+### Frontend Pattern:
+```typescript
+// Always compare with uppercase
+if (currentPlan === 'FREE') { ... }
+const isFreePlan = plan.plan_name === 'FREE';
+```
+
+### Why:
+- MySQL enum columns store values as uppercase
+- Ensures consistency between `SubscriptionPlan` enum and `SubscriptionPlanConfig.plan_name`
+- Prevents case-sensitivity bugs after SQLite → MySQL migration
+
 
 
 

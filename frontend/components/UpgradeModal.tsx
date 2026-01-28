@@ -25,7 +25,7 @@ export function UpgradeModal({ isOpen, onClose, userPlan, creditsRemaining = 0 }
 
   useEffect(() => {
     // Only show for free users on login
-    if (isOpen && userPlan === 'free') {
+    if (isOpen && userPlan === 'FREE') {
       // Check if user has seen modal today
       const lastShown = localStorage.getItem('upgradeModalLastShown');
       const today = new Date().toDateString();
@@ -48,7 +48,7 @@ export function UpgradeModal({ isOpen, onClose, userPlan, creditsRemaining = 0 }
     onClose();
   };
 
-  if (!showModal || userPlan !== 'free') return null;
+  if (!showModal || userPlan !== 'FREE') return null;
 
   return (
     <Dialog open={showModal} onOpenChange={handleClose}>
