@@ -220,6 +220,9 @@ async def get_credit_breakdown(
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhook events"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     
@@ -234,15 +237,25 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 payload, sig_header, settings.stripe_webhook_secret
             )
         except ValueError as e:
+            logger.error(f"Invalid webhook payload: {e}")
             raise HTTPException(status_code=400, detail="Invalid payload")
         except stripe.error.SignatureVerificationError as e:
+            logger.error(f"Invalid webhook signature: {e}")
             raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    logger.info(f"Received Stripe webhook: {event.type}, ID: {event.id}")
     
     # Handle different event types
     if event.type == "checkout.session.completed":
         session = event.data.object
-        result = stripe_service.handle_checkout_completed(db, session)
-        return {"status": "success", "event": "checkout.session.completed", "result": result}
+        logger.info(f"Processing checkout session: {session.id}, subscription: {session.get('subscription', 'N/A')}")
+        try:
+            result = stripe_service.handle_checkout_completed(db, session)
+            logger.info(f"Checkout completed successfully: {result}")
+            return {"status": "success", "event": "checkout.session.completed", "result": result}
+        except Exception as e:
+            logger.error(f"Error handling checkout completed: {str(e)}", exc_info=True)
+            raise
     
     elif event.type == "invoice.payment_succeeded":
         invoice = event.data.object

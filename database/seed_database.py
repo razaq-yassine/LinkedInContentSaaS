@@ -55,27 +55,6 @@ try:
             ],
             "is_active": True,
             "sort_order": 2
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "plan_name": "AGENCY",
-            "display_name": "Agency Plan",
-            "description": "For agencies managing multiple clients",
-            "price_monthly": 9900,  # $99.00
-            "price_yearly": 99000,  # $990.00 (save $198)
-            "credits_limit": 500.0,
-            "features": [
-                "500 credits per month",
-                "Premium AI generation",
-                "All post formats",
-                "Dedicated support",
-                "Multi-user access",
-                "White-label options",
-                "API access",
-                "Custom integrations"
-            ],
-            "is_active": True,
-            "sort_order": 3
         }
     ]
     

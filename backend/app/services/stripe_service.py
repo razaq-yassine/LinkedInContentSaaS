@@ -428,8 +428,22 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
         raise HTTPException(status_code=404, detail="Plan config not found")
     
     # Retrieve Stripe subscription
-    stripe_subscription_id = session.subscription
-    stripe_subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+    stripe_subscription_id = session.subscription if hasattr(session, 'subscription') else None
+    if not stripe_subscription_id:
+        logger.error(f"No subscription ID in checkout session {session.id}")
+        logger.error(f"Session data: {session}")
+        raise HTTPException(status_code=400, detail="No subscription ID in session")
+    
+    # Retrieve subscription with expansion to get all fields
+    try:
+        stripe_subscription = stripe.Subscription.retrieve(
+            stripe_subscription_id,
+            expand=['latest_invoice', 'customer']
+        )
+        logger.info(f"Retrieved subscription {stripe_subscription_id}, status: {stripe_subscription.status}")
+    except Exception as e:
+        logger.error(f"Error retrieving subscription {stripe_subscription_id}: {str(e)}")
+        raise
     
     # Check if this is an upgrade (user has existing paid subscription)
     is_upgrade = (
@@ -450,8 +464,21 @@ def handle_checkout_completed(db: Session, session: stripe.checkout.Session) -> 
     subscription.billing_cycle = BillingCycle(billing_cycle_upper)
     subscription.subscription_status = SubscriptionStatus.ACTIVE
     subscription.stripe_subscription_id = stripe_subscription_id
-    subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
-    subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+    
+    # Set period dates with fallback to current time
+    if hasattr(stripe_subscription, 'current_period_start') and stripe_subscription.current_period_start:
+        subscription.current_period_start = datetime.fromtimestamp(stripe_subscription.current_period_start)
+    else:
+        subscription.current_period_start = datetime.utcnow()
+        logger.warning(f"Subscription {stripe_subscription_id} missing current_period_start, using current time")
+    
+    if hasattr(stripe_subscription, 'current_period_end') and stripe_subscription.current_period_end:
+        subscription.current_period_end = datetime.fromtimestamp(stripe_subscription.current_period_end)
+    else:
+        # Default to 30 days from now if missing
+        from datetime import timedelta
+        subscription.current_period_end = datetime.utcnow() + timedelta(days=30)
+        logger.warning(f"Subscription {stripe_subscription_id} missing current_period_end, using 30 days from now")
     
     db.commit()
     db.refresh(subscription)
@@ -502,9 +529,15 @@ def handle_invoice_paid(db: Session, invoice: stripe.Invoice) -> Dict:
     Returns:
         Dict with renewal details
     """
-    subscription_id = invoice.subscription
+    # Get subscription ID from invoice (handle both attribute and dict access)
+    subscription_id = None
+    if hasattr(invoice, 'subscription'):
+        subscription_id = invoice.subscription
+    elif isinstance(invoice, dict) and 'subscription' in invoice:
+        subscription_id = invoice['subscription']
     
     if not subscription_id:
+        logger.warning(f"Invoice {invoice.id if hasattr(invoice, 'id') else 'unknown'} has no subscription ID, skipping")
         return {"status": "skipped", "reason": "No subscription ID"}
     
     # Find subscription by Stripe ID

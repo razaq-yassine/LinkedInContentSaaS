@@ -24,7 +24,6 @@ class SubscriptionPlan(str, enum.Enum):
     STARTER = "STARTER"
     PRO = "PRO"
     UNLIMITED = "UNLIMITED"
-    AGENCY = "AGENCY"  # Legacy, keeping for backwards compatibility
 
 class MessageRole(str, enum.Enum):
     USER = "USER"

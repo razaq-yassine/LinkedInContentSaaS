@@ -431,8 +431,13 @@ export default function BillingPage() {
 
   const getCurrentPlanPrice = () => {
     const currentPlan = plans.find(p => p.plan_name === currentSubscription?.plan);
-    if (!currentPlan) return 0;
-    return billingCycle === 'monthly' ? currentPlan.price_monthly / 100 : currentPlan.price_yearly / 100;
+    if (!currentPlan || !currentSubscription) return 0;
+    // Use the user's actual billing cycle, not the selector
+    const actualBillingCycle = currentSubscription.billing_cycle?.toLowerCase();
+    if (actualBillingCycle === 'yearly') {
+      return currentPlan.price_yearly / 100;
+    }
+    return currentPlan.price_monthly / 100;
   };
 
   const getSpendingData = () => {
@@ -532,7 +537,7 @@ export default function BillingPage() {
                         ${getCurrentPlanPrice().toFixed(0)}
                       </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        per month
+                        per {currentSubscription?.billing_cycle?.toLowerCase() === 'yearly' ? 'year' : 'month'}
                       </p>
                     </CardContent>
                   </Card>
@@ -703,7 +708,7 @@ export default function BillingPage() {
               };
 
               return (
-                <div className="space-y-6">
+                <div className="space-y-6 max-w-5xl mx-auto">
                   <div className="text-center">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
                       Your Plan
@@ -713,7 +718,7 @@ export default function BillingPage() {
                     </p>
                   </div>
 
-                  <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
                     {/* Current Plan Card */}
                     <Card className="flex-1 w-full md:max-w-sm bg-white dark:bg-slate-800 border-2 border-emerald-500 dark:border-emerald-400 shadow-lg hover:shadow-xl transition-all duration-300">
                       <CardHeader className="pb-3">
@@ -740,12 +745,16 @@ export default function BillingPage() {
                       <CardContent className="space-y-3">
                         <div className="flex items-baseline gap-1">
                           <span className="text-3xl font-bold text-slate-900 dark:text-white">
-                            ${billingCycle === 'monthly'
+                            ${currentSubscription.billing_cycle?.toLowerCase() === 'monthly'
                               ? (currentPlan.price_monthly / 100).toFixed(0)
-                              : (currentPlan.price_yearly / 100 / 12).toFixed(0)
+                              : currentSubscription.billing_cycle?.toLowerCase() === 'yearly'
+                                ? (currentPlan.price_yearly / 100).toFixed(0)
+                                : (currentPlan.price_monthly / 100).toFixed(0)
                             }
                           </span>
-                          <span className="text-slate-500 dark:text-slate-400">/mo</span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {currentSubscription.billing_cycle?.toLowerCase() === 'yearly' ? '/year' : '/mo'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <Zap className="w-4 h-4 text-amber-500" />
@@ -849,12 +858,16 @@ export default function BillingPage() {
                               ? "bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400"
                               : "bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400"
                           )}>
-                            ${billingCycle === 'monthly'
+                            ${currentSubscription.billing_cycle?.toLowerCase() === 'monthly'
                               ? (nextPlan.price_monthly / 100).toFixed(0)
-                              : (nextPlan.price_yearly / 100 / 12).toFixed(0)
+                              : currentSubscription.billing_cycle?.toLowerCase() === 'yearly'
+                                ? (nextPlan.price_yearly / 100).toFixed(0)
+                                : (nextPlan.price_monthly / 100).toFixed(0)
                             }
                           </span>
-                          <span className="text-slate-500 dark:text-slate-400">/mo</span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {currentSubscription.billing_cycle?.toLowerCase() === 'yearly' ? '/year' : '/mo'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <Zap className={cn(
