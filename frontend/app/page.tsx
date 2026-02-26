@@ -17,11 +17,15 @@ function LandingPageContent() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    // Safety: always show landing page after 2s (prevents stuck loading if JS/API fails)
+    const fallbackTimer = setTimeout(() => setIsChecking(false), 2000);
+
     // Check if running in PWA standalone mode
     const isStandalone = 
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true ||
-      document.referrer.includes('android-app://');
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+       (window.navigator as any).standalone === true ||
+       document.referrer.includes('android-app://'));
 
     if (isStandalone) {
       // Check if user is logged in
@@ -45,10 +49,14 @@ function LandingPageContent() {
         // Not logged in, redirect to login
         router.replace("/login");
       }
+      clearTimeout(fallbackTimer);
     } else {
       // Not in standalone mode, show landing page
+      clearTimeout(fallbackTimer);
       setIsChecking(false);
     }
+
+    return () => clearTimeout(fallbackTimer);
   }, [router]);
 
   // Show loading state while checking (prevents flash of landing page in PWA)

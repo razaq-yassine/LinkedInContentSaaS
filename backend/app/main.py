@@ -31,6 +31,8 @@ cors_origins = [
     settings.frontend_url,
     "http://localhost:3000",
     "http://localhost:3001",
+    "https://postinai.com",
+    "http://postinai.com",
 ]
 # Allow all trycloudflare.com domains (Cloudflare Quick Tunnels)
 # This is a wildcard approach - in production, use specific domains
