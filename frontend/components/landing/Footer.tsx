@@ -103,9 +103,9 @@ export function Footer() {
       <div className="border-t border-slate-800/50">
         <div className="container mx-auto px-4 lg:px-8 py-6 relative z-10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-600">
-            <p>© {new Date().getFullYear()} PostInAi LLC. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Smart Technologies MA LLC. All rights reserved.</p>
             <p>
-              PostInAi LLC is a New Mexico company. Not endorsed by or affiliated with LinkedIn™ Corporation.
+              Smart Technologies MA LLC is a Wyoming company. Not endorsed by or affiliated with LinkedIn™ Corporation.
             </p>
           </div>
         </div>

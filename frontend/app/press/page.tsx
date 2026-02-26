@@ -99,7 +99,7 @@ export function PressPageDisabled() {
                   <h2 className="text-2xl font-bold text-white mb-6">About PostInAi</h2>
                   <div className="space-y-4 text-slate-400">
                     <p>
-                      PostInAi is a New Mexico-based technology company that develops AI-powered content creation tools for LinkedIn professionals.
+                      PostInAi is a Wyoming-based technology company that develops AI-powered content creation tools for LinkedIn professionals.
                     </p>
                     <p>
                       PostInAi&apos;s proprietary voice matching technology helps users create authentic content that matches their unique writing style.
@@ -118,7 +118,7 @@ export function PressPageDisabled() {
                     </div>
                     <div className="flex justify-between border-b border-slate-800 pb-3">
                       <span className="text-slate-500">Headquarters</span>
-                      <span className="text-white">New Mexico, USA</span>
+                      <span className="text-white">Wyoming, USA</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-800 pb-3">
                       <span className="text-slate-500">Employees</span>

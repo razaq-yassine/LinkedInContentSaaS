@@ -191,7 +191,7 @@ export default function GDPRPage() {
                   <p className="mb-4">For any GDPR-related inquiries or concerns, contact our Data Protection Officer:</p>
                   <div className="space-y-2">
                     <p><strong className="text-white">Email:</strong> <a href="mailto:dpo@postinai.com" className="text-cyan-400 hover:underline">dpo@postinai.com</a></p>
-                    <p><strong className="text-white">Address:</strong> Data Protection Officer, PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
+                    <p><strong className="text-white">Address:</strong> Data Protection Officer, Smart Technologies MA LLC, 30 N Gould St, Ste R, Sheridan, WY 82801, USA</p>
                   </div>
                   <p className="mt-4">You also have the right to lodge a complaint with your local data protection authority if you believe we have not adequately addressed your concerns.</p>
                 </div>

@@ -197,9 +197,9 @@ export default function ContactPage() {
                         <div>
                           <h3 className="text-white font-semibold mb-1">Headquarters</h3>
                           <p className="text-slate-400 text-sm">
-                            PostInAi Inc.<br />
-                            548 Market St #82756<br />
-                            San Francisco, CA 94104<br />
+                            Smart Technologies MA LLC<br />
+                            30 N Gould St, Ste R<br />
+                            Sheridan, WY 82801<br />
                             United States
                           </p>
                         </div>
