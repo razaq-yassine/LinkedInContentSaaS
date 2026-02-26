@@ -262,7 +262,7 @@ function LoginPageContent() {
 
                 <Button
                   variant="outline"
-                  className="w-full flex items-center justify-center gap-3 py-6 border-2 border-slate-700 text-slate-300 hover:bg-slate-800 rounded-xl font-medium transition-all"
+                  className="w-full flex items-center justify-center gap-3 py-6 border-2 border-slate-700 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-medium transition-all"
                   onClick={handleGoogleLogin}
                   disabled={googleLoading}
                 >

@@ -129,7 +129,7 @@ export default function SuggestionsPage() {
                   </Button>
                 </Link>
                 <Link href="/pricing">
-                  <Button size="lg" variant="outline" className="rounded-full px-8 py-6 text-lg border-slate-700 text-slate-300 hover:bg-slate-800">
+                  <Button size="lg" variant="outline" className="rounded-full px-8 py-6 text-lg border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                     View Pricing
                   </Button>
                 </Link>

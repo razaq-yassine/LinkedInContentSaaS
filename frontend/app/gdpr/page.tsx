@@ -157,7 +157,7 @@ export default function GDPRPage() {
                       </Button>
                     </Link>
                   </div>
-                  <p className="text-sm mt-4">We will respond to your request within 30 days. You may also email us directly at <a href="mailto:dpo@postinai.com" className="text-cyan-400 hover:underline">dpo@postinai.com</a>.</p>
+                  <p className="text-sm mt-4">We will respond to your request within 30 days. You may also email us directly at <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a>.</p>
                 </div>
               </div>
 

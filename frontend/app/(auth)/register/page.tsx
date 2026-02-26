@@ -116,7 +116,7 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-bold text-white mb-3">Registration Closed</h1>
           <p className="text-slate-400 mb-6">New user registration is currently disabled. Please check back later or contact support.</p>
           <Link href="/login">
-            <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
+            <Button variant="outline" className="w-full border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
               Back to Login
             </Button>
           </Link>
@@ -162,7 +162,7 @@ export default function RegisterPage() {
               </button>
             </p>
             <Link href="/login">
-              <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
+              <Button variant="outline" className="w-full border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                 Back to Login
               </Button>
             </Link>

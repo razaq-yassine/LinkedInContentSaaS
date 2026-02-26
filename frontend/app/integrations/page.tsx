@@ -283,7 +283,7 @@ export default function IntegrationsPage() {
                     </Button>
                   </Link>
                   <Link href="/contact">
-                    <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 text-slate-300 hover:bg-slate-800">
+                    <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                       Request an Integration
                     </Button>
                   </Link>

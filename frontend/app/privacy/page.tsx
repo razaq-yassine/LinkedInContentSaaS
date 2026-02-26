@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
                       <span><strong className="text-white">Right to Non-Discrimination:</strong> We will not discriminate against you for exercising your privacy rights.</span>
                     </li>
                   </ul>
-                  <p className="mt-4">To exercise these rights, contact us at <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a>.</p>
+                  <p className="mt-4">To exercise these rights, contact us at <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a>.</p>
                 </div>
               </div>
 

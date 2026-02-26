@@ -230,7 +230,7 @@ export default function HelpPage() {
                     Detailed guides and tutorials
                   </p>
                   <Link href="/docs">
-                    <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
+                    <Button variant="outline" className="w-full border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                       View Docs
                     </Button>
                   </Link>
@@ -258,7 +258,7 @@ export default function HelpPage() {
                     We&apos;ll respond within 24 hours
                   </p>
                   <Link href="mailto:support@postinai.com">
-                    <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
+                    <Button variant="outline" className="w-full border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                       Send Email
                     </Button>
                   </Link>
@@ -292,7 +292,7 @@ export default function HelpPage() {
 
               <div className="text-center mt-8">
                 <Link href="/pricing">
-                  <Button variant="outline" className="rounded-full border-slate-700 text-slate-300 hover:bg-slate-800">
+                  <Button variant="outline" className="rounded-full border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                     View All FAQs
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>

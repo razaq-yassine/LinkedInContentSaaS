@@ -162,7 +162,7 @@ export default function CookiePolicyPage() {
                   </div>
 
                   <div className="mt-4 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
-                    <p className="text-cyan-200 text-sm"><strong>Do Not Sell or Share My Personal Information:</strong> To exercise your right to opt out, use our cookie banner, adjust your browser settings, or contact us at <a href="mailto:privacy@postinai.com" className="underline hover:text-cyan-400">privacy@postinai.com</a>.</p>
+                    <p className="text-cyan-200 text-sm"><strong>Do Not Sell or Share My Personal Information:</strong> To exercise your right to opt out, use our cookie banner, adjust your browser settings, or contact us at <a href="mailto:support@postinai.com" className="underline hover:text-cyan-400">support@postinai.com</a>.</p>
                   </div>
                 </div>
               </div>
@@ -250,7 +250,7 @@ export default function CookiePolicyPage() {
                 </div>
                 <div className="space-y-4 text-slate-400">
                   <p>We may update this Cookie Policy from time to time. We will notify you of significant changes by posting a notice on our website or sending you an email.</p>
-                  <p>For questions about our use of cookies, contact us at <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a>.</p>
+                  <p>For questions about our use of cookies, contact us at <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a>.</p>
                 </div>
               </div>
 

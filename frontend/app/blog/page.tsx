@@ -202,7 +202,7 @@ export default function BlogPage() {
               </div>
               
               <div className="text-center mt-12">
-                <Button variant="outline" className="rounded-full px-8 border-slate-700 text-slate-300 hover:bg-slate-800">
+                <Button variant="outline" className="rounded-full px-8 border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                   Load More Articles
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
