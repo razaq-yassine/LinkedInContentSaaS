@@ -247,7 +247,7 @@ export default function DocsPage() {
                     </Button>
                   </Link>
                   <a href="https://github.com/postinai" target="_blank" rel="noopener noreferrer">
-                    <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 text-slate-300 hover:bg-slate-800">
+                    <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                       <ExternalLink className="w-4 h-4 mr-2" />
                       View on GitHub
                     </Button>

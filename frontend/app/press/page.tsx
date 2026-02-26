@@ -81,7 +81,7 @@ export function PressPageDisabled() {
                     Media Inquiries
                   </Button>
                 </Link>
-                <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 text-slate-300 hover:bg-slate-800">
+                <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                   <Download className="w-5 h-5 mr-2" />
                   Download Press Kit
                 </Button>
@@ -155,7 +155,7 @@ export function PressPageDisabled() {
                   </div>
                   <h3 className="text-white font-semibold mb-2">Primary Logo</h3>
                   <p className="text-slate-500 text-sm mb-4">PNG, SVG formats</p>
-                  <Button variant="outline" size="sm" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+                  <Button variant="outline" size="sm" className="border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
@@ -166,7 +166,7 @@ export function PressPageDisabled() {
                   </div>
                   <h3 className="text-white font-semibold mb-2">Product Screenshots</h3>
                   <p className="text-slate-500 text-sm mb-4">High-res images</p>
-                  <Button variant="outline" size="sm" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+                  <Button variant="outline" size="sm" className="border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
@@ -177,7 +177,7 @@ export function PressPageDisabled() {
                   </div>
                   <h3 className="text-white font-semibold mb-2">Brand Guidelines</h3>
                   <p className="text-slate-500 text-sm mb-4">PDF document</p>
-                  <Button variant="outline" size="sm" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+                  <Button variant="outline" size="sm" className="border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
@@ -239,7 +239,7 @@ export function PressPageDisabled() {
                   For press inquiries, interview requests, or additional information, please contact our communications team.
                 </p>
                 <div className="text-slate-300">
-                  <p><strong className="text-white">Email:</strong> <a href="mailto:press@postinai.com" className="text-cyan-400 hover:underline">press@postinai.com</a></p>
+                  <p><strong className="text-white">Email:</strong> <a href="mailto:ceo@postinai.com" className="text-cyan-400 hover:underline">ceo@postinai.com</a></p>
                 </div>
               </div>
             </div>

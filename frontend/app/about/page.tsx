@@ -193,7 +193,7 @@ export default function AboutPage() {
                     </Button>
                   </Link>
                   <Link href="/careers">
-                    <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 text-slate-300 hover:bg-slate-800">
+                    <Button size="lg" variant="outline" className="rounded-full px-8 border-slate-700 bg-white text-slate-900 hover:bg-slate-100">
                       View Open Positions
                     </Button>
                   </Link>

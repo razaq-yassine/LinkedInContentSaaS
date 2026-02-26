@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
                       <span><strong className="text-white">Right to Non-Discrimination:</strong> We will not discriminate against you for exercising your privacy rights.</span>
                     </li>
                   </ul>
-                  <p className="mt-4">To exercise these rights, contact us at <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a>.</p>
+                  <p className="mt-4">To exercise these rights, contact us at <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a>.</p>
                 </div>
               </div>
 
@@ -168,7 +168,7 @@ export default function PrivacyPolicyPage() {
                 <div className="text-slate-400">
                   <p className="mb-4">If you have questions about this Privacy Policy or our data practices, contact us:</p>
                   <div className="space-y-2">
-                    <p><strong className="text-white">Email:</strong> <a href="mailto:privacy@postinai.com" className="text-cyan-400 hover:underline">privacy@postinai.com</a></p>
+                    <p><strong className="text-white">Email:</strong> <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a></p>
                     <p><strong className="text-white">Address:</strong> PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                 </div>

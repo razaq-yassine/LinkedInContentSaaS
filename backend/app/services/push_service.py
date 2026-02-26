@@ -88,12 +88,12 @@ def get_vapid_credentials():
     """
     # Check if VAPID keys are configured
     if settings.vapid_public_key and settings.vapid_private_key:
-        return settings.vapid_public_key, settings.vapid_private_key, settings.vapid_subject or settings.smtp_from_email or "mailto:admin@postinai.com"
+        return settings.vapid_public_key, settings.vapid_private_key, settings.vapid_subject or settings.smtp_from_email or "mailto:support@postinai.com"
     
     # Generate new keys if not configured
     logger.warning("VAPID keys not configured. Generating new keys. Please add them to your .env file.")
     public_key, private_key = generate_vapid_keys()
-    subject = settings.vapid_subject or settings.smtp_from_email or "mailto:admin@postinai.com"
+    subject = settings.vapid_subject or settings.smtp_from_email or "mailto:support@postinai.com"
     
     logger.info(f"Generated VAPID keys. Add these to your .env file:")
     logger.info(f"VAPID_PUBLIC_KEY={public_key}")

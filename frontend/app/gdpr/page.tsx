@@ -157,7 +157,7 @@ export default function GDPRPage() {
                       </Button>
                     </Link>
                   </div>
-                  <p className="text-sm mt-4">We will respond to your request within 30 days. You may also email us directly at <a href="mailto:dpo@postinai.com" className="text-cyan-400 hover:underline">dpo@postinai.com</a>.</p>
+                  <p className="text-sm mt-4">We will respond to your request within 30 days. You may also email us directly at <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a>.</p>
                 </div>
               </div>
 
@@ -190,7 +190,7 @@ export default function GDPRPage() {
                 <div className="text-slate-400">
                   <p className="mb-4">For any GDPR-related inquiries or concerns, contact our Data Protection Officer:</p>
                   <div className="space-y-2">
-                    <p><strong className="text-white">Email:</strong> <a href="mailto:dpo@postinai.com" className="text-cyan-400 hover:underline">dpo@postinai.com</a></p>
+                    <p><strong className="text-white">Email:</strong> <a href="mailto:support@postinai.com" className="text-cyan-400 hover:underline">support@postinai.com</a></p>
                     <p><strong className="text-white">Address:</strong> Data Protection Officer, PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                   <p className="mt-4">You also have the right to lodge a complaint with your local data protection authority if you believe we have not adequately addressed your concerns.</p>

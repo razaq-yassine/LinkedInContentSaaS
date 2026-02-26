@@ -189,7 +189,7 @@ export default function TermsOfServicePage() {
                 <div className="text-slate-400">
                   <p className="mb-4">For questions about these Terms, contact us:</p>
                   <div className="space-y-2">
-                    <p><strong className="text-white">Email:</strong> <a href="mailto:legal@postinai.com" className="text-teal-400 hover:underline">legal@postinai.com</a></p>
+                    <p><strong className="text-white">Email:</strong> <a href="mailto:ceo@postinai.com" className="text-teal-400 hover:underline">ceo@postinai.com</a></p>
                     <p><strong className="text-white">Address:</strong> PostInAi Inc., 548 Market St #82756, San Francisco, CA 94104, USA</p>
                   </div>
                 </div>

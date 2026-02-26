@@ -152,7 +152,7 @@ export function Header() {
               </div>
               <div className="pt-4 border-t border-slate-800 space-y-2">
                 <Link href="/login" className="block">
-                  <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">Log in</Button>
+                  <Button variant="outline" className="w-full border-slate-700 bg-white text-slate-900 hover:bg-slate-100">Log in</Button>
                 </Link>
                 <Link href="/register" className="block">
                   <Button className="w-full bg-gradient-to-r from-cyan-600 to-teal-600">Try Free</Button>

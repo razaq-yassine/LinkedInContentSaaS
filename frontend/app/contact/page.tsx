@@ -50,7 +50,7 @@ export default function ContactPage() {
               <Button
                 onClick={() => setSubmitted(false)}
                 variant="outline"
-                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                className="border-slate-700 bg-white text-slate-900 hover:bg-slate-100"
               >
                 Send Another Message
               </Button>
