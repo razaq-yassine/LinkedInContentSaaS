@@ -20,6 +20,7 @@ from ..schemas.auth import (
 from ..config import get_settings
 from ..services.linkedin_service import LinkedInService
 from ..services.email_service import EmailService
+from ..utils.encryption import encrypt_token, decrypt_token
 
 router = APIRouter()
 settings = get_settings()
@@ -1158,10 +1159,10 @@ async def linkedin_callback(
             existing_user.linkedin_connected = False
             existing_user.linkedin_last_sync = None
         
-        # Link LinkedIn to this user
+        # Link LinkedIn to this user (encrypt tokens at rest)
         user.linkedin_id = linkedin_id
-        user.linkedin_access_token = access_token
-        user.linkedin_refresh_token = refresh_token
+        user.linkedin_access_token = encrypt_token(access_token)
+        user.linkedin_refresh_token = encrypt_token(refresh_token) if refresh_token else None
         user.linkedin_token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
         user.linkedin_profile_data = linkedin_profile
         user.linkedin_connected = True
@@ -1329,17 +1330,23 @@ async def sync_linkedin_posts(
         raise HTTPException(status_code=400, detail="LinkedIn account not connected")
     
     try:
+        # Decrypt tokens for API use
+        access_token = decrypt_token(user.linkedin_access_token)
+        refresh_token = decrypt_token(user.linkedin_refresh_token) if user.linkedin_refresh_token else None
+        
         if user.linkedin_token_expires_at and datetime.utcnow() >= user.linkedin_token_expires_at:
-            if user.linkedin_refresh_token:
-                token_data = await LinkedInService.refresh_access_token(user.linkedin_refresh_token)
-                user.linkedin_access_token = token_data["access_token"]
+            if refresh_token:
+                token_data = await LinkedInService.refresh_access_token(refresh_token)
+                # Re-encrypt new tokens before storing
+                user.linkedin_access_token = encrypt_token(token_data["access_token"])
+                access_token = token_data["access_token"]  # Use new token for this request
                 user.linkedin_token_expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 5184000))
                 db.commit()
             else:
                 raise HTTPException(status_code=401, detail="Token expired. Please reconnect LinkedIn account")
         
         author_id = user.linkedin_id
-        posts = await LinkedInService.get_user_posts(user.linkedin_access_token, author_id, limit=50)
+        posts = await LinkedInService.get_user_posts(access_token, author_id, limit=50)
         
         post_texts = [post["text"] for post in posts if post["text"]]
         

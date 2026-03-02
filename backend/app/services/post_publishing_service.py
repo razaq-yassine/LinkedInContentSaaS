@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from ..models import GeneratedPost, User, GeneratedImage, GeneratedPDF, PostFormat
 from ..services.linkedin_service import LinkedInService
 from ..services.notification_service import send_notification
+from ..utils.encryption import encrypt_token, decrypt_token
 
 async def publish_post_to_linkedin(post_id: str, db: Session) -> Dict[str, Any]:
     """
@@ -32,14 +33,18 @@ async def publish_post_to_linkedin(post_id: str, db: Session) -> Dict[str, Any]:
     if not user.linkedin_connected or not user.linkedin_access_token:
         raise ValueError("LINKEDIN_NOT_CONNECTED: Please connect your LinkedIn account first to publish posts. Go to Settings > LinkedIn to connect your account.")
     
+    # Decrypt tokens for API use
+    access_token = decrypt_token(user.linkedin_access_token)
+    refresh_token = decrypt_token(user.linkedin_refresh_token) if user.linkedin_refresh_token else None
+    
     # Check if token is expired and refresh if needed
-    access_token = user.linkedin_access_token
     if user.linkedin_token_expires_at and datetime.utcnow() >= user.linkedin_token_expires_at:
-        if user.linkedin_refresh_token:
+        if refresh_token:
             try:
-                token_data = await LinkedInService.refresh_access_token(user.linkedin_refresh_token)
+                token_data = await LinkedInService.refresh_access_token(refresh_token)
                 access_token = token_data["access_token"]
-                user.linkedin_access_token = access_token
+                # Re-encrypt new token before storing
+                user.linkedin_access_token = encrypt_token(access_token)
                 user.linkedin_token_expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 5184000))
                 db.commit()
             except Exception as e:

@@ -198,6 +198,40 @@ async def generate_image(
         raise Exception(error_msg)
 
 
+# SECURITY: Blocked terms for image generation content moderation
+BLOCKED_IMAGE_TERMS = [
+    'nude', 'naked', 'nsfw', 'porn', 'sexual', 'explicit', 'erotic',
+    'violence', 'gore', 'blood', 'murder', 'kill', 'weapon', 'gun',
+    'hate', 'racist', 'nazi', 'terrorist', 'bomb', 'attack',
+    'drug', 'cocaine', 'heroin', 'meth',
+    'child abuse', 'minor', 'underage',
+]
+
+def _moderate_image_prompt(prompt: str) -> tuple[str, bool]:
+    """
+    SECURITY: Content moderation for image generation prompts.
+    Returns (sanitized_prompt, is_blocked) tuple.
+    """
+    if not prompt:
+        return prompt, False
+    
+    prompt_lower = prompt.lower()
+    
+    # Check for blocked terms
+    for term in BLOCKED_IMAGE_TERMS:
+        if term in prompt_lower:
+            return "", True
+    
+    # Remove potentially problematic patterns
+    import re
+    # Remove URLs that could reference external harmful content
+    sanitized = re.sub(r'https?://\S+', '[URL_REMOVED]', prompt)
+    # Remove base64 or data URIs
+    sanitized = re.sub(r'data:[^\s]+', '[DATA_REMOVED]', sanitized)
+    
+    return sanitized, False
+
+
 async def generate_image_from_post(
     post_content: str,
     image_prompt: Optional[str] = None,
@@ -217,11 +251,15 @@ async def generate_image_from_post(
     # Use the provided image prompt, or create one from post content
     if not image_prompt:
         # Extract key concepts from post for image generation
-        # In a real scenario, you might want to use AI to create a better prompt
         image_prompt = f"Professional LinkedIn image for: {post_content[:200]}"
     
+    # SECURITY: Content moderation for image prompts
+    moderated_prompt, is_blocked = _moderate_image_prompt(image_prompt)
+    if is_blocked:
+        raise Exception("Image prompt contains prohibited content. Please revise your request.")
+    
     # Add style guidance for professional LinkedIn images
-    enhanced_prompt = f"{image_prompt}. Professional, high-quality, business-appropriate, clean design, modern aesthetic."
+    enhanced_prompt = f"{moderated_prompt}. Professional, high-quality, business-appropriate, clean design, modern aesthetic."
     
     # Generate with good quality settings for LinkedIn (square format, high quality)
     result = await generate_image(

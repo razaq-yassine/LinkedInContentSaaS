@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 import os
 import sqlalchemy as sa
 from .config import get_settings
@@ -18,12 +19,47 @@ settings = get_settings()
 setup_logging()
 logger = get_logger(__name__)
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses."""
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+        
+        # Enable XSS filter (legacy browsers)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        
+        # Control referrer information
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # Permissions policy (disable unnecessary browser features)
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        # In production, add Strict-Transport-Security
+        if not settings.dev_mode:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
+        return response
+
+
 # Create FastAPI app
 app = FastAPI(
     title="LinkedIn Content SaaS API",
     description="AI-powered LinkedIn content generation platform",
     version="1.0.0",
+    # Disable docs in production for security
+    docs_url="/docs" if settings.dev_mode else None,
+    redoc_url="/redoc" if settings.dev_mode else None,
 )
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Configure CORS
 # Allow Cloudflare tunnel origins (trycloudflare.com domains)
@@ -34,29 +70,32 @@ cors_origins = [
     "https://postinai.com",
     "http://postinai.com",
 ]
-# Allow all trycloudflare.com domains (Cloudflare Quick Tunnels)
-# This is a wildcard approach - in production, use specific domains
-# For now, we'll allow any trycloudflare.com origin
 
-# Custom CORS function to allow trycloudflare.com domains
+# SECURITY: In production (dev_mode=False), disable wildcard trycloudflare.com
+# and only allow explicitly listed origins for credential-bearing requests
 def is_allowed_origin(origin: str) -> bool:
     if origin in cors_origins:
         return True
-    # Allow any trycloudflare.com domain
-    if "trycloudflare.com" in origin:
+    # Only allow trycloudflare.com in development mode
+    if settings.dev_mode and "trycloudflare.com" in origin:
         return True
     return False
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"https?://.*\.trycloudflare\.com",
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods including OPTIONS
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600  # Cache preflight requests for 1 hour
-)
+# Build CORS configuration based on environment
+_cors_kwargs = {
+    "allow_origins": cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    "allow_headers": ["Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"],
+    "expose_headers": ["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"],
+    "max_age": 3600,  # Cache preflight requests for 1 hour
+}
+
+# Only add wildcard regex in development mode
+if settings.dev_mode:
+    _cors_kwargs["allow_origin_regex"] = r"https?://.*\.trycloudflare\.com"
+
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 # Create uploads directory if it doesn't exist
 os.makedirs(settings.upload_dir, exist_ok=True)

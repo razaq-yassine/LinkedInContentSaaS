@@ -1,12 +1,25 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 
+# Security limits for input validation
+MAX_MESSAGE_LENGTH = 10000  # 10K chars max for user messages
+MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024  # 5MB per attachment
+MAX_ATTACHMENTS = 10
+
+
 class PostGenerationRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=MAX_MESSAGE_LENGTH)
     options: Dict[str, Any]
-    attachments: Optional[List[Dict[str, Any]]] = None
-    conversation_id: Optional[str] = None
+    attachments: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=MAX_ATTACHMENTS)
+    conversation_id: Optional[str] = Field(default=None, max_length=36)
+    
+    @field_validator('message')
+    @classmethod
+    def validate_message_content(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Message cannot be empty or whitespace only')
+        return v.strip()
 
 class TokenUsage(BaseModel):
     input_tokens: int

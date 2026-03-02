@@ -16,6 +16,7 @@ from ..services.worthiness_evaluator import evaluate_comment_worthiness, extract
 from ..services.ai_service import generate_completion
 from ..services.file_processor import process_image_upload
 from ..prompts.system_prompts import build_comment_generation_prompt
+from ..utils.prompt_security import sanitize_user_input
 
 router = APIRouter()
 
@@ -46,6 +47,10 @@ async def evaluate_comment(
         # If screenshot is actually text (for testing), use it directly
         if not request.screenshot.startswith("data:image"):
             post_text = request.screenshot
+        
+        # SECURITY: Sanitize external post content to prevent indirect prompt injection
+        post_text, _ = sanitize_user_input(post_text, strict=False)
+        post_text = post_text[:3000] if post_text else ""
         
         # Get user expertise from profile
         context = profile.context_json or {}
@@ -90,6 +95,12 @@ async def generate_comment(
         post_text = await extract_post_from_screenshot(screenshot_path)
         if not request.screenshot.startswith("data:image"):
             post_text = request.screenshot
+        
+        # SECURITY: Sanitize external post content to prevent indirect prompt injection
+        # External LinkedIn posts could contain malicious content
+        post_text, _ = sanitize_user_input(post_text, strict=False)
+        # Truncate to prevent excessive content
+        post_text = post_text[:3000] if post_text else ""
         
         # Get expertise
         context = profile.context_json or {}

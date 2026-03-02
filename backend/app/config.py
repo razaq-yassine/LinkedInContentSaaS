@@ -1,5 +1,15 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
+import secrets
+import warnings
+
+# Insecure default JWT key - used only to detect if user hasn't set a real key
+_INSECURE_DEFAULT_JWT_KEY = "your-super-secret-jwt-key-change-in-production"
+
+def generate_secure_jwt_secret() -> str:
+    """Generate a cryptographically secure JWT secret (256 bits / 32 bytes)"""
+    return secrets.token_urlsafe(32)
 
 class Settings(BaseSettings):
     # Development mode - skips email verification
@@ -34,10 +44,38 @@ class Settings(BaseSettings):
     cloudflare_api_token: str = ""
     cloudflare_image_model: str = "@cf/leonardo/lucid-origin"  # Options: @cf/leonardo/lucid-origin, @cf/black-forest-labs/flux-1-schnell, @cf/stabilityai/stable-diffusion-xl-base-1.0
     
-    # JWT
-    jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
+    # JWT - SECURITY: jwt_secret_key must be set in production
+    jwt_secret_key: str = _INSECURE_DEFAULT_JWT_KEY
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
+    
+    @field_validator('jwt_secret_key')
+    @classmethod
+    def validate_jwt_secret(cls, v, info):
+        """Validate JWT secret key is secure in production"""
+        # Check if using insecure default
+        if v == _INSECURE_DEFAULT_JWT_KEY:
+            # In dev mode, generate a random key and warn
+            # Note: This means dev tokens won't persist across restarts
+            warnings.warn(
+                "\n" + "="*60 + "\n"
+                "SECURITY WARNING: Using auto-generated JWT secret.\n"
+                "Tokens will NOT persist across server restarts.\n"
+                "For production, set JWT_SECRET_KEY in your .env file:\n"
+                f"JWT_SECRET_KEY={generate_secure_jwt_secret()}\n"
+                + "="*60,
+                UserWarning
+            )
+            return generate_secure_jwt_secret()
+        
+        # Validate minimum security requirements
+        if len(v) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be at least 32 characters. "
+                f"Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        
+        return v
     
     # CORS
     frontend_url: str = "http://localhost:3000"
@@ -85,6 +123,10 @@ class Settings(BaseSettings):
     vapid_public_key: str = ""
     vapid_private_key: str = ""
     vapid_subject: str = ""  # Email or URL for VAPID
+    
+    # Token Encryption (for OAuth tokens at rest)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    encryption_key: str = ""  # If empty, derives from JWT_SECRET_KEY (less secure)
     
     class Config:
         env_file = ".env"

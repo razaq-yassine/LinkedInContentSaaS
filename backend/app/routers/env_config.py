@@ -13,8 +13,11 @@ from ..database import get_db
 from ..models import Admin
 from ..routers.admin_auth import get_current_admin
 from ..config import get_settings
+import re
+import logging
 
 router = APIRouter()
+security_logger = logging.getLogger("env_config_security")
 
 # Define env variable categories and metadata
 ENV_VARIABLES = {
@@ -193,20 +196,132 @@ async def get_env_variables(admin: Admin = Depends(get_current_admin)):
     return result
 
 
+# Build whitelist of allowed environment variable keys from ENV_VARIABLES
+ALLOWED_ENV_KEYS = set()
+for category in ENV_VARIABLES.values():
+    for var in category["variables"]:
+        ALLOWED_ENV_KEYS.add(var["key"])
+
+# Value validation patterns for each key type
+VALUE_VALIDATORS = {
+    # Boolean values
+    "DEV_MODE": lambda v: v.lower() in ("true", "false"),
+    "BRAVE_SEARCH_ENABLED": lambda v: v.lower() in ("true", "false"),
+    
+    # Select options - validated against ENV_VARIABLES
+    "AI_PROVIDER": lambda v: v in ["openai", "gemini", "claude"],
+    "OPENAI_MODEL": lambda v: v in ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
+    "GEMINI_MODEL": lambda v: v in ["gemini-2.5-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"],
+    "CLAUDE_MODEL": lambda v: v in ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5"],
+    "CLOUDFLARE_IMAGE_MODEL": lambda v: v.startswith("@cf/"),
+    
+    # URLs - basic validation
+    "FRONTEND_URL": lambda v: v.startswith(("http://", "https://")),
+    "LINKEDIN_REDIRECT_URI": lambda v: v.startswith(("http://", "https://")),
+    "GOOGLE_REDIRECT_URI": lambda v: v.startswith(("http://", "https://")),
+    "DATABASE_URL": lambda v: bool(re.match(r'^(sqlite|postgresql|mysql)://', v)),
+    
+    # Port numbers
+    "SMTP_PORT": lambda v: v.isdigit() and 1 <= int(v) <= 65535,
+    
+    # API keys - basic format validation (no shell injection characters)
+    "OPENAI_API_KEY": lambda v: bool(re.match(r'^[a-zA-Z0-9_-]*$', v)),
+    "GEMINI_API_KEY": lambda v: bool(re.match(r'^[a-zA-Z0-9_-]*$', v)),
+    "CLAUDE_API_KEY": lambda v: bool(re.match(r'^[a-zA-Z0-9_-]*$', v)),
+    "BRAVE_API_KEY": lambda v: bool(re.match(r'^[a-zA-Z0-9_-]*$', v)),
+    "CLOUDFLARE_API_TOKEN": lambda v: bool(re.match(r'^[a-zA-Z0-9_-]*$', v)),
+    "STRIPE_SECRET_KEY": lambda v: v == "" or v.startswith("sk_"),
+    "STRIPE_PUBLISHABLE_KEY": lambda v: v == "" or v.startswith("pk_"),
+    "STRIPE_WEBHOOK_SECRET": lambda v: v == "" or v.startswith("whsec_"),
+}
+
+# Characters that should never appear in env values (shell injection prevention)
+DANGEROUS_PATTERNS = [
+    r'[`$]\(',  # Command substitution
+    r'\$\{',    # Variable expansion
+    r'[;&|]',   # Command chaining
+    r'[<>]',    # Redirects (allow in URLs though)
+    r'\\n',    # Newlines that could break parsing
+]
+
+def validate_env_value(key: str, value: str) -> tuple[bool, str]:
+    """
+    Validate an environment variable value.
+    Returns (is_valid, error_message)
+    """
+    # Skip empty values
+    if not value:
+        return True, ""
+    
+    # Check for dangerous shell injection patterns (except in URLs)
+    if not key.endswith("_URL") and not key.endswith("_URI"):
+        for pattern in DANGEROUS_PATTERNS:
+            if re.search(pattern, value):
+                return False, f"Value contains potentially dangerous characters"
+    
+    # Check specific validator if exists
+    if key in VALUE_VALIDATORS:
+        try:
+            if not VALUE_VALIDATORS[key](value):
+                return False, f"Invalid value format for {key}"
+        except Exception:
+            return False, f"Value validation failed for {key}"
+    
+    return True, ""
+
+
 @router.put("/env/variables")
 async def update_env_variables(
     request: EnvUpdateRequest,
     admin: Admin = Depends(get_current_admin)
 ):
-    """Update environment variables"""
+    """Update environment variables with security validation"""
     current_vars = read_env_file()
+    validation_errors = []
+    updated_keys = []
     
-    # Update only provided variables
+    # SECURITY: Validate and filter variables
     for key, value in request.variables.items():
         # Skip masked values (user didn't change them)
         if "••••" in value:
             continue
+        
+        # SECURITY: Whitelist check - only allow known keys
+        if key not in ALLOWED_ENV_KEYS:
+            security_logger.warning(
+                f"Rejected unknown env key: {key} (Admin: {admin.email})"
+            )
+            validation_errors.append(f"Unknown environment variable: {key}")
+            continue
+        
+        # SECURITY: Validate value format
+        is_valid, error_msg = validate_env_value(key, value)
+        if not is_valid:
+            security_logger.warning(
+                f"Rejected invalid env value for {key}: {error_msg} (Admin: {admin.email})"
+            )
+            validation_errors.append(f"{key}: {error_msg}")
+            continue
+        
         current_vars[key] = value
+        updated_keys.append(key)
+    
+    # If there are validation errors, return them without writing
+    if validation_errors:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Some variables failed validation",
+                "errors": validation_errors,
+                "updated": updated_keys
+            }
+        )
+    
+    # Log successful update
+    if updated_keys:
+        security_logger.info(
+            f"Env variables updated by admin {admin.email}: {', '.join(updated_keys)}"
+        )
     
     write_env_file(current_vars)
     
@@ -214,7 +329,7 @@ async def update_env_variables(
     from ..config import get_settings
     get_settings.cache_clear()
     
-    return {"success": True, "message": "Environment variables updated. Restart the server for changes to take effect."}
+    return {"success": True, "message": "Environment variables updated. Restart the server for changes to take effect.", "updated_keys": updated_keys}
 
 
 @router.get("/env/key-status/{key_type}")
