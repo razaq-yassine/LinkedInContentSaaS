@@ -250,16 +250,16 @@ async def generate_image_from_post(
     """
     # Use the provided image prompt, or create one from post content
     if not image_prompt:
-        # Extract key concepts from post for image generation
-        image_prompt = f"Professional LinkedIn image for: {post_content[:200]}"
+        # Extract key concepts from post for image generation (fallback only — AI-generated prompts are preferred)
+        image_prompt = f"Modern flat illustration of a professional scene inspired by: {post_content[:150]}. Clean vector style, teal and coral palette, white background, centered composition, confident mood"
     
     # SECURITY: Content moderation for image prompts
     moderated_prompt, is_blocked = _moderate_image_prompt(image_prompt)
     if is_blocked:
         raise Exception("Image prompt contains prohibited content. Please revise your request.")
     
-    # Add style guidance for professional LinkedIn images
-    enhanced_prompt = f"{moderated_prompt}. Professional, high-quality, business-appropriate, clean design, modern aesthetic."
+    # Enhance prompt with quality keywords for diffusion models (no text/typography — models render it poorly)
+    enhanced_prompt = f"{moderated_prompt}, professional quality, high resolution, clean composition, sharp details, square format 1200x1200"
     
     # Generate with good quality settings for LinkedIn (square format, high quality)
     result = await generate_image(

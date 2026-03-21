@@ -176,17 +176,22 @@ function OnboardingContent() {
     } catch (error: unknown) {
       console.error("Processing error:", error);
       
-      // Extract error message from various possible locations
+      // Extract error message - prefer backend detail (e.g. Axios: error.response.data.detail)
       let errorMessage = "";
       if (typeof error === 'string') {
         errorMessage = error;
       } else if (error && typeof error === 'object') {
-        if ('detail' in error) {
-          errorMessage = String((error as { detail?: unknown }).detail || "");
-        } else if ('message' in error) {
-          errorMessage = String((error as { message?: unknown }).message || "");
-        } else if ('error' in error) {
-          errorMessage = String((error as { error?: unknown }).error || "");
+        const err = error as Record<string, unknown>;
+        const response = err.response as Record<string, unknown> | undefined;
+        const data = response?.data as Record<string, unknown> | undefined;
+        if (data?.detail) {
+          errorMessage = typeof data.detail === 'string' ? data.detail : String(data.detail);
+        } else if (err.detail) {
+          errorMessage = String(err.detail);
+        } else if (err.message) {
+          errorMessage = String(err.message);
+        } else if (err.error) {
+          errorMessage = String(err.error);
         } else {
           errorMessage = JSON.stringify(error) || "";
         }
@@ -194,28 +199,16 @@ function OnboardingContent() {
         errorMessage = String(error) || "";
       }
       
-      console.log("Extracted error message:", errorMessage);
+      // Show explicit backend error message to user
+      const displayMessage = errorMessage && errorMessage !== "{}" 
+        ? errorMessage 
+        : "Something went wrong while processing your file. Please try again.";
       
-      // Check if this is a CV validation error
-      const lowerMessage = errorMessage.toLowerCase();
-      if (lowerMessage.includes("cv") || 
-          lowerMessage.includes("resume") ||
-          lowerMessage.includes("doesn't appear to be") ||
-          lowerMessage.includes("not a cv")) {
-        setErrorDialog({
-          open: true,
-          title: "Invalid Document",
-          message: "The file you uploaded doesn't appear to be a CV or Resume. Please make sure you're uploading your actual CV/Resume in PDF format."
-        });
-      } else {
-        setErrorDialog({
-          open: true,
-          title: "Upload Failed",
-          message: errorMessage && errorMessage !== "{}" 
-            ? errorMessage 
-            : "Something went wrong while processing your file. Please try again."
-        });
-      }
+      setErrorDialog({
+        open: true,
+        title: "Upload Failed",
+        message: displayMessage
+      });
     } finally {
       setLoading(false);
     }

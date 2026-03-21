@@ -31,41 +31,68 @@ def parse_toon_to_dict(toon_string: str) -> Dict[str, Any]:
             continue
             
         # Check if this is a tabular array declaration (e.g., "expertise[5]{skill,level}:")
+        # AI may use [N] as either a row COUNT or an INDEX — handle both cases
         tabular_match = re.match(r'^(\w+)\[(\d+)\]\{([^}]+)\}:\s*$', line)
         if tabular_match:
             field_name = tabular_match.group(1)
-            count = int(tabular_match.group(2))
             fields = [f.strip() for f in tabular_match.group(3).split(',')]
             
-            # Parse the rows
+            # Read data rows until we hit a non-data line (empty line, new section header,
+            # or unindented non-data line). Ignore the [N] count — AI uses it inconsistently.
             rows = []
             i += 1
-            for _ in range(count):
-                if i >= len(lines):
-                    break
+            while i < len(lines):
                 row_line = lines[i].strip()
                 if not row_line:
                     break
+                
+                # Stop if we hit a new tabular declaration for a DIFFERENT field
+                next_tab = re.match(r'^(\w+)\[\d+\]\{[^}]+\}:\s*$', row_line)
+                if next_tab and next_tab.group(1) != field_name:
+                    break
+                
+                # If it's another declaration for the SAME field (indexed entries), skip header
+                if next_tab and next_tab.group(1) == field_name:
+                    i += 1
+                    continue
+                
+                # Stop if we hit an unindented key-value or section header
+                if re.match(r'^[A-Za-z_]\w*:', row_line) and not lines[i].startswith(' '):
+                    break
                     
-                # Split by comma, but respect quoted strings
+                # Parse the data row — handle excess commas by merging into last field
                 values = _split_csv_line(row_line)
                 if len(values) == len(fields):
-                    row_dict = {}
-                    for field, value in zip(fields, values):
-                        row_dict[field] = _parse_value(value)
+                    row_dict = {f: _parse_value(v) for f, v in zip(fields, values)}
+                    rows.append(row_dict)
+                elif len(values) > len(fields) and len(fields) >= 2:
+                    # Merge excess values into the last field (for descriptions with commas)
+                    merged = values[:len(fields) - 1]
+                    merged.append(','.join(values[len(fields) - 1:]))
+                    row_dict = {f: _parse_value(v) for f, v in zip(fields, merged)}
                     rows.append(row_dict)
                 i += 1
             
-            result[field_name] = rows
+            # Append to existing list if field was already seen (indexed entries)
+            if field_name in result and isinstance(result[field_name], list):
+                result[field_name].extend(rows)
+            else:
+                result[field_name] = rows
             continue
         
-        # Check if this is a simple array (e.g., "content_goals[4]: val1,val2,val3,val4")
+        # Check if this is a simple indexed array (e.g., "content_goals[0]: value")
+        # AI outputs content_goals[0], content_goals[1], etc. as individual entries
         simple_array_match = re.match(r'^(\w+)\[(\d+)\]:\s*(.+)$', line)
         if simple_array_match:
             field_name = simple_array_match.group(1)
             values_str = simple_array_match.group(3)
+            # Check if this is a multi-value array or single indexed entry
             values = [_parse_value(v.strip()) for v in _split_csv_line(values_str)]
-            result[field_name] = values
+            # Append to existing list if field already exists (indexed entries)
+            if field_name in result and isinstance(result[field_name], list):
+                result[field_name].extend(values)
+            else:
+                result[field_name] = values
             i += 1
             continue
         
@@ -93,6 +120,9 @@ def parse_toon_to_dict(toon_string: str) -> Dict[str, Any]:
             continue
         
         i += 1
+    
+    # Post-processing: consolidate numbered keys (e.g., expertise1, expertise2 → expertise list)
+    result = _consolidate_numbered_keys(result)
     
     return result
 
@@ -153,6 +183,125 @@ def validate_toon_structure(toon_string: str) -> bool:
         return isinstance(parsed, dict)
     except Exception:
         return False
+
+
+# Known field schemas for structured data in curly-brace format {val1,val2,...}
+# Maps base key name → list of field names for parsing into dicts
+_KNOWN_FIELD_SCHEMAS: Dict[str, List[str]] = {
+    'expertise': ['skill', 'level', 'years', 'ai_generated'],
+    'target_audience': ['persona', 'description'],
+    'content_mix': ['category', 'percentage'],
+}
+
+
+def _consolidate_numbered_keys(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Consolidate numbered keys into lists.
+    
+    AI models often output numbered keys like expertise1, expertise2, etc.
+    instead of the expected tabular array format. This function detects
+    these patterns and merges them into proper lists.
+    
+    Also parses curly-brace wrapped values like {Salesforce,Expert,6,false}
+    into structured dicts using known field schemas.
+    """
+    # Find all numbered key groups (e.g., expertise1, expertise2 → base "expertise")
+    numbered_groups: Dict[str, Dict[int, Any]] = {}
+    non_numbered_keys: Dict[str, Any] = {}
+    
+    for key, value in data.items():
+        # Match keys ending with a number (e.g., expertise1, target_audience3)
+        match = re.match(r'^(.+?)(\d+)$', key)
+        if match:
+            base_name = match.group(1)
+            index = int(match.group(2))
+            if base_name not in numbered_groups:
+                numbered_groups[base_name] = {}
+            numbered_groups[base_name][index] = value
+        else:
+            non_numbered_keys[key] = value
+    
+    # Start with non-numbered keys
+    result = dict(non_numbered_keys)
+    
+    # Consolidate each numbered group into a list
+    for base_name, indexed_values in numbered_groups.items():
+        # Skip if the base key already exists as a proper list
+        if base_name in result and isinstance(result[base_name], list) and len(result[base_name]) > 0:
+            continue
+        
+        # Sort by index and extract values
+        sorted_values = [v for _, v in sorted(indexed_values.items())]
+        
+        # Try to parse curly-brace wrapped values into structured dicts
+        schema = _KNOWN_FIELD_SCHEMAS.get(base_name)
+        if schema:
+            parsed_list = []
+            for val in sorted_values:
+                parsed_item = _parse_curly_brace_value(val, schema)
+                if parsed_item is not None:
+                    parsed_list.append(parsed_item)
+                else:
+                    # Couldn't parse as structured — keep as-is
+                    parsed_list.append(val)
+            result[base_name] = parsed_list
+        else:
+            # Simple values (strings, numbers) — just collect into a list
+            result[base_name] = sorted_values
+    
+    return result
+
+
+def _parse_curly_brace_value(value: Any, field_names: List[str]) -> Union[Dict[str, Any], None]:
+    """
+    Parse a curly-brace wrapped value like {Salesforce,Expert,6,false}
+    into a dict using the provided field names.
+    
+    Handles both plain commas and escaped commas (\\,) as delimiters inside braces,
+    since the AI may escape commas to avoid conflicts with outer TOON CSV parsing.
+    
+    Returns None if the value can't be parsed in this format.
+    """
+    if not isinstance(value, str):
+        return None
+    
+    val = value.strip()
+    
+    # Strip curly braces if present
+    if val.startswith('{') and val.endswith('}'):
+        val = val[1:-1]
+    
+    # Strategy 1: Split by comma using _split_csv_line (respects escape sequences)
+    parts = _split_csv_line(val)
+    
+    if len(parts) == len(field_names):
+        result = {}
+        for field, part in zip(field_names, parts):
+            result[field] = _parse_value(part.strip())
+        return result
+    
+    # Strategy 2: If escape-aware split produced too few parts (e.g., \, was treated as literal),
+    # un-escape \, back to , and split by plain comma
+    if len(parts) < len(field_names) and '\\,' in val:
+        unescaped = val.replace('\\,', ',')
+        parts = [p.strip() for p in unescaped.split(',')]
+    
+    if len(parts) == len(field_names):
+        result = {}
+        for field, part in zip(field_names, parts):
+            result[field] = _parse_value(part.strip())
+        return result
+    
+    # Strategy 3: Too many parts — join excess into the last field (for descriptions with commas)
+    if len(parts) > len(field_names) and len(field_names) >= 2:
+        merged_parts = parts[:len(field_names) - 1]
+        merged_parts.append(','.join(parts[len(field_names) - 1:]))
+        result = {}
+        for field, part in zip(field_names, merged_parts):
+            result[field] = _parse_value(part.strip())
+        return result
+    
+    return None
 
 
 def _split_csv_line(line: str) -> List[str]:

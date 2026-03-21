@@ -10,8 +10,125 @@ from ..services.file_processor import extract_text_from_pdf
 from ..services.profile_builder import build_user_profile, update_user_profile_in_db
 from ..services.ai_service import validate_cv_content
 from ..services.usage_tracking_service import log_onboarding_usage
+from ..utils.toon_parser import parse_toon_to_dict, dict_to_toon
 
 router = APIRouter()
+
+
+def _ensure_context_json_consolidated(profile, db: Session) -> Dict[str, Any]:
+    """
+    Ensure context_json has consolidated list keys (expertise, target_audience, etc.)
+    instead of stale numbered keys (expertise1, expertise2, ...) or garbage entries
+    from corrupted TOON re-serialization.
+    
+    Detects and fixes:
+    1. Stale numbered keys (expertise1, expertise2 → expertise list)
+    2. Garbage entries where tabular headers leaked into data values
+    """
+    ctx = profile.context_json or {}
+    
+    # Detect stale numbered keys (e.g., expertise1 exists but expertise doesn't)
+    stale_prefixes = ['expertise', 'target_audience', 'content_mix', 'content_goals', 'ai_generated_fields']
+    has_numbered = False
+    for prefix in stale_prefixes:
+        if any(k.startswith(prefix) and k != prefix and k[len(prefix):].isdigit() for k in ctx):
+            has_numbered = True
+            break
+    
+    # Detect garbage entries (tabular headers that leaked into data)
+    has_garbage = _has_garbage_entries(ctx)
+    
+    # Detect incomplete data — TOON may have more data than context_json
+    # (e.g., after a previous buggy parse stored partial results)
+    has_incomplete = False
+    toon_raw_check = profile.custom_instructions or ""
+    if toon_raw_check.startswith("TOON_CONTEXT:"):
+        for prefix in ['expertise', 'target_audience', 'content_mix', 'content_goals']:
+            ctx_count = len(ctx.get(prefix, []))
+            # Count how many declarations exist in TOON for this field
+            import re as _re
+            toon_count = len(_re.findall(rf'^{prefix}\[', toon_raw_check, _re.MULTILINE))
+            if toon_count > ctx_count and toon_count > 0:
+                has_incomplete = True
+                break
+    
+    if not has_numbered and not has_garbage and not has_incomplete:
+        return ctx
+    
+    # Re-parse from stored TOON context
+    toon_raw = profile.custom_instructions or ""
+    if not toon_raw.startswith("TOON_CONTEXT:"):
+        # No TOON available — just filter garbage from existing context_json
+        if has_garbage:
+            ctx = _filter_garbage_entries(ctx)
+            profile.context_json = ctx
+            db.commit()
+        return ctx
+    
+    try:
+        toon_str = toon_raw.replace("TOON_CONTEXT:\n", "", 1)
+        reparsed = parse_toon_to_dict(toon_str)
+        
+        # Filter any remaining garbage entries after parsing
+        reparsed = _filter_garbage_entries(reparsed)
+        
+        # Preserve fields that aren't in TOON (content_ideas, additional_context)
+        for key in ['content_ideas_evergreen', 'content_ideas_trending', 'additional_context']:
+            if key in ctx and key not in reparsed:
+                reparsed[key] = ctx[key]
+        
+        # Update both context_json and custom_instructions
+        profile.context_json = reparsed
+        try:
+            regenerated_toon = dict_to_toon(reparsed)
+            profile.custom_instructions = f"TOON_CONTEXT:\n{regenerated_toon}"
+        except Exception:
+            pass  # Keep existing TOON if regeneration fails
+        
+        db.commit()
+        print(f"Fixed context_json for user {profile.user_id} — re-parsed from TOON, filtered garbage")
+        return reparsed
+    except Exception as e:
+        print(f"Warning: Failed to re-parse TOON for context_json fix: {e}")
+        return ctx
+
+
+def _has_garbage_entries(ctx: Dict[str, Any]) -> bool:
+    """Check if context_json has garbage entries (tabular headers that leaked into data)."""
+    import re
+    header_pattern = re.compile(r'\w+\[\d+\]\{')
+    for key in ['expertise', 'target_audience', 'content_mix']:
+        items = ctx.get(key, [])
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    for v in item.values():
+                        if isinstance(v, str) and header_pattern.search(v):
+                            return True
+    return False
+
+
+def _filter_garbage_entries(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove garbage entries where tabular headers leaked into data values."""
+    import re
+    header_pattern = re.compile(r'\w+\[\d+\]\{')
+    for key in ['expertise', 'target_audience', 'content_mix']:
+        items = ctx.get(key, [])
+        if isinstance(items, list):
+            cleaned = []
+            for item in items:
+                if isinstance(item, dict):
+                    # Check if any value looks like a tabular header
+                    is_garbage = any(
+                        isinstance(v, str) and header_pattern.search(v)
+                        for v in item.values()
+                    )
+                    if not is_garbage:
+                        cleaned.append(item)
+                else:
+                    cleaned.append(item)
+            ctx[key] = cleaned
+    return ctx
 
 class OnboardingStartResponse(BaseModel):
     user_id: str
@@ -64,10 +181,12 @@ async def get_onboarding_state(
     # Prepare profile data if it exists
     profile_data = None
     if has_processed_profile:
+        # Auto-fix stale numbered keys (expertise1, expertise2 → expertise list)
+        fixed_ctx = _ensure_context_json_consolidated(profile, db)
         profile_data = {
             "profile_md": profile.profile_md,
             "writing_style_md": profile.writing_style_md,
-            "context_json": profile.context_json,
+            "context_json": fixed_ctx,
             "preferences": profile.preferences
         }
     
@@ -299,10 +418,13 @@ async def get_preview(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     
+    # Auto-fix stale numbered keys (expertise1, expertise2 → expertise list)
+    fixed_ctx = _ensure_context_json_consolidated(profile, db)
+    
     return OnboardingPreviewResponse(
         profile_md=profile.profile_md,
         writing_style_md=profile.writing_style_md,
-        context_json=profile.context_json,
+        context_json=fixed_ctx,
         preferences=profile.preferences
     )
 

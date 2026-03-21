@@ -52,6 +52,20 @@ AI_PROVIDERS = {
         "features": ["vision", "long_context", "extended_thinking"],
         "api_key_env": "CLAUDE_API_KEY",
         "model_env": "CLAUDE_MODEL"
+    },
+    "openrouter": {
+        "name": "OpenRouter (Multi-Provider)",
+        "models": [
+            {"id": "anthropic/claude-3.5-haiku", "name": "Claude 3.5 Haiku", "description": "Fast, cost-effective content generation"},
+            {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet", "description": "Balanced intelligence and speed"},
+            {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash", "description": "Fast, great for analysis tasks"},
+            {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "description": "Best quality Gemini model"},
+            {"id": "openai/gpt-4o", "name": "GPT-4o", "description": "Most capable OpenAI model"},
+            {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "description": "Fast and cost-effective"},
+        ],
+        "features": ["vision", "long_context", "multi_provider"],
+        "api_key_env": "OPENROUTER_API_KEY",
+        "model_env": "OPENROUTER_MODEL"
     }
 }
 

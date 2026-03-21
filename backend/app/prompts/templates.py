@@ -10,14 +10,14 @@ IMPORTANT: You need to generate TWO separate things:
 1. POST CONTENT: The actual LinkedIn post text that users will read.
    - This should be a normal LinkedIn post (not structured as slides)
    - Write it as a standalone post
-   - Do NOT include slide descriptions or prompts
-   - Do NOT mention "slide 1", "slide 2", etc.
+   - Do NOT include slide descriptions or prompts in the post text
 
-2. SLIDE IMAGE PROMPTS: An array of image generation prompts (one per slide).
-   - These describe what each slide image should look like
-   - These are ONLY for image generation, NOT shown in the post
-   - Typically 4-8 slides
-   - All slides should have consistent theming (same colors, style, visual language)
+2. SLIDE IMAGE PROMPTS: An array of image generation prompts for AI diffusion models (one per slide).
+   - NEVER include text, words, letters, or numbers in any prompt — text overlays are added programmatically later
+   - Describe ONLY visual scenes, objects, people, colors, lighting, composition
+   - ALL slides MUST use the SAME color palette, visual style, and composition approach
+   - Typically 4-8 slides, each illustrating ONE point from the post
+   - Format: 1200×1200px square per slide
 
 The post_content and image_prompts are COMPLETELY SEPARATE."""
 
@@ -28,14 +28,14 @@ TEXT_IMAGE_TEMPLATE = """Generate TWO separate things:
    - This is what users will READ on LinkedIn
    - Write it as a normal LinkedIn post
    - Do NOT include image descriptions or prompts in the post text
-   - Do NOT mention "image" or "visual" in the post content
 
-2. IMAGE PROMPT: An AI image generation prompt (for image generation only)
-   - This is ONLY for AI image generation, NOT shown to users
-   - Describe: Visual concept, composition, style, colors, key elements
-   - Dimensions: 1200x628px (LinkedIn optimal)
+2. IMAGE PROMPT: A prompt for AI diffusion model image generation (NOT shown to users)
+   - NEVER include text, words, letters, or numbers — diffusion models render text poorly
+   - Describe ONLY: visual scene, composition, style, colors, lighting, mood
+   - Format: 1200×1200px square, professional, high-resolution
+   - Structure: [Style], [Scene/subject], [Visual elements], [Color palette], [Lighting], [Mood]
 
-IMPORTANT: post_content and image_prompt are COMPLETELY SEPARATE. The post_content should be a normal LinkedIn post, and image_prompt is metadata for image generation."""
+IMPORTANT: post_content and image_prompt are COMPLETELY SEPARATE. image_prompt describes a visual scene only (no text in image)."""
 
 # Template for analyzing post performance
 PERFORMANCE_ANALYSIS_TEMPLATE = """Analyze why this post performed well/poorly:

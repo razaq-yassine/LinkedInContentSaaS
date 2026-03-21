@@ -11,15 +11,15 @@ Generate TWO separate fields:
    - Normal post, small statements with spacing
    - NO image descriptions/prompts in content
 
-2. image_prompt: Image generation prompt (REQUIRED, for AI only)
-   - If content is specific (mentions tools/platforms/concrete scenarios): Use real-world visuals (dashboards, offices, devices, professional photos)
-   - If content is general/abstract/conceptual: Use friendly cartoon/illustration style with characters doing actions that match the post's message
-   - For before/after comparisons: Use split-screen with cartoon characters or illustrations showing the transformation
-   - Characters should be diverse, professional, and doing actions that directly represent the post's concepts
-   - LinkedIn-optimized: 1200×628px, professional, engaging, mobile-friendly
-   - Output ONLY the final prompt text - no explanations
+2. image_prompt: Prompt for AI diffusion model image generation (REQUIRED)
+   - NEVER include text, words, letters, or numbers — diffusion models render text poorly
+   - Describe ONLY visual scenes, objects, people, colors, lighting, composition
+   - Style decision: specific tools/platforms → photorealistic | abstract concepts → modern flat illustration
+   - Format: 1200×1200px square, professional, high-resolution
+   - Structure: [Style], [Scene/subject], [Visual elements], [Color palette], [Lighting], [Mood]
+   - Output ONLY the final prompt text — no explanations
 
-Keep them SEPARATE but image_prompt must create concrete visuals matching post content."""
+Keep them SEPARATE. image_prompt describes a visual scene only (no text/words in image)."""
 
 # Carousel Post Instructions
 CAROUSEL_POST_INSTRUCTIONS = """## TEXT + CAROUSEL POST
@@ -30,31 +30,18 @@ Generate TWO separate fields:
    - Normal post, NOT structured as slides
    - NO slide descriptions/prompts in content
 
-2. image_prompts: Array of 4-8 image prompts (REQUIRED, for AI only)
-   - CRITICAL: ALL slides must use SAME color palette, SAME visual style, SAME composition
-   - Choose ONE visual style for entire carousel:
-     * If content is specific: Real-world visuals (photography, dashboards, devices)
-     * If content is general/abstract: Cartoon/illustration style with characters
-   - Break down post into logical sections (one per slide)
-   - Each slide represents ONE specific point from post
-   - Visual progression: slides build like a story (not random images)
-   - If using characters: They should be diverse, professional, doing actions matching each slide's point
-   - Create cohesive series with consistent theming
-   
-   - CRITICAL FOR EDUCATIONAL/TUTORIAL CONTENT:
-     * If post is educational (explains how to do something, teaches concepts, provides solutions):
-       - Each slide MUST include TEXT OVERLAYS with clear explanations
-       - Include step-by-step instructions in text if applicable
-       - Add key concepts, solutions, or takeaways as text on the slide
-       - Text should be readable, well-positioned, and complement visuals
-       - For "how to" posts: Include numbered steps or sequential instructions in text overlays
-       - For explanatory posts: Include definitions, concepts, or solutions in text overlays
-       - Visuals support the text - slides cannot be images only
-       - Example: "Slide showing [visual concept] with text overlay explaining: '[key explanation or step]'"
-   
-   - Output ONLY JSON array - no explanations
+2. image_prompts: Array of 4-8 image prompts for AI diffusion models (REQUIRED)
+   - NEVER include text, words, letters, or numbers in any prompt — text overlays are added programmatically later
+   - Describe ONLY visual scenes, objects, people, colors, lighting, composition
+   - ALL slides MUST use SAME color palette, SAME visual style, SAME composition approach
+   - Choose ONE style for entire carousel: photorealistic OR flat illustration
+   - Each slide illustrates ONE specific point from the post
+   - Slides progress like a visual story (intro → points → conclusion)
+   - Format: 1200×1200px square per slide
+   - Structure per prompt: [Shared style], [Unique scene], [Visual elements], [Shared palette], [Lighting], [Mood]
+   - Output ONLY JSON array — no explanations
 
-Keep them SEPARATE but image_prompts must create consistent visual story matching post structure. For educational content, ensure text overlays are included in prompts."""
+Keep them SEPARATE. image_prompts describe visual scenes only (text is added to slides programmatically)."""
 
 # Video Script Post Instructions
 VIDEO_SCRIPT_INSTRUCTIONS = """## VIDEO SCRIPT POST
@@ -84,23 +71,23 @@ The script should be engaging, valuable, and optimized for LinkedIn video format
 CAROUSEL_JSON_FORMAT = """{
     "title": "Concise title (3-8 words)",
     "post_content": "LinkedIn post text with hashtags at end",
-    "image_prompts": ["Slide 1: prompt with consistent theme", "Slide 2: same theme", "4-15 slides total, same colors/style"],
+    "image_prompts": ["Slide 1: [style], [scene], [palette], [mood]", "Slide 2: same style...", "4-15 slides, visually consistent"],
     "hashtags": ["#tag1", "#tag2", "#tag3"]
 }
 
 Rules: 
-- All slides use SAME colors/style
-- Educational posts need text overlays
+- All slides use SAME style/colors — NO text/words/numbers in any prompt
 - Include hashtags in post_content AND as separate array"""
 
 IMAGE_JSON_FORMAT = """{
     "title": "Concise title (3-8 words)",
     "post_content": "LinkedIn post text with hashtags at end",
-    "image_prompt": "Visual prompt: real-world if specific tools/platforms, cartoon if abstract. 1200x628px, professional.",
+    "image_prompt": "[Style], [scene/subject], [visual elements], [color palette], [lighting], [mood]. NO text/words in image. 1200x1200 square.",
     "hashtags": ["#tag1", "#tag2", "#tag3"]
 }
 
 Rules: 
+- image_prompt must NEVER contain text/words/letters — visual scene only
 - Include hashtags in post_content AND as separate array"""
 
 VIDEO_SCRIPT_JSON_FORMAT = """{

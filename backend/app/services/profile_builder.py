@@ -116,12 +116,20 @@ async def build_user_profile(
     # Step 6.5: Initialize additional_context as empty (user-editable, not AI-generated)
     parsed_context['additional_context'] = ""
     
-    # Step 7: Regenerate complete TOON with content ideas
+    # Step 7: Build complete TOON by appending new sections to original AI TOON
+    # Preserve original AI TOON format and append content ideas as new sections
     try:
-        complete_toon = dict_to_toon(parsed_context)
-        print(f"✅ Generated complete TOON context")
+        ideas_only = {}
+        if evergreen_ideas:
+            ideas_only['content_ideas_evergreen'] = evergreen_ideas
+        if trending_ideas:
+            ideas_only['content_ideas_trending'] = trending_ideas
+        ideas_only['additional_context'] = ""
+        appended_toon = dict_to_toon(ideas_only) if ideas_only else ""
+        complete_toon = toon_context.rstrip() + "\n" + appended_toon if appended_toon else toon_context
+        print(f"✅ Generated complete TOON context (original + appended sections)")
     except Exception as e:
-        print(f"⚠️  Error serializing complete TOON: {str(e)}, using partial")
+        print(f"⚠️  Error building complete TOON: {str(e)}, using original AI TOON")
         complete_toon = toon_context
     
     # Step 8: Analyze writing style (only if user chose "my_style" and provided samples)

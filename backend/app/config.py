@@ -19,7 +19,12 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./linkedin_content_saas.db"
     
     # AI Provider Selection
-    ai_provider: str = "gemini"  # Options: "openai", "gemini", or "claude"
+    ai_provider: str = "openrouter"  # Options: "openai", "gemini", "claude", or "openrouter"
+    
+    # OpenRouter (unified API for multiple providers)
+    openrouter_api_key: str = ""
+    openrouter_model: str = "anthropic/claude-3.5-haiku"  # Content generation model
+    openrouter_onboarding_model: str = "google/gemini-2.5-flash"  # Onboarding/CV analysis model
     
     # OpenAI
     openai_api_key: str = ""

@@ -1995,7 +1995,8 @@ def format_video_script_string(script_text: str) -> str:
 
 async def generate_image_prompt(post_content: str, context: dict) -> tuple[str, Dict[str, Any]]:
     """
-    Generate AI image prompt for Canva/DALL-E that matches the post content and is LinkedIn-friendly
+    Generate AI image prompt for diffusion models (FLUX/Stable Diffusion) that matches the post content.
+    Optimized for square LinkedIn images (1200×1200).
     """
     try:
         # Extract key themes and concepts from the post content
@@ -2007,46 +2008,41 @@ async def generate_image_prompt(post_content: str, context: dict) -> tuple[str, 
             expertise_str = str(expertise) if expertise else industry
         
         prompt, token_usage = await generate_completion(
-            system_prompt="""You are a creative expert at writing image generation prompts for LinkedIn posts. Your prompts create vivid, concrete visuals that perfectly match the post's content.
+            system_prompt="""You write image generation prompts for AI diffusion models (FLUX, Stable Diffusion). Your prompts produce visually striking LinkedIn post images.
 
-VISUAL STRATEGY:
-- If post mentions specific tools/platforms/concrete scenarios: Use real-world visuals (photography style, dashboards on screens, offices, devices, professional photos)
-- If post is general/abstract/conceptual: Use friendly cartoon/illustration style with diverse professional characters doing actions that match the post's message
-- For before/after comparisons: Use split-screen with cartoon characters or illustrations showing the transformation
+CRITICAL RULES:
+1. NEVER include text, words, letters, numbers, or typography in prompts — diffusion models render text poorly
+2. Describe ONLY visual scenes, objects, people, colors, lighting, and composition
+3. Output format: 1200×1200px square, professional, high-resolution
 
-Your prompts should:
-- Be specific and concrete (show actual tools, screens, people, settings OR cartoon characters doing relevant actions)
-- Use appropriate visual style based on content specificity
-- Include diverse professional characters (realistic OR cartoon style)
-- Be LinkedIn-optimized: 1200×628px, professional aesthetic, clear composition, engaging
-- Create visuals that enhance the post's message
+STYLE DECISION TREE:
+- Specific tools/platforms/products mentioned → photorealistic style: real offices, screens, devices, professional settings
+- Abstract concepts/soft skills/leadership → modern flat illustration style: clean vector-like characters, bold colors, geometric shapes
+- Data/metrics/comparisons → infographic-style illustration: charts as visual elements, graphs as abstract art, no readable numbers
+- Personal stories/experiences → warm photography style: natural lighting, candid feel, professional but approachable
 
-AVOID abstract descriptions like "data flow visualization". Instead use:
-- Specific content: "Salesforce dashboard on laptop screen" or "professionals reviewing analytics"
-- General content: "Friendly cartoon professional character [doing action that matches post]" or "Illustration showing [concept] with diverse characters"
+PROMPT STRUCTURE (follow this order):
+[Style keyword], [Main subject/scene], [Key visual elements], [Color palette], [Lighting], [Composition], [Mood]
 
-Write creative, detailed prompts that image generators can easily visualize. Output ONLY the final prompt text - no explanations.""",
-            user_message=f"""Create a creative, detailed image generation prompt for this LinkedIn post:
+GOOD EXAMPLES:
+- "Photorealistic, professional woman presenting to diverse team in modern glass office, laptop showing colorful dashboard, warm natural lighting, shallow depth of field, confident and collaborative mood"
+- "Modern flat illustration, cartoon professional climbing staircase made of oversized colorful building blocks, teal and coral palette, clean white background, centered composition, optimistic and aspirational mood"
+- "Minimalist corporate illustration, two professionals shaking hands across a bridge connecting two platforms, gradient blue to purple palette, soft ambient lighting, symmetrical composition, trust and partnership mood"
 
-POST CONTENT:
-{post_content}
+BAD EXAMPLES (never do this):
+- "Image with text saying 'Top 5 Tips'" ← contains text
+- "Data flow visualization with labels" ← abstract + text
+- "Slide with bullet points showing..." ← slide/text content
 
-INDUSTRY: {industry}
-EXPERTISE: {expertise_str}
+Output ONLY the prompt — no explanations, no labels, no markdown.""",
+            user_message=f"""Write one image generation prompt for this LinkedIn post:
 
-Analyze the content:
-- If it mentions specific tools/platforms: Create real-world visual (photography, dashboards, devices)
-- If it's general/abstract: Create cartoon/illustration with characters doing actions matching the post
-- For comparisons: Use split-screen with characters showing transformation
+POST: {post_content[:500]}
 
-Create a vivid visual description that:
-- Directly represents the post's main message and key concepts
-- Uses appropriate style (realistic OR cartoon/illustration based on content)
-- Shows characters/people doing actions that match the post's concepts
-- Is optimized for LinkedIn (1200×628px, professional, engaging, mobile-friendly)
+INDUSTRY: {industry} | EXPERTISE: {expertise_str}
 
-Write the complete prompt as a single, detailed description ready for image generation.""",
-            temperature=0.8
+Remember: NO text/words/numbers in the image. Visual scene only. Square format (1200×1200).""",
+            temperature=0.7
         )
         
         # Clean up the prompt (remove markdown formatting if present)
@@ -2056,11 +2052,11 @@ Write the complete prompt as a single, detailed description ready for image gene
             prompt = re.sub(r'\n?```$', '', prompt)
         prompt = prompt.strip()
         
-        final_prompt = prompt if prompt else "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px"
+        final_prompt = prompt if prompt else "Modern flat illustration, diverse professional team collaborating in bright modern workspace, teal and warm orange palette, clean white background, centered balanced composition, confident and innovative mood, high quality, square format"
         return final_prompt, token_usage
     except Exception as e:
         print(f"Error generating image prompt: {str(e)}")
-        return "Professional LinkedIn post image, modern design, diverse professional characters, clean composition, brand colors, 1200x628px", {
+        return "Modern flat illustration, diverse professional team collaborating in bright modern workspace, teal and warm orange palette, clean white background, centered balanced composition, confident and innovative mood, high quality, square format", {
             "input_tokens": 0,
             "output_tokens": 0,
             "total_tokens": 0,
@@ -2070,7 +2066,8 @@ Write the complete prompt as a single, detailed description ready for image gene
 
 async def generate_carousel_image_prompts(post_content: str, context: dict, requested_slide_count: Optional[int] = None) -> tuple[list[str], Dict[str, Any]]:
     """
-    Generate multiple AI image prompts for carousel slides that match the post content and are LinkedIn-friendly
+    Generate multiple AI image prompts for carousel slides that match the post content and are LinkedIn-friendly.
+    Optimized for square format (1200×1200) with consistent visual theming across all slides.
     
     Args:
         post_content: The post content
@@ -2093,95 +2090,51 @@ async def generate_carousel_image_prompts(post_content: str, context: dict, requ
         else:
             expertise_str = str(expertise) if expertise else industry
         
-        # Detect if content is educational/tutorial/how-to
-        educational_keywords = ['how to', 'step', 'tutorial', 'guide', 'explain', 'learn', 'teach', 'solution', 'process', 'method', 'technique', 'way to', 'tips', 'best practices', 'example', 'demonstrate']
-        is_educational = any(keyword in post_content.lower() for keyword in educational_keywords)
-        
-        # Extract key educational points if educational
-        educational_instruction = ""
-        if is_educational:
-            educational_instruction = """
-
-CRITICAL FOR EDUCATIONAL CONTENT:
-- This post is educational/tutorial/how-to content
-- Each slide MUST include TEXT OVERLAYS with:
-  * Clear explanations of concepts being taught
-  * Step-by-step instructions if applicable
-  * Key takeaways or solutions
-  * Specific details that educate the viewer
-- Text should be readable, well-positioned, and complement the visuals
-- For "how to" content: Include numbered steps or sequential instructions in text
-- For explanatory content: Include key concepts, definitions, or solutions in text
-- Visuals should support the text, not replace it
-- Example: If explaining a process, the slide should show BOTH the visual representation AND text explaining what's happening
-- Text overlays are REQUIRED - slides cannot be images only"""
-        
         prompt, token_usage = await generate_completion(
-            system_prompt=f"""You are a creative expert at writing image generation prompts for LinkedIn carousel posts. Your prompts create a cohesive visual story with consistent theming.
+            system_prompt=f"""You write image generation prompts for AI diffusion models (FLUX, Stable Diffusion) to create LinkedIn carousel slide backgrounds.
 
-CRITICAL REQUIREMENTS:
+CRITICAL RULES:
+1. NEVER include text, words, letters, numbers, labels, or typography in any prompt — diffusion models render text poorly. Text overlays are added programmatically later.
+2. Describe ONLY visual scenes, objects, people, colors, lighting, and composition
+3. Output format: 1200×1200px square, professional, high-resolution
+4. ALL slides MUST share the SAME color palette, visual style, and composition approach
 
-1. VISUAL CONSISTENCY (MOST IMPORTANT):
-   - ALL slides must use the SAME color palette (specify exact colors)
-   - ALL slides must use the SAME visual style (choose ONE: photography OR cartoon/illustration)
-   - ALL slides must use the SAME composition approach
-   - Create visual continuity - each slide feels like part of the same series
+STYLE DECISION (choose ONE for the entire set):
+- Specific tools/platforms → photorealistic: offices, screens, devices, professional settings
+- Abstract concepts/soft skills → modern flat illustration: clean vector characters, bold colors, geometric shapes
+- Data/metrics → infographic-style: charts as abstract visual art, geometric data representations, no readable numbers
+- Stories/experiences → warm photography: natural lighting, candid professional feel
 
-2. VISUAL STYLE SELECTION:
-   - If post mentions specific tools/platforms: Use real-world style (photography, dashboards, devices)
-   - If post is general/abstract: Use cartoon/illustration style with characters
-   - Choose ONE style for entire carousel and maintain it across all slides
+PROMPT STRUCTURE (use for every slide):
+[Shared style keyword], [This slide's unique scene/subject], [Key visual elements], [Shared color palette], [Lighting], [Composition], [Mood]
 
-3. CONCRETE VISUALS:
-   - Each slide represents ONE specific point from the post
-   - Real-world style: "Salesforce dashboard on laptop", "professionals in office"
-   - Cartoon style: "Friendly cartoon professional character [doing action matching slide's point]"
-   - Characters should be diverse, professional, doing actions that match each slide's concept
-   - Avoid abstract concepts - use either realistic visuals OR character illustrations
+CONSISTENCY RULES:
+- First 3 words of every prompt should be the SAME style descriptor (e.g., "Modern flat illustration,")
+- Specify the SAME 2-3 colors in every prompt (e.g., "teal and coral palette")
+- Use the SAME background treatment (e.g., "clean white background" or "soft gradient background")
+- If using characters, maintain the SAME character style across all slides
 
-4. VISUAL STORY PROGRESSION:
-   - Slide 1: Introduces the topic with established visual theme
-   - Slides 2-N: Each shows a specific point/concept, maintaining the theme
-   - Final slide: Summarizes or provides takeaway, maintains theme
-   - Slides build on each other visually like a story
-{educational_instruction}
-5. LINKEDIN OPTIMIZATION:
-   - Professional, polished, engaging aesthetic
-   - 1200×628px landscape format
-   - Text overlay space consideration
+SLIDE PROGRESSION:
+- Slide 1: Title/hook visual — sets the visual theme
+- Middle slides: Each illustrates ONE specific concept from the post
+- Final slide: Summary/takeaway visual — wraps the visual story
 
-Return ONLY a valid JSON array of strings. Each prompt should be creative, detailed, and ready for image generation. Output ONLY the JSON array - no explanations.""",
-            user_message=f"""Create {slide_count} creative, detailed image prompts for this LinkedIn carousel post (maximum 15 slides allowed):
+Return ONLY a valid JSON array of prompt strings. No explanations, no markdown.""",
+            user_message=f"""Create exactly {slide_count} carousel slide image prompts for this LinkedIn post:
 
-POST CONTENT:
-{post_content}
+POST: {post_content[:800]}
 
-INDUSTRY: {industry}
-EXPERTISE: {expertise_str}
+INDUSTRY: {industry} | EXPERTISE: {expertise_str}
 
-TASK:
-1. Analyze content: If specific tools/platforms mentioned → use real-world style. If general/abstract → use cartoon/illustration style with characters
-2. Determine if content is educational/tutorial/how-to: {"YES - This is educational content. Each slide MUST include text overlays with explanations, steps, or solutions." if is_educational else "NO - Standard content"}
-3. Break the post into {slide_count} logical sections/points (one per slide)
-4. Choose ONE consistent visual theme: same colors, same style (realistic OR cartoon), same composition for ALL slides
-5. Create {slide_count} prompts where:
-   - Each slide represents ONE specific point from the post
-   - All slides share the SAME color palette and visual style
-   - If using characters: They do actions matching each slide's point
-   - Slides build on each other visually (like a story)
-   {"- CRITICAL: Each slide MUST include text overlays with:" if is_educational else ""}
-   {"  * Clear explanations of what is being taught" if is_educational else ""}
-   {"  * Step-by-step instructions if applicable" if is_educational else ""}
-   {"  * Key solutions or takeaways" if is_educational else ""}
-   {"  * Specific educational content that helps viewers understand" if is_educational else ""}
-   {"- Text should be readable and well-integrated with visuals" if is_educational else ""}
+Requirements:
+- {slide_count} prompts, each for a 1200×1200 square image
+- ALL slides visually consistent (same style, colors, composition)
+- NO text/words/numbers in any prompt — text is added later programmatically
+- Each slide illustrates ONE point from the post
+- Slides progress like a visual story
 
-CRITICAL: All slides must be visually consistent - same colors, same style (realistic OR cartoon), same type of elements. They should feel like a cohesive series.{" For educational content, text overlays are REQUIRED on every slide." if is_educational else ""}
-
-CRITICAL: Return EXACTLY {slide_count} prompts (maximum 15 slides). Do NOT exceed 15 slides even if requested.
-
-Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
-            temperature=0.8
+Return ONLY a JSON array of {slide_count} strings:""",
+            temperature=0.7
         )
         
         # Try to parse as JSON array
@@ -2205,7 +2158,7 @@ Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
                 elif len(prompts) < slide_count:
                     # Pad with variations of the last prompt
                     while len(prompts) < slide_count:
-                        prompts.append(prompts[-1] if prompts else "Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, brand colors, 1200x628px")
+                        prompts.append(prompts[-1] if prompts else "Modern flat illustration, professional character in collaborative workspace, teal and coral palette, clean white background, centered composition, confident mood, square format")
                     return prompts[:slide_count], token_usage
                 return prompts, token_usage
         except json.JSONDecodeError as e:
@@ -2218,11 +2171,11 @@ Return ONLY a JSON array with exactly {slide_count} detailed prompts:""",
             return lines[:slide_count], token_usage
         
         # Ultimate fallback: create generic but LinkedIn-friendly prompts
-        return [f"Professional LinkedIn carousel slide {i+1}, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for i in range(slide_count)], token_usage
+        return [f"Modern flat illustration, professional scene {i+1}, diverse characters collaborating, teal and coral palette, clean white background, centered composition, confident mood, square format" for i in range(slide_count)], token_usage
     except Exception as e:
         print(f"Error generating carousel image prompts: {str(e)}")
         # Fallback: return default LinkedIn-friendly prompts
-        return ["Professional LinkedIn carousel slide, modern design, diverse professional characters, clean composition, consistent brand colors, 1200x628px" for _ in range(4)], {
+        return ["Modern flat illustration, diverse professionals collaborating in bright workspace, teal and coral palette, clean white background, centered composition, confident and innovative mood, square format" for _ in range(4)], {
             "input_tokens": 0,
             "output_tokens": 0,
             "total_tokens": 0,

@@ -311,9 +311,16 @@ async def generate_image_for_post(
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = str(e)
+        # Check if it's a Cloudflare rate limit error
+        if "429" in error_msg or "daily free allocation" in error_msg.lower() or "neurons" in error_msg.lower():
+            raise HTTPException(
+                status_code=429,
+                detail="Cloudflare daily limit reached. You've used your free tier allocation (10,000 neurons). Please upgrade to Cloudflare Workers Paid plan or wait until tomorrow for the limit to reset."
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Image generation failed: {str(e)}"
+            detail=f"Image generation failed: {error_msg}"
         )
 
 class CustomPromptImageRequest(BaseModel):
