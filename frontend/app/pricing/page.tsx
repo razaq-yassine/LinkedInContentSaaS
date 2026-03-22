@@ -102,7 +102,17 @@ const fallbackPlans: Plan[] = [
 
 export default function PricingPage() {
   const [plans, setPlans] = useState<Plan[]>(fallbackPlans);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('billing_cycle');
+      return (saved === 'monthly' || saved === 'yearly') ? saved : 'yearly';
+    }
+    return 'yearly';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('billing_cycle', billingCycle);
+  }, [billingCycle]);
 
   useEffect(() => {
     async function fetchPlans() {
