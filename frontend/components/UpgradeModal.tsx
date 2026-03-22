@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Sparkles, Zap, Crown, Check, TrendingUp } from 'lucide-react';
+import { X, Sparkles, Crown, Check, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -28,7 +28,7 @@ export function UpgradeModal({ isOpen, onClose, userPlan, creditsRemaining = 0 }
     if (isOpen && userPlan === 'FREE') {
       // Check if user has ever seen the modal
       const hasSeenModal = localStorage.getItem('upgradeModalSeen');
-      
+
       if (!hasSeenModal) {
         setShowModal(true);
         localStorage.setItem('upgradeModalSeen', 'true');
@@ -61,7 +61,7 @@ export function UpgradeModal({ isOpen, onClose, userPlan, creditsRemaining = 0 }
           >
             <X className="w-5 h-5" />
           </button>
-          
+
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
               <Sparkles className="w-5 h-5" />
@@ -90,7 +90,7 @@ export function UpgradeModal({ isOpen, onClose, userPlan, creditsRemaining = 0 }
             <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-bl-lg">
               POPULAR
             </div>
-            
+
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Starter Plan</h3>
@@ -151,23 +151,14 @@ export function UpgradeModal({ isOpen, onClose, userPlan, creditsRemaining = 0 }
           </div>
 
           {/* Other Plans Preview */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="mb-3">
             <div className="bg-white rounded-lg p-3 border border-gray-200">
               <div className="flex items-center gap-1.5 mb-1">
-                <Zap className="w-4 h-4 text-blue-600" />
+                <Crown className="w-4 h-4 text-blue-600" />
                 <h4 className="font-bold text-sm text-gray-900">Pro Plan</h4>
               </div>
               <div className="text-xl font-bold text-blue-600">$25<span className="text-xs text-gray-600">/mo</span></div>
               <p className="text-xs text-gray-600 mt-0.5">100 credits • ~40-200 posts</p>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Crown className="w-4 h-4 text-blue-600" />
-                <h4 className="font-bold text-sm text-gray-900">Unlimited</h4>
-              </div>
-              <div className="text-xl font-bold text-blue-600">$50<span className="text-xs text-gray-600">/mo</span></div>
-              <p className="text-xs text-gray-600 mt-0.5">∞ Unlimited posts</p>
             </div>
           </div>
 

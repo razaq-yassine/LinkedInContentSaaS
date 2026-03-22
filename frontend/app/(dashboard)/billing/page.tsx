@@ -136,7 +136,7 @@ export default function BillingPage() {
       const activePlans = plansResponse.data
         .filter((plan: SubscriptionPlan) => plan.is_active)
         .sort((a: SubscriptionPlan, b: SubscriptionPlan) => a.sort_order - b.sort_order)
-        .slice(0, 4);
+        .slice(0, 3);
 
       setPlans(activePlans);
       const subscriptionData = subscriptionResponse.data;
@@ -153,13 +153,13 @@ export default function BillingPage() {
 
   const handleSubscribe = async (planName: string) => {
     const currentPlan = currentSubscription?.plan;
-    
+
     // If switching to free plan, use downgrade endpoint (no Stripe needed)
     if (planName === 'FREE') {
       handleDowngrade();
       return;
     }
-    
+
     // Check if this is an upgrade (user has paid plan and selecting another paid plan)
     const isUpgrade = currentPlan && currentPlan !== 'FREE' && currentPlan !== planName;
 
@@ -229,14 +229,14 @@ export default function BillingPage() {
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
+
       console.log('Attempting upgrade with:', {
         currentPlan: currentSubscription?.plan,
         newPlan: normalizedPlan,
         originalPlan: selectedUpgradePlan,
         billingCycle: billingCycle,
       });
-      
+
       await axios.post(
         `${apiUrl}/api/subscription/upgrade`,
         {

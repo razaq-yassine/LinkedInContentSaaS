@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Header, Footer } from "@/components/landing";
-import { Check, Zap, Crown, Building2, ArrowRight, HelpCircle, Sparkles, Brain, Cpu } from "lucide-react";
+import { Check, Zap, Crown, ArrowRight, HelpCircle, Sparkles, Brain, Cpu } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL, type Plan } from "@/app/api-config";
@@ -11,14 +11,12 @@ const planIcons: Record<string, React.ElementType> = {
   free: Zap,
   starter: Sparkles,
   pro: Crown,
-  unlimited: Building2,
 };
 
 const planGradients: Record<string, string> = {
   free: "from-gray-500 to-gray-600",
   starter: "from-cyan-500 to-teal-500",
   pro: "from-violet-600 to-indigo-600",
-  unlimited: "from-emerald-500 to-teal-600",
 };
 
 const faqs = [
@@ -40,7 +38,7 @@ const faqs = [
   },
   {
     question: "Can I generate images and carousels?",
-    answer: "Yes! Pro and Agency plans include AI-generated images and carousel designs. Our image AI creates stunning visuals that complement your posts and increase engagement.",
+    answer: "Yes! All plans include AI-generated images and carousel designs. Our image AI creates stunning visuals that complement your posts and increase engagement.",
   },
   {
     question: "Is my data used to train AI models?",
@@ -100,19 +98,6 @@ const fallbackPlans: Plan[] = [
     is_active: true,
     sort_order: 3,
   },
-  {
-    id: "4",
-    plan_name: "unlimited",
-    display_name: "Unlimited Plan",
-    description: "Unlimited content creation for power users",
-    price_monthly: 5000,
-    price_yearly: 50000,
-    credits_limit: -1,
-    estimated_posts: { min: 999, max: 999, display: "Unlimited" },
-    features: ["Unlimited credits", "Unlimited posts", "All post formats", "Priority support", "Dedicated account manager", "Custom integrations", "API access", "White-label options"],
-    is_active: true,
-    sort_order: 4,
-  },
 ];
 
 export default function PricingPage() {
@@ -130,7 +115,7 @@ export default function PricingPage() {
           const activePlans = data
             .filter((plan: Plan) => plan.is_active)
             .sort((a: Plan, b: Plan) => a.sort_order - b.sort_order)
-            .slice(0, 4);
+            .slice(0, 3);
           setPlans(activePlans);
         }
       } catch (error) {
@@ -201,7 +186,7 @@ export default function PricingPage() {
         {/* Pricing Cards */}
         <section className="pb-24 relative">
           <div className="container mx-auto px-4 lg:px-8">
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {plans.map((plan, i) => {
                 const IconComponent = planIcons[plan.plan_name] || Zap;
                 const gradient = planGradients[plan.plan_name] || "from-gray-500 to-gray-600";
