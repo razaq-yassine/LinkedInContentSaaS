@@ -26,7 +26,7 @@ const faqs = [
   },
   {
     question: "What AI models power PostInAi?",
-    answer: "We use state-of-the-art large language models fine-tuned specifically for LinkedIn content. Our AI understands LinkedIn's algorithm, engagement patterns, and what makes posts go viral while maintaining your authentic voice.",
+    answer: "We primarily use Claude's latest AI models, powered by a smart engine that intelligently selects the optimal model based on your content type, context, and requirements. Whether it's creative storytelling, technical analysis, or professional insights, our system automatically chooses the best AI to match your needs while maintaining your authentic voice.",
   },
   {
     question: "Can I try PostInAi for free?",
@@ -318,8 +318,8 @@ export default function PricingPage() {
                   <Cpu className="w-6 h-6 text-teal-400" />
                 </div>
                 <div>
-                  <div className="font-semibold text-white">GPT-4 Powered</div>
-                  <div className="text-slate-500 text-sm">Latest AI models</div>
+                  <div className="font-semibold text-white">Claude AI Powered</div>
+                  <div className="text-slate-500 text-sm">Smart model selection</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">

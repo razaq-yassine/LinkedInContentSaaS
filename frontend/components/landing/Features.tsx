@@ -2,11 +2,11 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { 
-  Sparkles, 
-  Calendar, 
-  Mic, 
-  FileText, 
+import {
+  Sparkles,
+  Calendar,
+  Mic,
+  FileText,
   Target,
   TrendingUp,
   Clock,
@@ -42,10 +42,10 @@ const mainFeatures = [
   {
     icon: Cpu,
     title: "10x Faster Creation",
-    description: "What used to take hours now takes minutes. Our GPT-5 & Claude powered engine generates, refines, and optimizes content instantly.",
+    description: "What used to take hours now takes minutes. Our Claude-powered smart engine generates, refines, and optimizes content instantly.",
     gradient: "from-orange-500 to-rose-500",
     glowColor: "orange",
-    badge: "GPT-5 + Claude",
+    badge: "Claude AI",
     stats: "< 30 seconds",
   },
 ];
@@ -201,7 +201,7 @@ export function Features() {
     <section ref={ref} className="py-24 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
       {/* Animated Background */}
       <NeuralNetwork />
-      
+
       {/* Floating Particles */}
       <FloatingParticle delay={0} duration={3} x="10%" y="20%" />
       <FloatingParticle delay={0.5} duration={4} x="85%" y="15%" />
@@ -217,13 +217,13 @@ export function Features() {
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
         {/* Section Header */}
-        <motion.div 
+        <motion.div
           className="text-center max-w-3xl mx-auto mb-20"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <motion.div 
+          <motion.div
             className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6 backdrop-blur-sm"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={isInView ? { opacity: 1, scale: 1 } : {}}
@@ -259,7 +259,7 @@ export function Features() {
             >
               {/* Card Glow Effect */}
               <div className={`absolute -inset-0.5 bg-gradient-to-r ${feature.gradient} rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500`} />
-              
+
               {/* Card */}
               <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-2xl p-8 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 h-full">
                 {/* Top bar with badge and stats */}
@@ -272,7 +272,7 @@ export function Features() {
                     <span>{feature.stats}</span>
                   </div>
                 </div>
-                
+
                 {/* Icon with glow */}
                 <div className="relative mb-6">
                   <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} blur-xl opacity-40 group-hover:opacity-60 transition-opacity`} />
@@ -280,12 +280,12 @@ export function Features() {
                     <feature.icon className="w-8 h-8 text-white" />
                   </div>
                 </div>
-                
+
                 <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
                 <p className="text-slate-400 leading-relaxed">{feature.description}</p>
 
                 {/* Animated border line */}
-                <motion.div 
+                <motion.div
                   className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r ${feature.gradient} rounded-full`}
                   initial={{ width: 0 }}
                   whileHover={{ width: "100%" }}
@@ -297,7 +297,7 @@ export function Features() {
         </div>
 
         {/* Detail Features Grid - Futuristic */}
-        <motion.div 
+        <motion.div
           className="relative"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -305,7 +305,7 @@ export function Features() {
         >
           {/* Section glow */}
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-600/10 via-transparent to-teal-600/10 rounded-3xl blur-xl" />
-          
+
           <div className="relative bg-slate-900/50 backdrop-blur-xl rounded-3xl p-8 lg:p-12 border border-slate-700/30">
             <div className="flex items-center justify-center gap-3 mb-10">
               <div className="h-px w-12 bg-gradient-to-r from-transparent to-cyan-500" />
@@ -314,7 +314,7 @@ export function Features() {
               </h3>
               <div className="h-px w-12 bg-gradient-to-l from-transparent to-cyan-500" />
             </div>
-            
+
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {detailFeatures.map((feature, i) => {
                 const colors = colorMap[feature.color];

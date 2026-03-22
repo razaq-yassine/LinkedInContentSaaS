@@ -58,7 +58,7 @@ export function Hero() {
     <section ref={ref} className="relative pt-32 pb-24 overflow-hidden bg-slate-950">
       {/* Grid Background */}
       <GridBackground />
-      
+
       {/* Animated Gradient Orbs */}
       <FloatingOrb className="absolute top-40 left-10 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" delay={0} />
       <FloatingOrb className="absolute top-60 right-10 w-96 h-96 bg-teal-600/20 rounded-full blur-3xl" delay={2} />
@@ -70,14 +70,14 @@ export function Hero() {
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
-          <motion.div 
+          <motion.div
             className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-8 backdrop-blur-sm"
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5 }}
           >
             <Cpu className="w-4 h-4" />
-            <span>Powered by GPT-5 & Claude AI</span>
+            <span>Powered by Claude AI & Smart Engine</span>
             <span className="flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-cyan-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
@@ -85,7 +85,7 @@ export function Hero() {
           </motion.div>
 
           {/* Main Headline */}
-          <motion.h1 
+          <motion.h1
             className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6"
             initial={{ opacity: 0, y: 30 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -99,18 +99,18 @@ export function Hero() {
           </motion.h1>
 
           {/* Subheadline */}
-          <motion.p 
+          <motion.p
             className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed"
             initial={{ opacity: 0, y: 30 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            Even when you're stuck, our AI generates engaging content tailored to your interests, audience, and domain. 
-            Powered by GPT-5 & Claude to create posts that sound authentically you.
+            Even when you're stuck, our AI generates engaging content tailored to your interests, audience, and domain.
+            Powered by Claude's latest models with a smart engine that adapts to your unique voice and content needs.
           </motion.p>
 
           {/* CTA Buttons */}
-          <motion.div 
+          <motion.div
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12"
             initial={{ opacity: 0, y: 30 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -129,7 +129,7 @@ export function Hero() {
           </motion.div>
 
           {/* Social Proof */}
-          <motion.div 
+          <motion.div
             className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16"
             initial={{ opacity: 0, y: 30 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -145,8 +145,8 @@ export function Hero() {
                     transition={{ duration: 0.3, delay: 0.5 + i * 0.1 }}
                     className="w-10 h-10 rounded-full border-2 border-slate-900 overflow-hidden"
                   >
-                    <img 
-                      src={avatar.image} 
+                    <img
+                      src={avatar.image}
                       alt={avatar.name}
                       className="w-full h-full object-cover"
                     />
@@ -170,7 +170,7 @@ export function Hero() {
           </motion.div>
 
           {/* Stats */}
-          <motion.div 
+          <motion.div
             className="grid grid-cols-3 gap-6 max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 30 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -192,7 +192,7 @@ export function Hero() {
         </div>
 
         {/* Product Preview */}
-        <motion.div 
+        <motion.div
           className="mt-20 max-w-5xl mx-auto"
           initial={{ opacity: 0, y: 50 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -201,7 +201,7 @@ export function Hero() {
           <div className="relative">
             {/* Glow Effect */}
             <div className="absolute -inset-4 bg-gradient-to-r from-cyan-600/30 via-teal-600/20 to-cyan-600/30 rounded-3xl blur-2xl" />
-            
+
             {/* Preview Window */}
             <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden shadow-2xl">
               {/* Browser Bar */}
@@ -217,7 +217,7 @@ export function Hero() {
                   </div>
                 </div>
               </div>
-              
+
               {/* App Preview Content */}
               <div className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 min-h-[400px]">
                 <div className="grid lg:grid-cols-2 gap-6">
@@ -229,7 +229,7 @@ export function Hero() {
                       </div>
                       <div>
                         <span className="font-semibold text-white">AI Content Engine</span>
-                        <span className="ml-2 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">GPT-5 + Claude</span>
+                        <span className="ml-2 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">Claude AI</span>
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -245,7 +245,7 @@ export function Hero() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Post Preview */}
                   <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-4">
                     <div className="flex items-center gap-3 mb-4">

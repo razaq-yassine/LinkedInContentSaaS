@@ -29,7 +29,7 @@ const steps = [
     title: "AI Creates Magic",
     description: "Our AI generates engaging posts that sound like you, complete with hooks, stories, and calls-to-action proven to drive engagement.",
     gradient: "from-fuchsia-500 to-pink-500",
-    aiFeature: "GPT-5 + Claude",
+    aiFeature: "Claude AI",
   },
   {
     number: "04",
@@ -76,20 +76,20 @@ export function HowItWorks() {
         <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-violet-500 to-transparent" />
         <div className="absolute top-0 right-1/4 w-px h-full bg-gradient-to-b from-transparent via-cyan-500 to-transparent" />
       </div>
-      
+
       {/* Gradient Orbs */}
       <div className="absolute top-1/2 left-0 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl -translate-y-1/2" />
       <div className="absolute top-1/2 right-0 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl -translate-y-1/2" />
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
         {/* Section Header */}
-        <motion.div 
+        <motion.div
           className="text-center max-w-3xl mx-auto mb-20"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <motion.div 
+          <motion.div
             className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm font-medium mb-6"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={isInView ? { opacity: 1, scale: 1 } : {}}
@@ -114,7 +114,7 @@ export function HowItWorks() {
           {/* Connection Line */}
           <div className="hidden lg:block relative h-1 mb-12">
             <div className="absolute inset-0 bg-slate-800 rounded-full" />
-            <motion.div 
+            <motion.div
               className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 rounded-full"
               initial={{ width: 0 }}
               animate={isInView ? { width: "100%" } : {}}
@@ -135,7 +135,7 @@ export function HowItWorks() {
               >
                 {/* Card Glow */}
                 <div className={`absolute -inset-0.5 bg-gradient-to-r ${step.gradient} rounded-2xl blur opacity-0 group-hover:opacity-30 transition duration-500`} />
-                
+
                 {/* Card */}
                 <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 h-full">
                   {/* Step Number */}
@@ -155,7 +155,7 @@ export function HowItWorks() {
                       <step.icon className="w-7 h-7 text-white" />
                     </div>
                   </div>
-                  
+
                   <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
                   <p className="text-sm text-slate-400 leading-relaxed">{step.description}</p>
 
@@ -164,7 +164,7 @@ export function HowItWorks() {
                     <div className="flex items-center gap-2">
                       <Zap className="w-3 h-3 text-slate-500" />
                       <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-                        <motion.div 
+                        <motion.div
                           className={`h-full bg-gradient-to-r ${step.gradient}`}
                           initial={{ width: 0 }}
                           animate={isInView ? { width: "100%" } : {}}
@@ -178,7 +178,7 @@ export function HowItWorks() {
                 {/* Mobile Connection Line */}
                 {i < steps.length - 1 && (
                   <div className="lg:hidden flex justify-center py-4">
-                    <motion.div 
+                    <motion.div
                       className="w-0.5 h-8 bg-gradient-to-b from-slate-700 to-transparent"
                       initial={{ scaleY: 0 }}
                       animate={isInView ? { scaleY: 1 } : {}}
@@ -192,7 +192,7 @@ export function HowItWorks() {
         </div>
 
         {/* CTA */}
-        <motion.div 
+        <motion.div
           className="text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
