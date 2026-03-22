@@ -25,6 +25,7 @@ interface GenerationOptionsMenuProps {
   hashtagCount: number;
   setHashtagCount: (value: number) => void;
   triggerRef?: React.RefObject<HTMLButtonElement>;
+  desktopTriggerRef?: React.RefObject<HTMLButtonElement>;
 }
 
 export function GenerationOptionsMenu({
@@ -37,15 +38,29 @@ export function GenerationOptionsMenu({
   hashtagCount,
   setHashtagCount,
   triggerRef,
+  desktopTriggerRef,
 }: GenerationOptionsMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [internetSearch, setInternetSearch] = useState(false);
+
+  // Helper: get the visible trigger element (desktop or mobile)
+  const getVisibleTrigger = () => {
+    if (desktopTriggerRef?.current) {
+      const rect = desktopTriggerRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return desktopTriggerRef.current;
+    }
+    if (triggerRef?.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return triggerRef.current;
+    }
+    return null;
+  };
 
   // Close menu when clicking outside (but not when clicking on select dropdowns)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
+
       // Don't close if clicking on select dropdowns or their content
       if (
         target.closest('[role="listbox"]') ||
@@ -57,12 +72,15 @@ export function GenerationOptionsMenu({
       ) {
         return;
       }
-      
+
+      const clickedTrigger =
+        (triggerRef?.current && triggerRef.current.contains(target)) ||
+        (desktopTriggerRef?.current && desktopTriggerRef.current.contains(target));
+
       if (
         menuRef.current &&
         !menuRef.current.contains(target) &&
-        triggerRef?.current &&
-        !triggerRef.current.contains(target)
+        !clickedTrigger
       ) {
         onOpenChange(false);
       }
@@ -72,23 +90,24 @@ export function GenerationOptionsMenu({
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [open, onOpenChange, triggerRef]);
+  }, [open, onOpenChange, triggerRef, desktopTriggerRef]);
 
-  // Position menu relative to trigger
+  // Position menu relative to the visible trigger (desktop or mobile)
   useEffect(() => {
-    if (open && triggerRef?.current && menuRef.current) {
-      const triggerRect = triggerRef.current.getBoundingClientRect();
+    if (open && menuRef.current) {
+      const trigger = getVisibleTrigger();
+      if (!trigger) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
       const menuRect = menuRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      
+
       // Calculate position - prefer above, aligned to right
       let top = triggerRect.top - menuRect.height - 8;
       let left = triggerRect.right - menuRect.width;
-      
+
       // Adjust if menu would go off screen
       if (top < 8) {
-        // Position below instead
         top = triggerRect.bottom + 8;
       }
       if (left < 8) {
@@ -97,11 +116,11 @@ export function GenerationOptionsMenu({
       if (left + menuRect.width > viewportWidth - 8) {
         left = viewportWidth - menuRect.width - 8;
       }
-      
+
       menuRef.current.style.top = `${top}px`;
       menuRef.current.style.left = `${left}px`;
     }
-  }, [open, triggerRef]);
+  }, [open, triggerRef, desktopTriggerRef]);
 
   if (!open) return null;
 
@@ -140,14 +159,12 @@ export function GenerationOptionsMenu({
             </div>
             <button
               onClick={() => setInternetSearch(!internetSearch)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                internetSearch ? "bg-green-600" : "bg-gray-300"
-              }`}
+              className={`relative w-10 h-5 rounded-full transition-colors ${internetSearch ? "bg-green-600" : "bg-gray-300"
+                }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
-                  internetSearch ? "translate-x-5" : "translate-x-0"
-                }`}
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${internetSearch ? "translate-x-5" : "translate-x-0"
+                  }`}
               />
             </button>
           </div>
@@ -232,7 +249,7 @@ export function GenerationOptionsMenu({
   if (typeof window !== "undefined") {
     return createPortal(menuContent, document.body);
   }
-  
+
   return null;
 }
 

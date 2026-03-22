@@ -324,6 +324,7 @@ export default function GeneratePage() {
   const [showMobileButtons, setShowMobileButtons] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const optionsButtonRef = useRef<HTMLButtonElement>(null!);
+  const optionsButtonDesktopRef = useRef<HTMLButtonElement>(null!);
   const postTypeButtonRef = useRef<HTMLDivElement>(null);
   const justAddedMessagesRef = useRef<boolean>(false);
   const promptAreaRef = useRef<HTMLDivElement>(null);
@@ -2859,7 +2860,7 @@ export default function GeneratePage() {
                       Web Search
                     </Button>
                     <Button
-                      ref={optionsButtonRef}
+                      ref={optionsButtonDesktopRef}
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowOptions(!showOptions)}
@@ -2976,6 +2977,7 @@ export default function GeneratePage() {
             postType={postType}
             setPostType={setPostType}
             triggerRef={optionsButtonRef}
+            desktopTriggerRef={optionsButtonDesktopRef}
           />
 
           {/* Mobile Action Menu FAB - Removed, options now shown inline */}
