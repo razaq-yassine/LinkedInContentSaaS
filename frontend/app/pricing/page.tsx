@@ -188,9 +188,10 @@ export default function PricingPage() {
           <div className="container mx-auto px-4 lg:px-8">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {plans.map((plan, i) => {
-                const IconComponent = planIcons[plan.plan_name] || Zap;
-                const gradient = planGradients[plan.plan_name] || "from-gray-500 to-gray-600";
-                const isPopular = plan.plan_name === "starter";
+                const planNameLower = plan.plan_name.toLowerCase();
+                const IconComponent = planIcons[planNameLower] || Zap;
+                const gradient = planGradients[planNameLower] || "from-gray-500 to-gray-600";
+                const isPopular = planNameLower === "starter";
 
                 return (
                   <div
