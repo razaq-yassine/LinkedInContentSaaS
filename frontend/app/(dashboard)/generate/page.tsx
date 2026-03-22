@@ -323,7 +323,7 @@ export default function GeneratePage() {
   const [showPostTypeMenu, setShowPostTypeMenu] = useState(false);
   const [showMobileButtons, setShowMobileButtons] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const optionsButtonRef = useRef<HTMLButtonElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null!);
   const postTypeButtonRef = useRef<HTMLDivElement>(null);
   const justAddedMessagesRef = useRef<boolean>(false);
   const promptAreaRef = useRef<HTMLDivElement>(null);
@@ -2973,6 +2973,8 @@ export default function GeneratePage() {
             setLength={setLength}
             hashtagCount={hashtagCount}
             setHashtagCount={setHashtagCount}
+            postType={postType}
+            setPostType={setPostType}
             triggerRef={optionsButtonRef}
           />
 
