@@ -22,8 +22,8 @@ export function CookieConsent() {
   });
 
   useEffect(() => {
-    // Check if consent has been given in this session
-    const consentGiven = sessionStorage.getItem("cookie_consent");
+    // Check if consent has been given
+    const consentGiven = localStorage.getItem("cookie_consent");
     if (!consentGiven) {
       // Small delay before showing banner for better UX
       const timer = setTimeout(() => setIsVisible(true), 1000);
@@ -35,9 +35,9 @@ export function CookieConsent() {
     const finalPreferences = acceptAll
       ? { essential: true, functional: true, analytics: true, marketing: true }
       : preferences;
-    
-    sessionStorage.setItem("cookie_consent", JSON.stringify(finalPreferences));
-    sessionStorage.setItem("cookie_consent_timestamp", new Date().toISOString());
+
+    localStorage.setItem("cookie_consent", JSON.stringify(finalPreferences));
+    localStorage.setItem("cookie_consent_timestamp", new Date().toISOString());
     setIsVisible(false);
   };
 
@@ -70,13 +70,13 @@ export function CookieConsent() {
             <div className="hidden sm:flex w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-xl items-center justify-center flex-shrink-0">
               <Cookie className="w-6 h-6 text-cyan-400" />
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-semibold text-white mb-2">
                 We Value Your Privacy
               </h3>
               <p className="text-sm text-slate-400 mb-4">
-                We use cookies to enhance your browsing experience and analyze site traffic. 
+                We use cookies to enhance your browsing experience and analyze site traffic.
                 Under US privacy laws including CCPA, you have the right to opt out of certain data collection.{" "}
                 <Link href="/cookies" className="text-cyan-400 hover:underline">
                   Learn more
@@ -91,7 +91,7 @@ export function CookieConsent() {
                     description="Required for basic site functionality"
                     checked={true}
                     disabled={true}
-                    onChange={() => {}}
+                    onChange={() => { }}
                   />
                   <PreferenceToggle
                     label="Functional Cookies"
@@ -129,14 +129,14 @@ export function CookieConsent() {
                   <Check className="w-4 h-4" />
                   Accept All
                 </button>
-                
+
                 <button
                   onClick={handleDeclineOptional}
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   Reject Optional
                 </button>
-                
+
                 <button
                   onClick={() => setShowPreferences(!showPreferences)}
                   className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2"
@@ -201,14 +201,12 @@ function PreferenceToggle({
           className="sr-only peer"
         />
         <div
-          className={`w-11 h-6 rounded-full transition-colors ${
-            checked ? "bg-cyan-500" : "bg-slate-600"
-          } ${disabled ? "" : "peer-focus:ring-2 peer-focus:ring-cyan-500/50"}`}
+          className={`w-11 h-6 rounded-full transition-colors ${checked ? "bg-cyan-500" : "bg-slate-600"
+            } ${disabled ? "" : "peer-focus:ring-2 peer-focus:ring-cyan-500/50"}`}
         />
         <div
-          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0"
-          }`}
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0"
+            }`}
         />
       </div>
     </label>
