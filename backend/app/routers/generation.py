@@ -472,7 +472,18 @@ Choose a fresh angle, different subject matter, or completely new theme.
             # Topic generation instruction
             topic_instruction = ""
             if is_random_request:
-                topic_instruction = """
+                if post_type == 'carousel':
+                    topic_instruction = """
+- User wants a random/new topic for a CAROUSEL post. Generate a FRESH topic based on industry/expertise, NOT from CV projects/work history.
+- CAROUSEL TOPIC SELECTION RULES:
+  1. ONLY propose topics that naturally break into at least 6–10 distinct slides.
+  2. Prefer: step-by-step guides, "Top X" lists, frameworks, roadmaps, myths vs reality, before/after comparisons, metric/trend breakdowns, checklists, or process walkthroughs.
+  3. Before generating content, internally outline at least 7 distinct slide titles (hook, context, several body points, summary/CTA). If you cannot produce 7 meaningful slide titles, DISCARD that topic and pick another one.
+  4. NEVER choose topics that are single announcements, single facts, one-off opinions, or vague motivational statements — these belong in a short text post, NOT a carousel.
+  5. Each slide must convey a standalone point that adds value on its own while contributing to the overall narrative arc.
+"""
+                else:
+                    topic_instruction = """
 - User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
 """
             
@@ -599,7 +610,18 @@ Generate content matching their tone/expertise/audience. Use small statements wi
             # Topic generation instruction
             topic_instruction = ""
             if is_random_request:
-                topic_instruction = """
+                if post_type == 'carousel':
+                    topic_instruction = """
+- User wants a random/new topic for a CAROUSEL post. Generate a FRESH topic based on industry/expertise, NOT from CV projects/work history.
+- CAROUSEL TOPIC SELECTION RULES:
+  1. ONLY propose topics that naturally break into at least 6–10 distinct slides.
+  2. Prefer: step-by-step guides, "Top X" lists, frameworks, roadmaps, myths vs reality, before/after comparisons, metric/trend breakdowns, checklists, or process walkthroughs.
+  3. Before generating content, internally outline at least 7 distinct slide titles (hook, context, several body points, summary/CTA). If you cannot produce 7 meaningful slide titles, DISCARD that topic and pick another one.
+  4. NEVER choose topics that are single announcements, single facts, one-off opinions, or vague motivational statements — these belong in a short text post, NOT a carousel.
+  5. Each slide must convey a standalone point that adds value on its own while contributing to the overall narrative arc.
+"""
+                else:
+                    topic_instruction = """
 - User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
 """
             

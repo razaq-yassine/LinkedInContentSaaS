@@ -61,6 +61,15 @@ function OnboardingContent() {
   }, [step]);
 
   useEffect(() => {
+    // Check if deep-linking to a specific step (e.g., ?step=3 for CV re-upload)
+    const stepParam = searchParams.get("step");
+    if (stepParam === "3") {
+      // Go directly to CV upload step for profile update
+      setStep(3);
+      setInitializing(false);
+      return;
+    }
+
     // Check onboarding state on mount
     const checkOnboardingState = async () => {
       try {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Briefcase, Users, Target, Lightbulb, RefreshCw, Sparkles } from "lucide-react";
+import { User, Briefcase, Users, Target, Lightbulb, RefreshCw, Sparkles, Upload } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import CollapsibleSection, { Field } from "@/components/onboarding/CollapsibleSection";
@@ -12,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppLoader } from "@/components/AppLoader";
 
 export default function ContextPage() {
+  const router = useRouter();
   const [context, setContext] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshingTrending, setRefreshingTrending] = useState(false);
@@ -322,18 +324,29 @@ export default function ContextPage() {
     <div className="w-full max-w-4xl mx-auto md:px-6 lg:px-8 py-0 md:py-8 pb-20 md:pb-8 overflow-x-hidden bg-[#F5F5F5] md:bg-transparent dark:bg-slate-900 md:dark:bg-transparent min-h-screen">
       {/* Header - Mobile: sticky app-like header. Desktop: standard header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-slate-800 border-b border-[#E8E7E5] dark:border-slate-700 px-4 py-3 md:relative md:bg-transparent md:dark:bg-transparent md:border-0 md:px-0 md:py-0 md:mb-8">
-        <div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:gap-2">
+        <div className="flex items-center justify-between gap-3 md:gap-4">
           <div className="min-w-0 flex-1 md:flex-none">
             <h1 className="text-[17px] md:text-3xl font-semibold md:font-bold text-black dark:text-white">Profile Context</h1>
             <p className="hidden md:block text-base text-slate-600 dark:text-slate-400 mt-2">
               Manage your profile context for generating posts
             </p>
           </div>
-          {saveStatus !== "idle" && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[11px] md:text-sm px-2 py-0.5 md:px-2.5 md:py-1 flex-shrink-0">
-              {saveStatus === "saving" ? "Saving..." : "✓ Saved"}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {saveStatus !== "idle" && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[11px] md:text-sm px-2 py-0.5 md:px-2.5 md:py-1 flex-shrink-0">
+                {saveStatus === "saving" ? "Saving..." : "✓ Saved"}
+              </Badge>
+            )}
+            <Button
+              onClick={() => router.push("/onboarding?step=3")}
+              variant="outline"
+              size="sm"
+              className="border-[#0A66C2] text-[#0A66C2] hover:bg-[#EEF3F8] active:bg-[#D4E5F7] text-xs md:text-sm h-8 md:h-9 px-2.5 md:px-3.5 font-medium touch-manipulation"
+            >
+              <Upload className="h-3.5 w-3.5 md:mr-1.5" />
+              <span className="hidden md:inline">Update CV</span>
+            </Button>
+          </div>
         </div>
       </div>
 
