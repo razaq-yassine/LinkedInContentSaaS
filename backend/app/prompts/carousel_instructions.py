@@ -36,7 +36,13 @@ CAROUSEL_AI_INSTRUCTIONS = {
 
 Format to respect:
 
-1. post_content: LinkedIn post text (users read this), it should contain a short explanation for each point.
+1. post_content: The LinkedIn post that accompanies the carousel (users read this in their feed).
+   - Structure: Hook → Context/Why it matters → Key benefits or takeaways → CTA
+   - The hook should grab attention (bold opinion, surprising fact, or a question)
+   - Group related ideas into short paragraphs (2-3 sentences each), don't make every sentence its own line
+   - Explain WHY, not just WHAT — give the reader insight they can act on
+   - End with a clear takeaway
+   - Do NOT just list the slide titles as sentences — the post should stand alone and be in sync with the carousel (generated images)
 
 2. image_prompts: Array of image prompts for Image generation (REQUIRED)
    - Visual style is professional cartoon
