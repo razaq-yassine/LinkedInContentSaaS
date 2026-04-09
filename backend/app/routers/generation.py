@@ -31,6 +31,7 @@ from ..prompts.format_instructions import (
     get_json_format,
     RESPONSE_FORMAT_REQUIREMENTS
 )
+from ..prompts.carousel_instructions import CAROUSEL_AI_INSTRUCTIONS
 import json
 import re
 import traceback
@@ -473,15 +474,7 @@ Choose a fresh angle, different subject matter, or completely new theme.
             topic_instruction = ""
             if is_random_request:
                 if post_type == 'carousel':
-                    topic_instruction = """
-- User wants a random/new topic for a CAROUSEL post. Generate a FRESH topic based on industry/expertise, NOT from CV projects/work history.
-- CAROUSEL TOPIC SELECTION RULES:
-  1. ONLY propose topics that naturally break into at least 6–10 distinct slides.
-  2. Prefer: step-by-step guides, "Top X" lists, frameworks, roadmaps, myths vs reality, before/after comparisons, metric/trend breakdowns, checklists, or process walkthroughs.
-  3. Before generating content, internally outline at least 7 distinct slide titles (hook, context, several body points, summary/CTA). If you cannot produce 7 meaningful slide titles, DISCARD that topic and pick another one.
-  4. NEVER choose topics that are single announcements, single facts, one-off opinions, or vague motivational statements — these belong in a short text post, NOT a carousel.
-  5. Each slide must convey a standalone point that adds value on its own while contributing to the overall narrative arc.
-"""
+                    topic_instruction = CAROUSEL_AI_INSTRUCTIONS["topic_selection"]
                 else:
                     topic_instruction = """
 - User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
@@ -611,15 +604,7 @@ Generate content matching their tone/expertise/audience. Use small statements wi
             topic_instruction = ""
             if is_random_request:
                 if post_type == 'carousel':
-                    topic_instruction = """
-- User wants a random/new topic for a CAROUSEL post. Generate a FRESH topic based on industry/expertise, NOT from CV projects/work history.
-- CAROUSEL TOPIC SELECTION RULES:
-  1. ONLY propose topics that naturally break into at least 6–10 distinct slides.
-  2. Prefer: step-by-step guides, "Top X" lists, frameworks, roadmaps, myths vs reality, before/after comparisons, metric/trend breakdowns, checklists, or process walkthroughs.
-  3. Before generating content, internally outline at least 7 distinct slide titles (hook, context, several body points, summary/CTA). If you cannot produce 7 meaningful slide titles, DISCARD that topic and pick another one.
-  4. NEVER choose topics that are single announcements, single facts, one-off opinions, or vague motivational statements — these belong in a short text post, NOT a carousel.
-  5. Each slide must convey a standalone point that adds value on its own while contributing to the overall narrative arc.
-"""
+                    topic_instruction = CAROUSEL_AI_INSTRUCTIONS["topic_selection"]
                 else:
                     topic_instruction = """
 - User wants random/new topic. Generate FRESH topic based on industry/expertise, NOT from CV projects/work history.
@@ -670,9 +655,7 @@ DO NOT pull topics from CV projects/experiences unless user explicitly reference
             system_prompt += f"\n## Format Instructions\n{format_instructions}"
         elif post_type == 'carousel':
             enforced_format = 'carousel'
-            format_instructions = get_format_specific_instructions('carousel')
             system_prompt += f"\n\n{get_format_instructions('carousel')}"
-            system_prompt += f"\n## Format Instructions\n{format_instructions}"
         elif post_type == 'video_script':
             enforced_format = 'video_script'
             format_instructions = get_format_specific_instructions('video_script')
@@ -2113,49 +2096,13 @@ async def generate_carousel_image_prompts(post_content: str, context: dict, requ
             expertise_str = str(expertise) if expertise else industry
         
         prompt, token_usage = await generate_completion(
-            system_prompt=f"""You write image generation prompts for AI diffusion models (FLUX, Stable Diffusion) to create LinkedIn carousel slide backgrounds.
-
-CRITICAL RULES:
-1. NEVER include text, words, letters, numbers, labels, or typography in any prompt — diffusion models render text poorly. Text overlays are added programmatically later.
-2. Describe ONLY visual scenes, objects, people, colors, lighting, and composition
-3. Output format: 1200×1200px square, professional, high-resolution
-4. ALL slides MUST share the SAME color palette, visual style, and composition approach
-
-STYLE DECISION (choose ONE for the entire set):
-- Specific tools/platforms → photorealistic: offices, screens, devices, professional settings
-- Abstract concepts/soft skills → modern flat illustration: clean vector characters, bold colors, geometric shapes
-- Data/metrics → infographic-style: charts as abstract visual art, geometric data representations, no readable numbers
-- Stories/experiences → warm photography: natural lighting, candid professional feel
-
-PROMPT STRUCTURE (use for every slide):
-[Shared style keyword], [This slide's unique scene/subject], [Key visual elements], [Shared color palette], [Lighting], [Composition], [Mood]
-
-CONSISTENCY RULES:
-- First 3 words of every prompt should be the SAME style descriptor (e.g., "Modern flat illustration,")
-- Specify the SAME 2-3 colors in every prompt (e.g., "teal and coral palette")
-- Use the SAME background treatment (e.g., "clean white background" or "soft gradient background")
-- If using characters, maintain the SAME character style across all slides
-
-SLIDE PROGRESSION:
-- Slide 1: Title/hook visual — sets the visual theme
-- Middle slides: Each illustrates ONE specific concept from the post
-- Final slide: Summary/takeaway visual — wraps the visual story
-
-Return ONLY a valid JSON array of prompt strings. No explanations, no markdown.""",
-            user_message=f"""Create exactly {slide_count} carousel slide image prompts for this LinkedIn post:
-
-POST: {post_content[:800]}
-
-INDUSTRY: {industry} | EXPERTISE: {expertise_str}
-
-Requirements:
-- {slide_count} prompts, each for a 1200×1200 square image
-- ALL slides visually consistent (same style, colors, composition)
-- NO text/words/numbers in any prompt — text is added later programmatically
-- Each slide illustrates ONE point from the post
-- Slides progress like a visual story
-
-Return ONLY a JSON array of {slide_count} strings:""",
+            system_prompt=CAROUSEL_AI_INSTRUCTIONS["image_prompt_system"],
+            user_message=CAROUSEL_AI_INSTRUCTIONS["image_prompt_user"].format(
+                slide_count=slide_count,
+                post_content=post_content[:800],
+                industry=industry,
+                expertise_str=expertise_str,
+            ),
             temperature=0.7
         )
         

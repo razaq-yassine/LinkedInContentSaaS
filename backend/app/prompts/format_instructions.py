@@ -2,6 +2,8 @@
 Format-specific instructions for different post types
 """
 
+from .carousel_instructions import CAROUSEL_AI_INSTRUCTIONS
+
 # Image Post Instructions
 IMAGE_POST_INSTRUCTIONS = """## TEXT + IMAGE POST
 
@@ -21,27 +23,8 @@ Generate TWO separate fields:
 
 Keep them SEPARATE. image_prompt describes a visual scene only (no text/words in image)."""
 
-# Carousel Post Instructions
-CAROUSEL_POST_INSTRUCTIONS = """## TEXT + CAROUSEL POST
-
-Generate TWO separate fields:
-
-1. post_content: LinkedIn post text (users read this)
-   - Normal post, NOT structured as slides
-   - NO slide descriptions/prompts in content
-
-2. image_prompts: Array of 4-8 image prompts for AI diffusion models (REQUIRED)
-   - NEVER include text, words, letters, or numbers in any prompt — text overlays are added programmatically later
-   - Describe ONLY visual scenes, objects, people, colors, lighting, composition
-   - ALL slides MUST use SAME color palette, SAME visual style, SAME composition approach
-   - Choose ONE style for entire carousel: photorealistic OR flat illustration
-   - Each slide illustrates ONE specific point from the post
-   - Slides progress like a visual story (intro → points → conclusion)
-   - Format: 1200×1200px square per slide
-   - Structure per prompt: [Shared style], [Unique scene], [Visual elements], [Shared palette], [Lighting], [Mood]
-   - Output ONLY JSON array — no explanations
-
-Keep them SEPARATE. image_prompts describe visual scenes only (text is added to slides programmatically)."""
+# Carousel Post Instructions — sourced from carousel_instructions.py
+CAROUSEL_POST_INSTRUCTIONS = CAROUSEL_AI_INSTRUCTIONS["format_rules"]
 
 # Video Script Post Instructions
 VIDEO_SCRIPT_INSTRUCTIONS = """## VIDEO SCRIPT POST
@@ -68,16 +51,7 @@ Generate a comprehensive video script for LinkedIn:
 The script should be engaging, valuable, and optimized for LinkedIn video format."""
 
 # JSON Format Templates (Optimized for token efficiency - minimal fields only)
-CAROUSEL_JSON_FORMAT = """{
-    "title": "Concise title (3-8 words)",
-    "post_content": "LinkedIn post text with hashtags at end",
-    "image_prompts": ["Slide 1: [style], [scene], [palette], [mood]", "Slide 2: same style...", "4-15 slides, visually consistent"],
-    "hashtags": ["#tag1", "#tag2", "#tag3"]
-}
-
-Rules: 
-- All slides use SAME style/colors — NO text/words/numbers in any prompt
-- Include hashtags in post_content AND as separate array"""
+CAROUSEL_JSON_FORMAT = CAROUSEL_AI_INSTRUCTIONS["json_format"]
 
 IMAGE_JSON_FORMAT = """{
     "title": "Concise title (3-8 words)",

@@ -2,24 +2,10 @@
 Prompt templates for different content types
 """
 
-# Template for carousel posts
-CAROUSEL_TEMPLATE = """Generate a LinkedIn carousel post.
+from .carousel_instructions import CAROUSEL_AI_INSTRUCTIONS
 
-IMPORTANT: You need to generate TWO separate things:
-
-1. POST CONTENT: The actual LinkedIn post text that users will read.
-   - This should be a normal LinkedIn post (not structured as slides)
-   - Write it as a standalone post
-   - Do NOT include slide descriptions or prompts in the post text
-
-2. SLIDE IMAGE PROMPTS: An array of image generation prompts for AI diffusion models (one per slide).
-   - NEVER include text, words, letters, or numbers in any prompt — text overlays are added programmatically later
-   - Describe ONLY visual scenes, objects, people, colors, lighting, composition
-   - ALL slides MUST use the SAME color palette, visual style, and composition approach
-   - Typically 4-8 slides, each illustrating ONE point from the post
-   - Format: 1200×1200px square per slide
-
-The post_content and image_prompts are COMPLETELY SEPARATE."""
+# Template for carousel posts — sourced from carousel_instructions.py
+CAROUSEL_TEMPLATE = CAROUSEL_AI_INSTRUCTIONS["format_rules"]
 
 # Template for text + image posts
 TEXT_IMAGE_TEMPLATE = """Generate TWO separate things:
